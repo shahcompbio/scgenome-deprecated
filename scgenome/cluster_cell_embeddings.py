@@ -47,7 +47,7 @@ def cluster_cell_embeddings(embedding, min_samples, min_cluster_size):
     return cluster_labels
 
 
-if __name__ == '__main__':
+def main():
     argv = get_args()
 
     embedding = pd.read_table(argv.embedding, index_col='cell')
@@ -55,3 +55,8 @@ if __name__ == '__main__':
         embedding, argv.min_samples, argv.min_cluster_size
     )
     cluster_labels.to_csv(argv.clusters, sep='\t')
+    return
+
+
+if __name__ == '__main__':
+    main()

@@ -12,7 +12,7 @@ setup(name='scgenome',
             'cluster_cell_embeddings = scgenome.cluster_cell_embeddings:main',
             'filter_copynumber_cells = scgenome.filter_copynumber_cells:main',
             'filter_copynumber_bins = scgenome.filter_copynumber_bins:main',
-            'filter_copynumber_contiguous_duplicate_bins = '
-            'scgenome.filter_copynumber_contiguous_duplicate_bins:main',
+            'filter_copynumber_contiguous_duplicate_bins = scgenome.filter_copynumber_contiguous_duplicate_bins:main',
+            'generate_copynumber_clone_tree_hac = scgenome.generate_copynumber_clone_tree_hac:main'
         ]
       })
