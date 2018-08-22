@@ -1,0 +1,39 @@
+rule targets:
+    input:
+        'plots/cn_embedding.pdf',
+
+rule filt_cell_cn:
+    input:
+        config['copynumber_matrix'],
+        config['classified']
+    output: 'output/filt-cell_cn.tsv'
+    shell: 'filter_copynumber_cells {input} {output}'
+
+rule filt_bin_cn:
+    input:
+        'output/filt-cell_cn.tsv',
+        config['qdnaseq_blacklist']
+    output: 'output/filt-cell_filt-bin_cn.tsv'
+    shell: 'filter_copynumber_bins {input} {output}'
+
+rule filt_dup_cn:
+    input: 'output/filt-cell_filt-bin_cn.tsv',
+    output: 'output/filt-cell_filt-bin_filt-dup_cn.tsv'
+    shell: 'filter_copynumber_contiguous_duplicate_bins {input} {output}'
+
+rule cn_umap:
+    input: 'output/filt-cell_filt-bin_filt-dup_cn.tsv'
+    output: 'output/cn_embedding.tsv'
+    shell: 'reduce_copynumber_dims {input} {output}'
+
+rule umap_hdbscan:
+    input: 'output/cn_embedding.tsv'
+    output: 'output/cell_clusters.tsv'
+    shell: 'cluster_cell_embeddings {input} {output}'
+
+rule umap_plot:
+    input:
+        'output/cn_embedding.tsv',
+        'output/cell_clusters.tsv'
+    output: 'plots/cn_embedding.pdf'
+    shell: 'make_cell_embedding_scatterplot {input} {output}'
