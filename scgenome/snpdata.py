@@ -90,12 +90,13 @@ def plot_cell_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, siz
     ax.set_xlabel('chromosome')
     ax.set_xticks([0] + list(refgenome.info.chromosome_end.values))
     ax.set_xticklabels([])
+    ax.set_yticks([0., 0.1, 0.2, 0.3, 0.4, 0.5])
     ax.xaxis.tick_bottom()
     ax.yaxis.tick_left()
     ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_mid))
     ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.chromosomes))
 
-    seaborn.despine(offset=10, trim=True)
+    seaborn.despine(ax=ax, offset=10, trim=True)
 
 
 def infer_allele_cn(clone_cn_data, hap_data):
