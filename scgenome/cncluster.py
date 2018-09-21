@@ -31,9 +31,11 @@ def umap_hdbscan_cluster(cn):
         min_cluster_size=30,
     ).fit_predict(embedding)
 
-    df = pd.Series(clusters, index=cn.columns, name='cluster_id').reset_index()
-    df['umap1'] = embedding[:, 0]
-    df['umap2'] = embedding[:, 1]
+    df = pd.DataFrame({
+        'cell_id': cn.columns, 'cluster_id': clusters,
+        'umap1': embedding[:, 0], 'umap2': embedding[:, 1]
+    })
+    df = df[['cell_id', 'cluster_id', 'umap1', 'umap2']]
     df = df.dropna()
 
     return df
@@ -79,5 +81,3 @@ def plot_umap_clusters(ax, df):
     ax.set_xlabel('Comp. 1')
     ax.set_ylabel('Comp. 2')
     seaborn.despine(ax=ax, offset=0, trim=True)
-
-
