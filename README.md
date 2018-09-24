@@ -24,7 +24,7 @@ cluster_cells copynumber_matrix_filt-cell_filt-bin_filt-dup.tsv \
     --plot copynumber_cell_clusters.pdf
 ```
 
-![cell cluster scatterplot](https://github.com/funnell/scgenome/files/2412974/cell_clusters.pdf)
+![cell cluster scatterplot](https://user-images.githubusercontent.com/381464/45980923-56f2b300-c021-11e8-9b0e-9dcf4b53f9c7.png)
 
 There is a sample Snakemake file included in the pipelines directory. You can run it like this:
 ```
