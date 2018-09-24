@@ -2,7 +2,9 @@ import umap
 import hdbscan
 import seaborn
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+from adjustText import adjust_text
 
 
 def umap_hdbscan_cluster(cn):
@@ -41,6 +43,26 @@ def umap_hdbscan_cluster(cn):
     return df
 
 
+def get_cluster_palette(n_col):
+    if n_col <= 10:
+        palette = plt.get_cmap("tab10")
+    else:
+        palette = mpl.colors.ListedColormap([
+            '#1d1d1d', '#ebce2b', '#702c8c', '#db6917', '#96cde6', '#ba1c30',
+            '#c0bd7f', '#7f7e80', '#5fa641', '#d485b2', '#4277b6', '#df8461',
+            '#463397', '#e1a11a', '#91218c', '#e8e948', '#7e1510', '#92ae31',
+            '#6f340d', '#d32b1e', '#2b3514'
+        ])
+    return palette
+
+
+def cluster_labels(cluster_ids):
+    counts = cluster_ids.value_counts().astype(str)
+    labels = counts.index.to_series().astype(str) + ' (' + counts + ')'
+    labels.at[-1] = labels[-1].replace('-1', 'Filt.')
+    return dict(zip(counts.index, labels))
+
+
 def plot_umap_clusters(ax, df):
     """ Scatter plot of umap clusters.
 
@@ -52,6 +74,7 @@ def plot_umap_clusters(ax, df):
             umap2
 
     """
+    labels = cluster_labels(df['cluster_id'])
 
     df_noise = df[df['cluster_id'] < 0]
     ax.scatter(
@@ -59,21 +82,33 @@ def plot_umap_clusters(ax, df):
         df_noise['umap2'].values,
         c='0.85',
         s=2,
-        label='Filt.',
+        label=labels[-1],
     )
 
     num_colors = len(df[df['cluster_id'] >= 0]['cluster_id'].unique())
+    pal = get_cluster_palette(num_colors)
+    text_labels = []
     idx = 0.
     for cluster_id, cluster_df in df[df['cluster_id'] >= 0].groupby('cluster_id'):
-        c = plt.get_cmap("tab10")((idx) / (num_colors - 1))
+        c = pal((idx) / (num_colors - 1))
         ax.scatter(
             cluster_df['umap1'].values,
             cluster_df['umap2'].values,
             c=c,
             s=2,
-            label=int(cluster_id),
+            label=labels[int(cluster_id)],
         )
         idx += 1.
+
+    label_pos = df.groupby('cluster_id').mean()
+    text_labels = [
+        ax.text(label_pos.at[c, 'umap1'], label_pos.at[c, 'umap2'], c)
+        for c in labels.keys() if c >= 0
+    ]
+    adjust_text(
+        text_labels, ax=ax, x=df['umap1'], y=df['umap2'],
+        force_points=(0.1, 0.1)
+    )
 
     ax.legend(
         frameon=False, markerscale=5,

@@ -1,6 +1,6 @@
 rule targets:
     input:
-        'plots/cn_embedding.pdf',
+        'plots/cell_clusters.pdf',
 
 rule filt_cell_cn:
     input:
@@ -21,19 +21,9 @@ rule filt_dup_cn:
     output: 'output/filt-cell_filt-bin_filt-dup_cn.tsv'
     shell: 'filter_copynumber_contiguous_duplicate_bins {input} {output}'
 
-rule cn_umap:
+rule cell_clusters:
     input: 'output/filt-cell_filt-bin_filt-dup_cn.tsv'
-    output: 'output/cn_embedding.tsv'
-    shell: 'reduce_copynumber_dims {input} {output}'
-
-rule umap_hdbscan:
-    input: 'output/cn_embedding.tsv'
-    output: 'output/cell_clusters.tsv'
-    shell: 'cluster_cell_embeddings {input} {output}'
-
-rule umap_plot:
-    input:
-        'output/cn_embedding.tsv',
-        'output/cell_clusters.tsv'
-    output: 'plots/cn_embedding.pdf'
-    shell: 'make_cell_embedding_scatterplot {input} {output}'
+    output:
+        'output/cell_clusters.tsv',
+        'plots/cell_clusters.pdf'
+    shell: 'cluster_cells {input} {output[0]} --plot {output[1]}'

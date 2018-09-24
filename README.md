@@ -17,23 +17,14 @@ filter_copynumber_contiguous_duplicate_bins copynumber_matrix_filt-cell_filt-bin
     copynumber_matrix_filt-cell_filt-bin_filt-dup.tsv
 ```
 
-Generate cell embeddings:
+Cluster cells:
 ```
-reduce_copynumber_dims copynumber_matrix_filt-cell_filt-bin_filt-dup.tsv copynumber_cell_embeddings.tsv
-```
-
-Cluster cell embeddings:
-```
-cluster_cell_embeddings copynumber_cell_embeddings.tsv copynumber_cell_clusters.tsv
+cluster_cells copynumber_matrix_filt-cell_filt-bin_filt-dup.tsv \
+    copynumber_cell_clusters.tsv \
+    --plot copynumber_cell_clusters.pdf
 ```
 
-Plot cell embeddings:
-```
-make_cell_embedding_scatterplot copynumber_cell_embeddings.tsv copynumber_cell_clusters.tsv \
-    copynumber_embedding.pdf
-```
-
-![cell embedding scatterplot](https://user-images.githubusercontent.com/381464/44435403-afd3b500-a564-11e8-9365-98c5b66ac202.png)
+![cell cluster scatterplot](https://github.com/funnell/scgenome/files/2412974/cell_clusters.pdf)
 
 There is a sample Snakemake file included in the pipelines directory. You can run it like this:
 ```

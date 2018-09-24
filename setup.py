@@ -6,9 +6,12 @@ setup(name='scgenome',
       author='Shah Lab',
       url='https://www.shahlab.ca/',
       packages=find_packages(),
+      install_requires=[
+          'click', 'numpy', 'matplotlib', 'pandas', 'adjusttext'
+      ],
       entry_points={
         'console_scripts': [
-            'cluster_copynumber = scgenome.scripts.cluster_cn:main',
+            'cluster_cells = scgenome.scripts.cluster_cells:main',
             'filter_copynumber_cells = scgenome.filter_copynumber_cells:main',
             'filter_copynumber_bins = scgenome.filter_copynumber_bins:main',
             'filter_copynumber_contiguous_duplicate_bins = scgenome.filter_copynumber_contiguous_duplicate_bins:main',

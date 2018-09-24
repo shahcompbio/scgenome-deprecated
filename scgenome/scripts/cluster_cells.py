@@ -27,7 +27,7 @@ def main(cn_path, cl_path, plot):
     cl.to_csv(cl_path, sep='\t', index=False)
 
     if plot:
-        ax = plt.axes()
+        fig, ax = plt.subplots(tight_layout=True)
         cncluster.plot_umap_clusters(ax, cl)
         plt.savefig(plot)
 
