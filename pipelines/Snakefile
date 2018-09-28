@@ -2,27 +2,21 @@ rule targets:
     input:
         'plots/cell_clusters.pdf',
 
-rule filt_cell_cn:
+rule filt_cn:
     input:
         config['copynumber_matrix'],
-        config['classified']
-    output: 'output/filt-cell_cn.tsv'
-    shell: 'filter_copynumber_cells {input} {output}'
-
-rule filt_bin_cn:
-    input:
-        'output/filt-cell_cn.tsv',
+        config['classified'],
         config['qdnaseq_blacklist']
-    output: 'output/filt-cell_filt-bin_cn.tsv'
-    shell: 'filter_copynumber_bins {input} {output}'
-
-rule filt_dup_cn:
-    input: 'output/filt-cell_filt-bin_cn.tsv',
-    output: 'output/filt-cell_filt-bin_filt-dup_cn.tsv'
-    shell: 'filter_copynumber_contiguous_duplicate_bins {input} {output}'
+    output: 'output/filt_cn.tsv'
+    shell:
+        '''
+        filter_copynumber {input[0]} {output} \
+            --cell-scores {input[1]} --qdnaseq-blacklist {input[2]} \
+            --filter-contig-dup-bins
+        '''
 
 rule cell_clusters:
-    input: 'output/filt-cell_filt-bin_filt-dup_cn.tsv'
+    input: 'output/filt_cn.tsv'
     output:
         'output/cell_clusters.tsv',
         'plots/cell_clusters.pdf'

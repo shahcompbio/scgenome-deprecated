@@ -12,9 +12,7 @@ setup(name='scgenome',
       entry_points={
         'console_scripts': [
             'cluster_cells = scgenome.scripts.cluster_cells:main',
-            'filter_copynumber_cells = scgenome.filter_copynumber_cells:main',
-            'filter_copynumber_bins = scgenome.filter_copynumber_bins:main',
-            'filter_copynumber_contiguous_duplicate_bins = scgenome.filter_copynumber_contiguous_duplicate_bins:main',
+            'filter_copynumber = scgenome.scripts.filter_copynumber:main',
             'generate_copynumber_clone_tree_hac = scgenome.generate_copynumber_clone_tree_hac:main'
         ]
       })

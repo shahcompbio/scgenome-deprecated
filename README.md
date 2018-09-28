@@ -1,25 +1,23 @@
 A repository of code for analyzing single cell genomes
 
-Filter cells using the cell copynumber classifier output:
+Filter cells and bins:
 ```
-filter_copynumber_cells copynumber_matrix.tsv all_metrics_summary_classified.csv copynumber_matrix_filt-cell.tsv
-```
-
-Filter copynumber genome bins using the QDNAseq blacklist:
-```
-filter_copynumber_bins copynumber_matrix_filt-cell.tsv QDNAseq_1.14.0_500kb_blacklist.tsv \
-    copynumber_matrix_filt-cell_filt-bin.tsv
+filter_copynumber copynumber_matrix.tsv copynumber_matrix_filt.tsv \
+    --cell-scores all_metrics_summary_classified.csv \
+    --qdnaseq-blacklist QDNAseq_1.14.0_500kb_blacklist.tsv
 ```
 
-Filter contiguously duplicate copynumber genome bins:
+Same, but also remove consecutive bins with the same copy number across cells:
 ```
-filter_copynumber_contiguous_duplicate_bins copynumber_matrix_filt-cell_filt-bin.tsv \
-    copynumber_matrix_filt-cell_filt-bin_filt-dup.tsv
+filter_copynumber copynumber_matrix.tsv copynumber_matrix_filt.tsv \
+    --cell-scores all_metrics_summary_classified.csv \
+    --qdnaseq-blacklist QDNAseq_1.14.0_500kb_blacklist.tsv \
+    --filter-contig-dup-bins
 ```
 
 Cluster cells:
 ```
-cluster_cells copynumber_matrix_filt-cell_filt-bin_filt-dup.tsv \
+cluster_cells copynumber_matrix_filt.tsv \
     copynumber_cell_clusters.tsv \
     --plot copynumber_cell_clusters.pdf
 ```
