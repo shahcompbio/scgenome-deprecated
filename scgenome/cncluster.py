@@ -59,7 +59,8 @@ def get_cluster_palette(n_col):
 def cluster_labels(cluster_ids):
     counts = cluster_ids.value_counts().astype(str)
     labels = counts.index.to_series().astype(str) + ' (' + counts + ')'
-    labels.at[-1] = labels[-1].replace('-1', 'Filt.')
+    if -1 in labels:
+        labels.at[-1] = labels[-1].replace('-1', 'Filt.')
     return dict(zip(counts.index, labels))
 
 
@@ -76,14 +77,15 @@ def plot_umap_clusters(ax, df):
     """
     labels = cluster_labels(df['cluster_id'])
 
-    df_noise = df[df['cluster_id'] < 0]
-    ax.scatter(
-        df_noise['umap1'].values,
-        df_noise['umap2'].values,
-        c='0.85',
-        s=2,
-        label=labels[-1],
-    )
+    if -1 in labels:
+        df_noise = df[df['cluster_id'] < 0]
+        ax.scatter(
+            df_noise['umap1'].values,
+            df_noise['umap2'].values,
+            c='0.85',
+            s=2,
+            label=labels[-1],
+        )
 
     num_colors = len(df[df['cluster_id'] >= 0]['cluster_id'].unique())
     pal = get_cluster_palette(num_colors)
