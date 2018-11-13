@@ -3,12 +3,8 @@ import wget
 import pandas as pd
 
 
-def get_snv_results(sas, url, dest):
+def get_snv_results(dest):
     print 'starting load'
-
-    if not os.path.exists(dest):
-        filename = wget.download(url + sas)
-        os.rename(filename, dest)
 
     mappability = pd.DataFrame()
     for chunk in pd.read_hdf(dest, '/snv/mappability', chunksize=int(1e5)):
