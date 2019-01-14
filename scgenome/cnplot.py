@@ -38,10 +38,12 @@ def plot_cbar(ax):
     ax.set_yticklabels(np.arange(len(color_reference))[::-1])
 
 
-def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name):
+def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, raw=False, max_cn=13):
     plot_data = cn_data.merge(utils.chrom_idxs)
     plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', 'cluster_id'])[cn_field_name].unstack(level=[2, 3]).fillna(0)
     plot_data = plot_data.sort_index(axis=1, level=1)
+    if max_cn is not None:
+        plot_data[plot_data > max_cn] = max_cn
 
     mat_chrom_idxs = plot_data.index.get_level_values(0).values
     chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [plot_data.shape[0] - 1])
@@ -53,7 +55,11 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name):
     cluster_sizes = cluster_boundaries[1:] - cluster_boundaries[:-1]
     cluster_mids = cluster_boundaries[:-1] + cluster_sizes / 2
 
-    im = ax.imshow(plot_data.T, aspect='auto', cmap=get_cn_cmap(plot_data.values))
+    cmap = None
+    if not raw:
+        cmap = get_cn_cmap(plot_data.values)
+
+    im = ax.imshow(plot_data.T, aspect='auto', cmap=cmap)
 
     ax.set(xticks=chrom_mids)
     ax.set(xticklabels=utils.chrom_names)
@@ -80,14 +86,14 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13
     ax.set_xlabel('chromosome')
     ax.set_xticks([0] + list(refgenome.info.chromosome_end.values))
     ax.set_xticklabels([])
+    ax.set_ylim((-0.5, max_cn))
     ax.set_yticks(np.arange(0, max_cn, 2))
     ax.xaxis.tick_bottom()
     ax.yaxis.tick_left()
     ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_mid))
     ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.chromosomes))
 
-    seaborn.despine(ax=ax, offset=10, trim=False)
-#    seaborn.despine(ax=ax, offset=10, trim=True)
+    seaborn.despine(ax=ax, offset=10, trim=True)
 
 
 def plot_cluster_cn_matrix(ax, cn_data, cn_field_name):
