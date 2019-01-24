@@ -28,9 +28,6 @@ def import_cn_data(
 ):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
-    results_storage = tantalus_api.get("storage", name=results_storage_name)
-    local_storage = tantalus_api.get("storage", name=local_storage_name)
-
     local_results_client = tantalus_api.get_storage_client(local_storage_name)
 
     if local_storage_directory is not None:
@@ -67,8 +64,8 @@ def import_cn_data(
             datamanagement.transfer_files.transfer_results_dataset(
                 tantalus_api,
                 results['id'],
-                results_storage,
-                local_storage,
+                results_storage_name,
+                local_storage_name,
             )
     
             for file_resource_id in results['file_resources']:
@@ -77,14 +74,13 @@ def import_cn_data(
                 if file_resource['filename'].endswith(h5_suffix):
                     for table_name, table_key, columns in table_info:
                         filepath = local_results_client.get_url(file_resource['filename'])
-                        results_tables[table_name].append(pd.read_hdf(filepath, table_key, columns=columns))
+                        data = pd.read_hdf(filepath, table_key, columns=columns)
+                        results_tables[table_name].append(data)
 
     for table_name, results_data in results_tables.iteritems():
         results_data = pd.concat(results_data, ignore_index=True)
-        if 'sample_id' not in results_data:
-            results_data['sample_id'] = results_data['cell_id'].apply(lambda a: a.split('-')[0])
-        if 'library_id' not in results_data:
-            results_data['library_id'] = results_data['cell_id'].apply(lambda a: a.split('-')[1])
+        results_data['sample_id'] = results_data['cell_id'].apply(lambda a: a.split('-')[0])
+        results_data['library_id'] = results_data['cell_id'].apply(lambda a: a.split('-')[1])
         results_data = results_data[results_data['sample_id'].isin(sample_ids)]
         results_tables[table_name] = results_data
 
