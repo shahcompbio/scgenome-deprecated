@@ -21,28 +21,13 @@ default_hmmcopy_reads_cols = (
 def import_cn_data(
         tickets,
         sample_ids,
-        local_storage_name,
+        local_cache_directory,
         cols=default_hmmcopy_reads_cols,
-        local_storage_directory=None,
         results_storage_name='singlecellblob_results',
 ):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
-    local_results_client = tantalus_api.get_storage_client(local_storage_name)
-
-    if local_storage_directory is not None:
-        tantalus_api.get_or_create(
-            "storage_server",
-            storage_type="server",
-            name=local_storage_name,
-            storage_directory=local_storage_directory,
-        )
-
-    else:
-        tantalus_api.get(
-            "storage_server",
-            name=local_storage_name,
-        )
+    local_results_client = tantalus_api.get_cache_client(local_cache_directory)
 
     results_tables = collections.defaultdict(list)
 
@@ -61,11 +46,12 @@ def import_cn_data(
         for ticket in tickets:
             results = tantalus_api.get('results', name=analysis_template.format(ticket))
     
-            datamanagement.transfer_files.transfer_results_dataset(
+            datamanagement.transfer_files.cache_dataset(
                 tantalus_api,
                 results['id'],
+                'resultsdataset',
                 results_storage_name,
-                local_storage_name,
+                local_cache_directory,
             )
     
             for file_resource_id in results['file_resources']:
