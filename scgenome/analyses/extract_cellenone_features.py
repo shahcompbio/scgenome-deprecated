@@ -22,8 +22,8 @@ results_version = 'v0.0.1'
 
 
 txt_cols = [
-    'XPos',
     'YPos',
+    'XPos',
     'Circ', 
     'Elong',
     'Diameter',
@@ -42,23 +42,25 @@ def calculate_brief_cell_id(data, swap):
                 row['library_id'], int(row['YPos']), int(row['XPos'])), axis=1)
 
 
-def calculate_swap(data, cell_ids, library_id, filename):
+def calculate_swap(data, cell_ids, library_id):
     swap_scores = []
     for swap in (True, False):
         calculate_brief_cell_id(data, swap)
         score = data['brief_cell_id'].isin(cell_ids).mean()
         swap_scores.append((score, swap))
 
-        logging.info('library: {}, filename: {}, swap: {}, score: {}'.format(
+        logging.info('library: {}, swap: {}, score: {}'.format(
             library_id, filename, swap, score))
 
     selected_swap = sorted(swap_scores)[-1][1]
 
-    logging.info('library: {}, filename {}, selected swap: {}'.format(
+    logging.info('library: {}, selected swap: {}'.format(
         library_id, filename, selected_swap))
     
     calculate_brief_cell_id(data, selected_swap)
     data['selected_swap'] = selected_swap
+
+    return data
 
 
 def process_cellenone_table(tantalus_api, cellenone_dataset, storage_name):
@@ -68,10 +70,10 @@ def process_cellenone_table(tantalus_api, cellenone_dataset, storage_name):
     library_id = cellenone_dataset['libraries'][0]['library_id']
 
     txt_file_instances = tantalus_api.get_dataset_file_instances(
-        cellenone_dataset['id'], 'resultsdataset', storage_name,
+        cellenone_dataset['id'], 'resultsdataset', inputs_storage_name,
         filters={'filename__endswith': '.txt'})
     xls_file_instances = tantalus_api.get_dataset_file_instances(
-        cellenone_dataset['id'], 'resultsdataset', storage_name,
+        cellenone_dataset['id'], 'resultsdataset', inputs_storage_name,
         filters={'filename__endswith': '.xls'})
 
     filenames = set()
@@ -94,15 +96,15 @@ def process_cellenone_table(tantalus_api, cellenone_dataset, storage_name):
         if filename.endswith('isolated.xls'):
             data = pd.read_csv(url, sep='\t')
             data['filename_suffix'] = 'isolated.xls'
-            data['spotter'] = 'deckard'
+            data['spotter'] = 'rachael'
         elif filename.endswith('singleprinted.xls'):
             data = pd.read_csv(url, sep='\t')
             data['filename_suffix'] = 'isolated.xls'
-            data['spotter'] = 'deckard'
+            data['spotter'] = 'rachael'
         elif filename.endswith('.txt') and not filename.endswith('Mapping.txt'):
             data = pd.read_csv(url, sep='\t', names=txt_cols)
             data['filename_suffix'] = 'txt'
-            data['spotter'] = 'rachael'
+            data['spotter'] = 'deckard'
         else:
             continue
 
@@ -110,24 +112,35 @@ def process_cellenone_table(tantalus_api, cellenone_dataset, storage_name):
         # these have misaligned data in the TSV
         data = data[data['XPos'].notnull()]
         data = data[data['YPos'].notnull()]
-        data = data[data['Diameter'].notnull()]
+        data = data[data['Circ'].notnull()]
 
         if data.empty:
             continue
 
         data['library_id'] = library_id
 
-        calculate_swap(data, cell_ids, library_id, filename)
-
         cellenone_data.append(data)
 
     cellenone_data = pd.concat(cellenone_data, ignore_index=True)
+
+    corrected_data = []
+    for spotter, data in cellenone_data.groupby('spotter'):
+        if spotter == 'rachael':
+            data = calculate_swap(data.copy(), cell_ids, library_id)
+        else:
+            data = data.copy()
+            data['selected_swap'] = False
+            calculate_brief_cell_id(data, False)
+
+        corrected_data.append(data)
+
+    cellenone_data = pd.concat(corrected_data, ignore_index=True)
 
     return cellenone_data
 
 
 def get_unprocessed_cellenone(tantalus_api):
-    datasets = {}
+    datasets = []
 
     for results in tantalus_api.list('results', results_type='CELLENONE'):
         assert len(results['libraries']) <= 1
@@ -140,7 +153,7 @@ def get_unprocessed_cellenone(tantalus_api):
         try:
             features = tantalus_api.get(
                 'results',
-                results_type=results_type,
+                results_type='CELLENONE_FEATURES',
                 results_version=results_version,
                 libraries__library_id=library_id,
             )
@@ -155,11 +168,11 @@ def get_unprocessed_cellenone(tantalus_api):
         assert library_id not in datasets
         datasets[library_id] = results
 
-    return datasets.values()
+    return datasets
 
 
 def run_analysis(
-        tantalus_api, cellenone_dataset, jira_ticket,
+        tantalus_api, cellenone_dataset,
         inputs_storage_name, results_storage_name):
 
     results_storage = tantalus_api.get(
@@ -168,7 +181,6 @@ def run_analysis(
     )
 
     assert len(cellenone_dataset['libraries']) == 1
-    library_id = cellenone_dataset['libraries'][0]['library_id']
     library_pk = cellenone_dataset['libraries'][0]['id']
 
     results_filename = os.path.join(
@@ -190,8 +202,7 @@ def run_analysis(
 
     make_dirs(os.path.dirname(results_filepath))
 
-    cellenone_data = process_cellenone_table(
-        tantalus_api, cellenone_dataset, inputs_storage_name)
+    cellenone_data = process_cellenone_table(cellenone_dataset)
     cellenone_data.to_csv(results_filepath)
 
     analysis_name = '{}_{}_{}'.format(
@@ -228,10 +239,9 @@ def run_analysis(
 
 
 @click.command()
-@click.argument('jira_ticket', nargs=1)
 @click.argument('inputs_storage_name', nargs=1)
 @click.argument('results_storage_name', nargs=1)
-def run_all_analyses(jira_ticket, inputs_storage_name, results_storage_name):
+def run_all_analyses(inputs_storage_name, results_storage_name):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     datasets = get_unprocessed_cellenone(tantalus_api)
@@ -239,7 +249,8 @@ def run_all_analyses(jira_ticket, inputs_storage_name, results_storage_name):
         logging.warning('processing dataset {}'.format(dataset['name']))
 
         run_analysis(
-            tantalus_api, dataset, jira_ticket, inputs_storage_name, results_storage_name)
+            tantalus_api, dataset, inputs_storage_name, results_storage_name)
+        break
 
 
 if __name__ == "__main__":
