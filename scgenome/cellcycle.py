@@ -12,6 +12,7 @@ def predict(cn_data):
     corr_data = []
     
     for library_id, library_cn_data in cn_data.groupby('library_id'):
+        library_cn_data = library_cn_data.copy()
         library_cn_data = library_cn_data[library_cn_data['gc'] < 1.]
         library_cn_data = library_cn_data[library_cn_data['gc'] > 0.]
         library_cn_data = library_cn_data[library_cn_data['state'] < 9]

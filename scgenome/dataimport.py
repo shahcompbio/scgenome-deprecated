@@ -20,8 +20,8 @@ default_hmmcopy_reads_cols = (
 
 def import_cn_data(
         tickets,
-        sample_ids,
         local_cache_directory,
+        sample_ids=None,
         cols=default_hmmcopy_reads_cols,
         results_storage_name='singlecellblob_results',
 ):
@@ -67,7 +67,8 @@ def import_cn_data(
         results_data = pd.concat(results_data, ignore_index=True)
         results_data['sample_id'] = results_data['cell_id'].apply(lambda a: a.split('-')[0])
         results_data['library_id'] = results_data['cell_id'].apply(lambda a: a.split('-')[1])
-        results_data = results_data[results_data['sample_id'].isin(sample_ids)]
+        if sample_ids is not None:
+            results_data = results_data[results_data['sample_id'].isin(sample_ids)]
         results_tables[table_name] = results_data
 
     return results_tables
