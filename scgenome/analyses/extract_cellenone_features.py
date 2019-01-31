@@ -140,7 +140,7 @@ def get_unprocessed_cellenone(tantalus_api):
         try:
             features = tantalus_api.get(
                 'results',
-                results_type='CELLENONE_FEATURES',
+                results_type=results_type,
                 results_version=results_version,
                 libraries__library_id=library_id,
             )
