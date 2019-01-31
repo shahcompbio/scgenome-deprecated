@@ -38,9 +38,9 @@ def plot_cbar(ax):
     ax.set_yticklabels(np.arange(len(color_reference))[::-1])
 
 
-def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, raw=False, max_cn=13):
+def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', raw=False, max_cn=13):
     plot_data = cn_data.merge(utils.chrom_idxs)
-    plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', 'cluster_id'])[cn_field_name].unstack(level=[2, 3]).fillna(0)
+    plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=[2, 3]).fillna(0)
     plot_data = plot_data.sort_index(axis=1, level=1)
     if max_cn is not None:
         plot_data[plot_data > max_cn] = max_cn
@@ -63,6 +63,22 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, raw=False, max_cn=
 
     ax.set(xticks=chrom_mids)
     ax.set(xticklabels=utils.chrom_names)
+
+    for val in chrom_boundaries[:-1]:
+        ax.axvline(x=val, linewidth=1, color='black', zorder=100)
+
+    return plot_data
+
+
+def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_field_name='cluster_id', raw=False, max_cn=13):
+    ax = fig.add_axes([0.2,0.0,0.9,1.])
+    plot_data = plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name, raw=raw, max_cn=max_cn)
+
+    ax = fig.add_axes([0.0,0.0,0.05,1.])
+    ax.matshow(plot_data.columns.get_level_values(1)[::-1, np.newaxis], aspect='auto', origin='lower', cmap=plt.get_cmap("Set2"))
+    ax.grid(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
 
 
 def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13):
