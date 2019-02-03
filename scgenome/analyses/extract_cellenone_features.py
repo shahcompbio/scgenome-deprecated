@@ -7,6 +7,7 @@ import pandas as pd
 
 import dbclients.tantalus
 import dbclients.colossus
+import datamanagement.transfer_files
 from datamanagement.utils.utils import make_dirs
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
@@ -50,12 +51,12 @@ def calculate_swap(data, cell_ids, library_id):
         swap_scores.append((score, swap))
 
         logging.info('library: {}, swap: {}, score: {}'.format(
-            library_id, filename, swap, score))
+            library_id, swap, score))
 
     selected_swap = sorted(swap_scores)[-1][1]
 
     logging.info('library: {}, selected swap: {}'.format(
-        library_id, filename, selected_swap))
+        library_id, selected_swap))
     
     calculate_brief_cell_id(data, selected_swap)
     data['selected_swap'] = selected_swap
@@ -63,8 +64,8 @@ def calculate_swap(data, cell_ids, library_id):
     return data
 
 
-def process_cellenone_table(tantalus_api, cellenone_dataset, storage_name):
-    storage_client = tantalus_api.get_storage_client(storage_name)
+def process_cellenone_table(tantalus_api, cellenone_dataset, inputs_storage_name):
+    storage_client = tantalus_api.get_storage_client(inputs_storage_name)
 
     assert len(cellenone_dataset['libraries']) == 1
     library_id = cellenone_dataset['libraries'][0]['library_id']
@@ -140,7 +141,7 @@ def process_cellenone_table(tantalus_api, cellenone_dataset, storage_name):
 
 
 def get_unprocessed_cellenone(tantalus_api):
-    datasets = []
+    datasets = {}
 
     for results in tantalus_api.list('results', results_type='CELLENONE'):
         assert len(results['libraries']) <= 1
@@ -168,12 +169,13 @@ def get_unprocessed_cellenone(tantalus_api):
         assert library_id not in datasets
         datasets[library_id] = results
 
-    return datasets
+    return datasets.values()
 
 
 def run_analysis(
-        tantalus_api, cellenone_dataset,
-        inputs_storage_name, results_storage_name):
+        tantalus_api, jira_ticket, cellenone_dataset,
+        inputs_storage_name, results_storage_name,
+        archive_storage_name=None):
 
     results_storage = tantalus_api.get(
         'storage',
@@ -182,6 +184,7 @@ def run_analysis(
 
     assert len(cellenone_dataset['libraries']) == 1
     library_pk = cellenone_dataset['libraries'][0]['id']
+    library_id = cellenone_dataset['libraries'][0]['library_id']
 
     results_filename = os.path.join(
         'single_cell_indexing',
@@ -202,7 +205,7 @@ def run_analysis(
 
     make_dirs(os.path.dirname(results_filepath))
 
-    cellenone_data = process_cellenone_table(cellenone_dataset)
+    cellenone_data = process_cellenone_table(tantalus_api, cellenone_dataset, inputs_storage_name)
     cellenone_data.to_csv(results_filepath)
 
     analysis_name = '{}_{}_{}'.format(
@@ -237,20 +240,34 @@ def run_analysis(
         file_resources=[results_file_pk],
     )
 
+    if archive_storage_name is not None:
+        datamanagement.transfer_files.transfer_dataset(
+            tantalus_api,
+            results['id'],
+            'resultsdataset',
+            results_storage_name,
+            archive_storage_name,
+        )
+
 
 @click.command()
+@click.argument('jira_ticket', nargs=1)
 @click.argument('inputs_storage_name', nargs=1)
 @click.argument('results_storage_name', nargs=1)
-def run_all_analyses(inputs_storage_name, results_storage_name):
+@click.option('--archive_storage_name', required=False)
+def run_all_analyses(jira_ticket, inputs_storage_name, results_storage_name, archive_storage_name=None):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     datasets = get_unprocessed_cellenone(tantalus_api)
     for dataset in datasets:
-        logging.warning('processing dataset {}'.format(dataset['name']))
+        logging.info('processing dataset {}'.format(dataset['name']))
 
-        run_analysis(
-            tantalus_api, dataset, inputs_storage_name, results_storage_name)
-        break
+        try:
+            run_analysis(
+                tantalus_api, jira_ticket, dataset, inputs_storage_name, results_storage_name,
+                archive_storage_name=archive_storage_name)
+        except Exception as e:
+            logging.warning('processing of dataset {} failed with exception {}'.format(dataset['name'], e))
 
 
 if __name__ == "__main__":
