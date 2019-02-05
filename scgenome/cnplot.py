@@ -80,6 +80,8 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
     ax.set_xticks([])
     ax.set_yticks([])
 
+    return plot_data
+
 
 def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13):
     plot_data = cn_data.copy()
