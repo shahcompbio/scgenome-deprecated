@@ -22,6 +22,7 @@ def import_cn_data(
         tickets,
         local_cache_directory,
         sample_ids=None,
+        ploidy_solution='0',
         cols=default_hmmcopy_reads_cols,
         results_storage_name='singlecellblob_results',
 ):
@@ -33,8 +34,8 @@ def import_cn_data(
 
     results_info = [
         ('{}_hmmcopy', '_hmmcopy.h5', [
-            ('hmmcopy_reads', '/hmmcopy/reads/0', default_hmmcopy_reads_cols),
-            ('hmmcopy_metrics', '/hmmcopy/metrics/0', None),
+            ('hmmcopy_reads', '/hmmcopy/reads/'+ploidy_solution, default_hmmcopy_reads_cols),
+            ('hmmcopy_metrics', '/hmmcopy/metrics/'+ploidy_solution, None),
         ]),
         ('{}_align', '_alignment_metrics.h5', [
             ('align_metrics', '/alignment/metrics', None),
@@ -52,6 +53,7 @@ def import_cn_data(
                 'resultsdataset',
                 results_storage_name,
                 local_cache_directory,
+                suffix_filter='.h5',
             )
     
             for file_resource_id in results['file_resources']:
