@@ -158,6 +158,9 @@ def run_all_analyses(jira_ticket, cache_directory, results_storage_name, archive
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     datasets = get_unprocessed_hmmcopy(tantalus_api)
+
+    logging.info('processing {} datasets'.format(len(datasets)))
+
     for hmmcopy_jira_ticket, dataset in datasets.items():
         logging.info('processing dataset {}'.format(dataset['name']))
 
@@ -167,7 +170,7 @@ def run_all_analyses(jira_ticket, cache_directory, results_storage_name, archive
                 cache_directory, results_storage_name,
                 archive_storage_name=archive_storage_name)
         except Exception as e:
-            logging.warning('processing of dataset {} failed with exception {}'.format(dataset['name'], e))
+            logging.exception('processing of dataset {} failed with exception {}'.format(dataset['name'], e))
 
         ticket_directory = os.path.join(cache_directory, hmmcopy_jira_ticket)
         logging.info('cleaning ticket directory {}'.format(ticket_directory))
