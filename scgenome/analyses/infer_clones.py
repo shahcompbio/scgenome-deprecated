@@ -1,3 +1,4 @@
+import sys
 import os
 import logging
 import click
@@ -19,6 +20,11 @@ import dbclients.tantalus
 from dbclients.basicclient import NotFoundError
 import datamanagement.transfer_files
 
+
+LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+
+
+results_storage_name = 'singlecellblob_results'
 
 
 def get_hmmcopy_analyses(tantalus_api, library_ids):
@@ -59,7 +65,9 @@ def get_hmmcopy_analyses(tantalus_api, library_ids):
     return hmmcopy_results, hmmcopy_tickets
 
 
-def get_cell_cycle_data(tantalus_api, library_ids):
+def get_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results):
+    storage_client = tantalus_api.get_storage_client(results_storage_name)
+
     cell_cycle_data = []
 
     for library_id in library_ids:
@@ -78,7 +86,7 @@ def get_cell_cycle_data(tantalus_api, library_ids):
         file_instances = tantalus_api.get_dataset_file_instances(
             features['id'], 'resultsdataset', results_storage_name)
         for file_instance in file_instances:
-            f = client.open_file(file_instance['file_resource']['filename'])
+            f = storage_client.open_file(file_instance['file_resource']['filename'])
             data = pd.read_csv(f)
             data['library_id'] = library_id
             cell_cycle_data.append(data)
@@ -88,6 +96,8 @@ def get_cell_cycle_data(tantalus_api, library_ids):
 
 
 def get_image_feature_data(tantalus_api, library_ids):
+    storage_client = tantalus_api.get_storage_client(results_storage_name)
+
     image_feature_data = []
 
     for library_id in library_ids:
@@ -104,7 +114,7 @@ def get_image_feature_data(tantalus_api, library_ids):
         file_instances = tantalus_api.get_dataset_file_instances(
             features['id'], 'resultsdataset', results_storage_name)
         for file_instance in file_instances:
-            f = client.open_file(file_instance['file_resource']['filename'])
+            f = storage_client.open_file(file_instance['file_resource']['filename'])
             data = pd.read_csv(f, index_col=0)
             data['library_id'] = library_id
             image_feature_data.append(data)
@@ -113,19 +123,20 @@ def get_image_feature_data(tantalus_api, library_ids):
     return image_feature_data
 
 
-def retrieve_data(tantalus_api, library_ids, results_prefix):
+def retrieve_data(tantalus_api, library_ids, local_storage_directory, results_prefix):
     hmmcopy_results, hmmcopy_tickets = get_hmmcopy_analyses(tantalus_api, library_ids)
 
     results = scgenome.dataimport.import_cn_data(
         hmmcopy_tickets,
         local_storage_directory,
         ploidy_solution='2',
+        subsample=0.25,
     )
 
     cn_data = results['hmmcopy_reads']
     metrics_data = results['hmmcopy_metrics']
 
-    cell_cycle_data = get_cell_cycle_data(tantalus_api, library_ids)
+    cell_cycle_data = get_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
 
     image_feature_data = get_image_feature_data(tantalus_api, library_ids)
 
@@ -141,19 +152,30 @@ def retrieve_data(tantalus_api, library_ids, results_prefix):
 @click.argument('results_prefix')
 @click.argument('local_storage_directory')
 def infer_clones(library_ids_filename, sample_ids_filename, results_prefix, local_storage_directory):
-    tantalus_api = TantalusApi()
+    tantalus_api = dbclients.tantalus.TantalusApi()
 
     library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
 
-    cn_data_filename = results_prefix + '_cn_data.feather'
-    metrics_data_filename = results_prefix + '_metrics_data.feather'
-    image_data_filename = results_prefix + '_image_data.feather'
+    cn_data_filename = results_prefix + '_cn_data.json.gz'
+    metrics_data_filename = results_prefix + '_metrics_data.json.gz'
+    image_data_filename = results_prefix + '_image_data.json.gz'
 
-    cn_data, metrics_data, image_feature_data = retrieve_data(tantalus_api, library_ids, results_prefix)
+    if os.path.exists(cn_data_filename):
+        cn_data = pd.read_json(cn_data_filename)
+        metrics_data = pd.read_json(metrics_data_filename)
+        image_feature_data = pd.read_json(image_data_filename)
 
-    cn_data.to_feather(cn_data_filename)
-    metrics_data.to_feather(metrics_data_filename)
-    image_feature_data.to_feather(image_data_filename)
+    else:
+        cn_data, metrics_data, image_feature_data = retrieve_data(
+            tantalus_api, library_ids, local_storage_directory, results_prefix)
+
+        cn_data.to_json(cn_data_filename)
+        metrics_data.to_json(metrics_data_filename)
+        image_feature_data.to_json(image_data_filename)
+
+    print cn_data.head()
+    print metrics_data.head()
+    print image_feature_data.head()
 
 
 if __name__ == '__main__':
