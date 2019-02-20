@@ -1,7 +1,9 @@
 import pandas as pd
 
+import refgenome
 
-chrom_names = [str(v) for v in range(1, 23)] + ['X']
+
+chrom_names = refgenome.info.chromosomes
 
 chrom_idxs = pd.Series(chrom_names)
 chrom_idxs.name = 'chr'
