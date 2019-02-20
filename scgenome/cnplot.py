@@ -2,6 +2,8 @@ import matplotlib
 import seaborn
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.cluster.hierarchy as sch
+import scipy.spatial.distance as dst
 from matplotlib.colors import ListedColormap
 
 import refgenome
@@ -114,17 +116,31 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13
     seaborn.despine(ax=ax, offset=10, trim=True)
 
 
-def plot_cluster_cn_matrix(ax, cn_data, cn_field_name):
+def plot_cluster_cn_matrix(fig, cn_data, cn_field_name):
     plot_data = cn_data.merge(utils.chrom_idxs)
     plot_data = plot_data.groupby(['chr_index', 'start', 'cluster_id'])[cn_field_name].median().astype(int)
     plot_data = plot_data.unstack(level=2).fillna(0)
     plot_data = plot_data.sort_index(axis=1, level=1)
+
+    ax = fig.add_axes([0.0,1.,0.1,1.])
+    D = dst.squareform(dst.pdist(plot_data.T, 'cityblock'))
+    Y = sch.linkage(D, method='complete')
+    Z = sch.dendrogram(Y, color_threshold=-1, orientation='left')
+    idx = Z['leaves'][::-1]
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plot_data = plot_data.iloc[:, idx]
 
     mat_chrom_idxs = plot_data.index.get_level_values(0).values
     chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [plot_data.shape[0] - 1])
     chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
     chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
 
+    ax = fig.add_axes([0.125,1.,0.875,1.])
     im = ax.imshow(plot_data.T, aspect='auto', cmap=get_cn_cmap(plot_data.values))
 
     ax.set(xticks=chrom_mids)
@@ -134,5 +150,7 @@ def plot_cluster_cn_matrix(ax, cn_data, cn_field_name):
 
     for val in chrom_boundaries[:-1]:
         ax.axvline(x=val, linewidth=1, color='black', zorder=100)
+
+    return plot_data.columns.values
 
 
