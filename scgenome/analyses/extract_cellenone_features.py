@@ -43,11 +43,11 @@ def calculate_brief_cell_id(data, swap):
                 row['library_id'], int(row['YPos']), int(row['XPos'])), axis=1)
 
 
-def calculate_swap(data, cell_ids, library_id):
+def calculate_swap(data, brief_cell_ids, library_id):
     swap_scores = []
     for swap in (True, False):
         calculate_brief_cell_id(data, swap)
-        score = data['brief_cell_id'].isin(cell_ids).mean()
+        score = data['brief_cell_id'].isin(brief_cell_ids).mean()
         swap_scores.append((score, swap))
 
         logging.info('library: {}, swap: {}, score: {}'.format(
@@ -86,8 +86,15 @@ def process_cellenone_table(tantalus_api, cellenone_dataset, inputs_storage_name
 
     cell_info = dbclients.colossus.get_colossus_sublibraries_from_library_id(library_id, brief=True)
 
-    cell_ids = set(["{}-R{}-C{}".format(library_id, a["row"], a["column"]) for a in cell_info])
-    cell_ids = pd.Series(list(cell_ids), name='brief_cell_id')
+    cell_ids = []
+    for a in cell_info:
+        cell_ids.append(dict(
+            cell_id="{}-{}-R{}-C{}".format(a['sample_id'], library_id, a["row"], a["column"]),
+            brief_cell_id="{}-R{}-C{}".format(library_id, a["row"], a["column"]),
+        ))
+    cell_ids = pd.DataFrame(cell_ids)
+
+    brief_cell_ids = set(cell_ids['brief_cell_id'].values)
 
     cellenone_data = []
 
@@ -127,7 +134,7 @@ def process_cellenone_table(tantalus_api, cellenone_dataset, inputs_storage_name
     corrected_data = []
     for spotter, data in cellenone_data.groupby('spotter'):
         if spotter == 'rachael':
-            data = calculate_swap(data.copy(), cell_ids, library_id)
+            data = calculate_swap(data.copy(), brief_cell_ids, library_id)
         else:
             data = data.copy()
             data['selected_swap'] = False
@@ -136,6 +143,8 @@ def process_cellenone_table(tantalus_api, cellenone_dataset, inputs_storage_name
         corrected_data.append(data)
 
     cellenone_data = pd.concat(corrected_data, ignore_index=True)
+
+    cellenone_data = cellenone_data.merge(cell_ids, on='brief_cell_id')
 
     return cellenone_data
 
