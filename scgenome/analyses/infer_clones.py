@@ -15,6 +15,8 @@ import sklearn.preprocessing
 
 import scgenome
 import scgenome.dataimport
+import scgenome.cncluster
+import scgenome.cnplot
 
 import dbclients.tantalus
 from dbclients.basicclient import NotFoundError
@@ -90,7 +92,7 @@ def get_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results):
             data = pd.read_csv(f)
             data['library_id'] = library_id
             cell_cycle_data.append(data)
-    cell_cycle_data = pd.concat(cell_cycle_data, ignore_index=True)
+    cell_cycle_data = pd.concat(cell_cycle_data, ignore_index=True, sort=True)
 
     return cell_cycle_data
 
@@ -118,32 +120,108 @@ def get_image_feature_data(tantalus_api, library_ids):
             data = pd.read_csv(f, index_col=0)
             data['library_id'] = library_id
             image_feature_data.append(data)
-    image_feature_data = pd.concat(image_feature_data, ignore_index=True)
+    image_feature_data = pd.concat(image_feature_data, ignore_index=True, sort=True)
 
     return image_feature_data
 
 
-def retrieve_data(tantalus_api, library_ids, local_storage_directory, results_prefix):
+def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory, results_prefix):
     hmmcopy_results, hmmcopy_tickets = get_hmmcopy_analyses(tantalus_api, library_ids)
 
     results = scgenome.dataimport.import_cn_data(
         hmmcopy_tickets,
         local_storage_directory,
-        ploidy_solution='2',
-        subsample=0.25,
+        #ploidy_solution='2',
+        #subsample=0.25,
     )
 
     cn_data = results['hmmcopy_reads']
     metrics_data = results['hmmcopy_metrics']
 
+    metrics_data['sample_id'] = [a.split('-')[0] for a in metrics_data.index.get_level_values('cell_id')]
+    metrics_data['library_id'] = [a.split('-')[1] for a in metrics_data.index.get_level_values('cell_id')]
+
     cell_cycle_data = get_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
+    cell_cycle_data.set_index('cell_id', inplace=True)
+    metrics_data = metrics_data.merge(cell_cycle_data, left_index=True, right_index=True)
 
     image_feature_data = get_image_feature_data(tantalus_api, library_ids)
 
-    metrics_data = metrics_data.merge(cell_cycle_data)
-    cn_data = cn_data.merge(metrics_data[['cell_id', 'is_s_phase']].drop_duplicates())
+    # Sample filtering
+    metrics_data = metrics_data[metrics_data['sample_id'].isin(sample_ids)]
+
+    # Read count filtering
+    metrics_data = metrics_data[metrics_data['total_mapped_reads'] > 500000]
+
+    # Filter by experimental condition
+    metrics_data = metrics_data[~metrics_data['experimental_condition'].isin(['NTC'])]
+
+    cell_ids = metrics_data.index.get_level_values('cell_id')
+    cn_data = cn_data[cn_data.index.get_level_values('cell_id').isin(cell_ids)]
 
     return cn_data, metrics_data, image_feature_data
+
+
+def infer_clones(cn_data, metrics_data):
+    total_cells = len(metrics_data.index)
+
+    # Remove s phase cells
+    metrics_data = metrics_data[~metrics_data['is_s_phase']]
+
+    # Remove low quality cells
+    metrics_data = metrics_data[metrics_data['quality'] > 0.5]
+
+    # Remove low coverage cells
+    metrics_data = metrics_data[metrics_data['total_mapped_reads'] > 500000]
+
+    logging.info('filtering {} of {} cells'.format(
+        len(metrics_data.index), total_cells))
+
+    cn_data = cn_data[cn_data.index.get_level_values('cell_id').isin(
+        metrics_data.index.get_level_values('cell_id'))]
+
+    logging.info('creating copy number matrix')
+
+    cn = cn_data['copy'].unstack(level='cell_id').fillna(0)
+
+    print cn.head()
+
+    cluster_df = scgenome.cncluster.umap_hdbscan_cluster(cn)
+
+    print cluster_df.head()
+
+    cn_data.set_index(
+        cluster_df.set_index('cell_id').loc[
+            cn_data.index.get_level_values('cell_id'), 'cluster_id'],
+        append=True, inplace=True)
+    clone_cn = (
+        cn_data.groupby(level=['chr', 'start', 'end', 'cluster_id'])['copy']
+        .median().rename('clone_cn').reset_index())
+
+    print cluster_df.groupby('cluster_id').size().rename('size').reset_index()
+
+    return cluster_df, clone_cn
+
+
+def plot_clones(results_prefix, cn_data):
+    plot_data = cn_data.copy()
+    bin_filter = (plot_data['gc'] <= 0) | (plot_data['copy'].isnull())
+    plot_data.loc[bin_filter, 'state'] = 0
+    plot_data.loc[plot_data['copy'] > 5, 'copy'] = 5.
+    plot_data.loc[plot_data['copy'] < 0, 'copy'] = 0.
+
+    fig = plt.figure(figsize=(20, 30))
+    matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
+        fig, plot_data, 'copy', raw=True)
+    fig.savefig(results_prefix + '_raw_cn.pdf')
+
+    fig = plt.figure(figsize=(20, 30))
+    matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
+        fig, plot_data, 'state')
+    fig.savefig(results_prefix + '_cn_state.pdf')
+
+
+
 
 
 @click.command()
@@ -151,34 +229,58 @@ def retrieve_data(tantalus_api, library_ids, local_storage_directory, results_pr
 @click.argument('sample_ids_filename')
 @click.argument('results_prefix')
 @click.argument('local_storage_directory')
-def infer_clones(library_ids_filename, sample_ids_filename, results_prefix, local_storage_directory):
+def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, local_storage_directory):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
+    sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
 
-    cn_data_filename = results_prefix + '_cn_data.json.gz'
-    metrics_data_filename = results_prefix + '_metrics_data.json.gz'
-    image_data_filename = results_prefix + '_image_data.json.gz'
+    raw_data_filename = results_prefix + '_raw_data.h5'
 
-    if os.path.exists(cn_data_filename):
-        cn_data = pd.read_json(cn_data_filename)
-        metrics_data = pd.read_json(metrics_data_filename)
-        image_feature_data = pd.read_json(image_data_filename)
+    if os.path.exists(raw_data_filename):
+        logging.info('reading previous data')
+
+        cn_data = pd.read_hdf(raw_data_filename, 'cn_data')
+        metrics_data = pd.read_hdf(raw_data_filename, 'metrics')
+        image_feature_data = pd.read_hdf(raw_data_filename, 'image_features')
 
     else:
-        cn_data, metrics_data, image_feature_data = retrieve_data(
-            tantalus_api, library_ids, local_storage_directory, results_prefix)
+        logging.info('retrieving data')
 
-        cn_data.to_json(cn_data_filename)
-        metrics_data.to_json(metrics_data_filename)
-        image_feature_data.to_json(image_data_filename)
+        cn_data, metrics_data, image_feature_data = retrieve_data(
+            tantalus_api, library_ids, sample_ids, local_storage_directory, results_prefix)
+
+        cn_data.to_hdf(raw_data_filename, 'cn_data')
+        metrics_data.to_hdf(raw_data_filename, 'metrics')
+        image_feature_data.to_hdf(raw_data_filename, 'image_features')
+
+    clones_filename = results_prefix + '_clones.h5'
+
+    if os.path.exists(clones_filename):
+        clone_cn = pd.read_hdf(clones_filename, 'clone_cn')
+        clusters = pd.read_hdf(clones_filename, 'clusters')
+
+    else:
+        logging.info('inferring clones')
+
+        shape_check = cn_data.shape
+        logging.info('cn_data shape {}'.format(shape_check))
+        clusters, clone_cn = infer_clones(cn_data, metrics_data)
+        assert cn_data.shape == shape_check
+
+        clone_cn.to_hdf(clones_filename, 'clone_cn')
+        clusters.to_hdf(clones_filename, 'clusters')
+
+    plot_clones(results_prefix, cn_data)
 
     print cn_data.head()
     print metrics_data.head()
     print image_feature_data.head()
+    print clone_cn.head()
+    print clusters.head()
 
 
 if __name__ == '__main__':
     logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
 
-    infer_clones()
+    infer_clones_cmd()
