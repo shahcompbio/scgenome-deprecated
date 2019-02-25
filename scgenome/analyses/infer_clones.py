@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import wget
+import functools
+import cPickle as pickle
 
 import seaborn
 import numpy as np
@@ -138,12 +140,12 @@ def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory
     cn_data = results['hmmcopy_reads']
     metrics_data = results['hmmcopy_metrics']
 
-    metrics_data['sample_id'] = [a.split('-')[0] for a in metrics_data.index.get_level_values('cell_id')]
-    metrics_data['library_id'] = [a.split('-')[1] for a in metrics_data.index.get_level_values('cell_id')]
+    metrics_data['sample_id'] = [a.split('-')[0] for a in metrics_data['cell_id']]
+    metrics_data['library_id'] = [a.split('-')[1] for a in metrics_data['cell_id']]
 
     cell_cycle_data = get_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
-    cell_cycle_data.set_index('cell_id', inplace=True)
-    metrics_data = metrics_data.merge(cell_cycle_data, left_index=True, right_index=True)
+    cell_cycle_data['cell_id'] = pd.Categorical(cell_cycle_data['cell_id'], categories=metrics_data['cell_id'].cat.categories)
+    metrics_data = metrics_data.merge(cell_cycle_data)
 
     image_feature_data = get_image_feature_data(tantalus_api, library_ids)
 
@@ -156,13 +158,13 @@ def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory
     # Filter by experimental condition
     metrics_data = metrics_data[~metrics_data['experimental_condition'].isin(['NTC'])]
 
-    cell_ids = metrics_data.index.get_level_values('cell_id')
-    cn_data = cn_data[cn_data.index.get_level_values('cell_id').isin(cell_ids)]
+    cell_ids = metrics_data['cell_id']
+    cn_data = cn_data[cn_data['cell_id'].isin(cell_ids)]
 
     return cn_data, metrics_data, image_feature_data
 
 
-def infer_clones(cn_data, metrics_data):
+def infer_clones(cn_data, metrics_data, results_prefix):
     total_cells = len(metrics_data.index)
 
     # Remove s phase cells
@@ -176,34 +178,73 @@ def infer_clones(cn_data, metrics_data):
 
     logging.info('filtering {} of {} cells'.format(
         len(metrics_data.index), total_cells))
-
-    cn_data = cn_data[cn_data.index.get_level_values('cell_id').isin(
-        metrics_data.index.get_level_values('cell_id'))]
+    cn_data = cn_data.merge(metrics_data[['cell_id']].drop_duplicates())
+    assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
 
     logging.info('creating copy number matrix')
+    cn = (
+        cn_data
+            .set_index(['chr', 'start', 'end', 'cell_id'])['copy']
+            .unstack(level='cell_id').fillna(0)
+    )
 
-    cn = cn_data['copy'].unstack(level='cell_id').fillna(0)
+    logging.info('clustering copy number')
+    clusters = scgenome.cncluster.umap_hdbscan_cluster(cn)
 
-    print cn.head()
+    logging.info('merging clusters')
+    cn_data = cn_data.merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
 
-    cluster_df = scgenome.cncluster.umap_hdbscan_cluster(cn)
+    logging.info('plotting clusters to {}*'.format(results_prefix + '_initial'))
+    plot_clones(cn_data, 'cluster_id', results_prefix + '_initial')
 
-    print cluster_df.head()
+    clone_cn_data = (
+        cn_data
+            .groupby(['chr', 'start', 'end', 'cluster_id'])
+            .agg({'copy': np.mean, 'state': np.median})
+            .reset_index()
+    )
+    clone_cn_data['state'] = clone_cn_data['state'].round().astype(int)
 
-    cn_data.set_index(
-        cluster_df.set_index('cell_id').loc[
-            cn_data.index.get_level_values('cell_id'), 'cluster_id'],
-        append=True, inplace=True)
-    clone_cn = (
-        cn_data.groupby(level=['chr', 'start', 'end', 'cluster_id'])['copy']
-        .median().rename('clone_cn').reset_index())
-
-    print cluster_df.groupby('cluster_id').size().rename('size').reset_index()
-
-    return cluster_df, clone_cn
+    return clusters, clone_cn_data
 
 
-def plot_clones(results_prefix, cn_data):
+def reassign_cells(cn_data, clone_cn_data, results_prefix):
+    """
+    """
+    logging.info('Create matrix of cn data for all cells')
+    cell_cn_matrix = (
+        cn_data
+            .set_index(['chr', 'start', 'end', 'cell_id'])['copy']
+            .unstack(level=['cell_id']).fillna(0)
+    )
+
+    logging.info('Create a matrix of cn data for filtered clones')
+    clone_cn_matrix = (
+        clone_cn_data
+            .set_index(['chr', 'start', 'end', 'cluster_id'])['state']
+            .unstack(level=['cluster_id']).fillna(0)
+    )
+
+    logging.info('Calculating clone cell correlation')
+    cell_clone_corr = {}
+    for cluster_id in clone_cn_matrix.columns:
+        print cluster_id
+        cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(clone_cn_matrix[cluster_id])
+
+    reclusters = pd.DataFrame(cell_clone_corr).idxmax(axis=1).dropna().astype(int)
+    reclusters.name = 'recluster_id'
+    reclusters = reclusters.reset_index()
+
+    logging.info('merging clusters')
+    cn_data = cn_data.merge(reclusters[['cell_id', 'recluster_id']].drop_duplicates())
+
+    logging.info('plotting clusters to {}*'.format(results_prefix + '_recluster'))
+    plot_clones(cn_data, 'recluster_id', results_prefix + '_recluster')
+
+    return reclusters
+
+
+def plot_clones(cn_data, cluster_col, plots_prefix):
     plot_data = cn_data.copy()
     bin_filter = (plot_data['gc'] <= 0) | (plot_data['copy'].isnull())
     plot_data.loc[bin_filter, 'state'] = 0
@@ -212,16 +253,32 @@ def plot_clones(results_prefix, cn_data):
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
-        fig, plot_data, 'copy', raw=True)
-    fig.savefig(results_prefix + '_raw_cn.pdf')
+        fig, plot_data, 'copy', cluster_field_name=cluster_col, raw=True)
+    fig.savefig(plots_prefix + '_raw_cn.pdf')
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
-        fig, plot_data, 'state')
-    fig.savefig(results_prefix + '_cn_state.pdf')
+        fig, plot_data, 'state', cluster_field_name=cluster_col)
+    fig.savefig(plots_prefix + '_cn_state.pdf')
 
 
+def memoize(func):
+    @functools.wraps(func)
+    def memoized_func(cache_filename, *args, **kwargs):
+        if os.path.exists(cache_filename):
+            with open(cache_filename) as f:
+                data = pickle.load(f)
+        else:
+            data = func(*args, **kwargs)
+            with open(cache_filename, 'wb') as f:
+                pickle.dump(data, f, protocol=2)
+        return data
+    return memoized_func
 
+
+retrieve_data_with_cache = memoize(retrieve_data)
+infer_clones_with_cache = memoize(infer_clones)
+reassign_cells_with_cache = memoize(reassign_cells)
 
 
 @click.command()
@@ -235,48 +292,42 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
     sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
 
-    raw_data_filename = results_prefix + '_raw_data.h5'
+    raw_data_filename = results_prefix + '_raw_data.pickle'
 
-    if os.path.exists(raw_data_filename):
-        logging.info('reading previous data')
+    logging.info('retrieving cn data')
+    cn_data, metrics_data, image_feature_data = retrieve_data_with_cache(
+        raw_data_filename,
+        tantalus_api,
+        library_ids,
+        sample_ids,
+        local_storage_directory,
+        results_prefix,
+    )
 
-        cn_data = pd.read_hdf(raw_data_filename, 'cn_data')
-        metrics_data = pd.read_hdf(raw_data_filename, 'metrics')
-        image_feature_data = pd.read_hdf(raw_data_filename, 'image_features')
+    clones_filename = results_prefix + '_clones.pickle'
+    logging.info('inferring clones')
+    shape_check = cn_data.shape
+    logging.info('cn_data shape {}'.format(shape_check))
+    clusters, clone_cn_data = infer_clones_with_cache(
+        clones_filename,
+        cn_data,
+        metrics_data,
+        results_prefix,
+    )
+    assert cn_data.shape == shape_check
 
-    else:
-        logging.info('retrieving data')
-
-        cn_data, metrics_data, image_feature_data = retrieve_data(
-            tantalus_api, library_ids, sample_ids, local_storage_directory, results_prefix)
-
-        cn_data.to_hdf(raw_data_filename, 'cn_data')
-        metrics_data.to_hdf(raw_data_filename, 'metrics')
-        image_feature_data.to_hdf(raw_data_filename, 'image_features')
-
-    clones_filename = results_prefix + '_clones.h5'
-
-    if os.path.exists(clones_filename):
-        clone_cn = pd.read_hdf(clones_filename, 'clone_cn')
-        clusters = pd.read_hdf(clones_filename, 'clusters')
-
-    else:
-        logging.info('inferring clones')
-
-        shape_check = cn_data.shape
-        logging.info('cn_data shape {}'.format(shape_check))
-        clusters, clone_cn = infer_clones(cn_data, metrics_data)
-        assert cn_data.shape == shape_check
-
-        clone_cn.to_hdf(clones_filename, 'clone_cn')
-        clusters.to_hdf(clones_filename, 'clusters')
-
-    plot_clones(results_prefix, cn_data)
+    reassign_clones_filename = results_prefix + '_reassign_clones.pickle'
+    reclusters = reassign_cells_with_cache(
+        reassign_clones_filename,
+        cn_data,
+        clone_cn_data,
+        results_prefix,
+    )
 
     print cn_data.head()
     print metrics_data.head()
     print image_feature_data.head()
-    print clone_cn.head()
+    print clone_cn_data.head()
     print clusters.head()
 
 

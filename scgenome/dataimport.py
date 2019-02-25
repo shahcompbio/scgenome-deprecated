@@ -71,7 +71,7 @@ def import_cn_data(
                 if file_resource['filename'].endswith(h5_suffix):
                     for table_name, table_key, read_cols in table_info:
                         filepath = local_results_client.get_url(file_resource['filename'])
-                        data = pd.read_hdf(filepath, table_key, columns=read_cols).head() #FIX
+                        data = pd.read_hdf(filepath, table_key, columns=read_cols)
                         for col in categorical_cols:
                             if col in data:
                                 data[col] = pd.Categorical(data[col])
@@ -113,7 +113,7 @@ def import_cn_data(
         print 'concatenate', table_name
         results_data = pd.concat(ticket_tables.values(), sort=True)
         for col in categorical_cols:
-            if col not in table:
+            if col not in results_data:
                 continue
             assert isinstance(results_data[col].dtype, pd.api.types.CategoricalDtype)
         results_tables[table_name] = results_data
