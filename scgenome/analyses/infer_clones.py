@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import wget
 import functools
-import pickle as pickle
+import itertools
+import pickle
 
 import seaborn
 import numpy as np
@@ -262,16 +263,25 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
     fig.savefig(plots_prefix + '_cn_state.pdf')
 
 
+# Until we switch to python3 and can use pickle, cache using hdf5
+# and assume a list of pandas dataframes
 def memoize(func):
     @functools.wraps(func)
     def memoized_func(cache_filename, *args, **kwargs):
         if os.path.exists(cache_filename):
             with open(cache_filename) as f:
-                data = pickle.load(f)
+                data = []
+                with pd.HDFStore(cache_filename) as store:
+                    for i in itertools.count():
+                        try:
+                            data.append(store['table_{}'.format(i)])
+                        except KeyError:
+                            break
         else:
             data = func(*args, **kwargs)
-            with open(cache_filename, 'wb') as f:
-                pickle.dump(data, f, protocol=2)
+            with pd.HDFStore(cache_filename, 'w') as store:
+                for i, table in enumerate(data):
+                    store.put('table_{}'.format(i), table, format='table')
         return data
     return memoized_func
 
