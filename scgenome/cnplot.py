@@ -6,8 +6,8 @@ import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as dst
 from matplotlib.colors import ListedColormap
 
-import refgenome
-import utils
+from . import refgenome
+from . import utils
 
 
 def hex_to_rgb(h):
@@ -145,7 +145,7 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name):
 
     ax.set(xticks=chrom_mids)
     ax.set(xticklabels=utils.chrom_names)
-    ax.set(yticks=range(len(plot_data.columns.values)))
+    ax.set(yticks=list(range(len(plot_data.columns.values))))
     ax.set(yticklabels=plot_data.columns.values)
 
     for val in chrom_boundaries[:-1]:

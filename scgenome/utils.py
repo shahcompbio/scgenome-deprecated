@@ -1,6 +1,6 @@
 import pandas as pd
 
-import refgenome
+from . import refgenome
 
 
 chrom_names = refgenome.info.chromosomes

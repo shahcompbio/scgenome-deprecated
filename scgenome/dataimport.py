@@ -86,20 +86,20 @@ def import_cn_data(
 
     # For columns that need to be categorical, create a set of categories
     col_categories = collections.defaultdict(set)
-    for table_name, ticket_tables in results_tables.iteritems():
-        for ticket, table in ticket_tables.iteritems():
+    for table_name, ticket_tables in results_tables.items():
+        for ticket, table in ticket_tables.items():
             for col in categorical_cols:
                 if col not in table:
                     continue
                 col_categories[col].update(table[col].cat.categories.values)
 
     # Create a pandas index for each set of categories
-    for col, categories in col_categories.iteritems():
+    for col, categories in col_categories.items():
         col_categories[col] = pd.Index(categories)
 
     # Set all categorical columns as having the same set of categories
-    for table_name, ticket_tables in results_tables.iteritems():
-        for ticket, table in ticket_tables.iteritems():
+    for table_name, ticket_tables in results_tables.items():
+        for ticket, table in ticket_tables.items():
             for col in categorical_cols:
                 if col not in table:
                     continue
@@ -109,9 +109,9 @@ def import_cn_data(
                 assert (prev_values == table[col].astype(str).values).all()
 
     # Concatenate tables, checking that categorical columns are maintained
-    for table_name, ticket_tables in results_tables.iteritems():
-        print 'concatenate', table_name
-        results_data = pd.concat(ticket_tables.values(), sort=True)
+    for table_name, ticket_tables in results_tables.items():
+        print('concatenate', table_name)
+        results_data = pd.concat(list(ticket_tables.values()), sort=True)
         for col in categorical_cols:
             if col not in results_data:
                 continue

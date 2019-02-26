@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import wget
 import functools
-import cPickle as pickle
+import pickle as pickle
 
 import seaborn
 import numpy as np
@@ -228,7 +228,7 @@ def reassign_cells(cn_data, clone_cn_data, results_prefix):
     logging.info('Calculating clone cell correlation')
     cell_clone_corr = {}
     for cluster_id in clone_cn_matrix.columns:
-        print cluster_id
+        print(cluster_id)
         cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(clone_cn_matrix[cluster_id])
 
     reclusters = pd.DataFrame(cell_clone_corr).idxmax(axis=1).dropna().astype(int)
@@ -324,11 +324,11 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
         results_prefix,
     )
 
-    print cn_data.head()
-    print metrics_data.head()
-    print image_feature_data.head()
-    print clone_cn_data.head()
-    print clusters.head()
+    print(cn_data.head())
+    print(metrics_data.head())
+    print(image_feature_data.head())
+    print(clone_cn_data.head())
+    print(clusters.head())
 
 
 if __name__ == '__main__':

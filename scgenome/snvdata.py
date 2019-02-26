@@ -4,7 +4,7 @@ import pandas as pd
 
 
 def get_snv_results(dest):
-    print 'starting load'
+    print('starting load')
 
     mappability = pd.DataFrame()
     for chunk in pd.read_hdf(dest, '/snv/mappability', chunksize=int(1e5)):
@@ -14,13 +14,13 @@ def get_snv_results(dest):
     store = pd.HDFStore(dest, 'r')
 
     strelka_results = store['/strelka/vcf'].rename(columns={'score': 'strelka_score'})
-    print 'strelka', strelka_results.shape
+    print('strelka', strelka_results.shape)
     strelka_results = strelka_results[strelka_results['strelka_score'] > 20.]
     for col in ('chrom', 'ref', 'alt'):
         strelka_results[col] = strelka_results[col].astype(str)
 
     museq_results = store['/museq/vcf'].rename(columns={'score': 'museq_score'})
-    print 'museq', museq_results.shape
+    print('museq', museq_results.shape)
     museq_results = museq_results[museq_results['museq_score'] > .9]
     for col in ('chrom', 'ref', 'alt'):
         museq_results[col] = museq_results[col].astype(str)
@@ -44,7 +44,7 @@ def get_snv_results(dest):
     data = data.merge(snpeff, how='left')
     data = data.merge(tnc, how='left')
 
-    print 'finishing load', data[['chrom', 'coord']].drop_duplicates().shape
+    print('finishing load', data[['chrom', 'coord']].drop_duplicates().shape)
 
     return data
 

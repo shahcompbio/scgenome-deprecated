@@ -6,7 +6,7 @@ import numpy as np
 from hmmlearn._hmmc import _viterbi
 from scipy.stats import binom
 
-import refgenome
+from . import refgenome
 
 
 def get_clone_snp_count(het_counts, cluster_df):
@@ -17,9 +17,9 @@ def get_clone_snp_count(het_counts, cluster_df):
 
     cluster_df = cluster_df.merge(cell_ids.reset_index()[['cell_id']].drop_duplicates())
 
-    print cluster_df.shape[0]
+    print(cluster_df.shape[0])
     for cell_id, cluster_id in cluster_df[['cell_id', 'cluster_id']].values:
-        print '.',
+        print('.', end=' ')
         cell_index = cell_ids.loc[cell_id, 'cell_index']
         df = het_counts.select('/allele_counts', where='cell_index=={}'.format(cell_index))
         df['cluster_id'] = cluster_id
