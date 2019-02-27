@@ -134,6 +134,7 @@ def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory
     results = scgenome.dataimport.import_cn_data(
         hmmcopy_tickets,
         local_storage_directory,
+        sample_ids=sample_ids,
         #ploidy_solution='2',
         #subsample=0.25,
     )
@@ -141,17 +142,11 @@ def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory
     cn_data = results['hmmcopy_reads']
     metrics_data = results['hmmcopy_metrics']
 
-    metrics_data['sample_id'] = [a.split('-')[0] for a in metrics_data['cell_id']]
-    metrics_data['library_id'] = [a.split('-')[1] for a in metrics_data['cell_id']]
-
     cell_cycle_data = get_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
     cell_cycle_data['cell_id'] = pd.Categorical(cell_cycle_data['cell_id'], categories=metrics_data['cell_id'].cat.categories)
     metrics_data = metrics_data.merge(cell_cycle_data)
 
     image_feature_data = get_image_feature_data(tantalus_api, library_ids)
-
-    # Sample filtering
-    metrics_data = metrics_data[metrics_data['sample_id'].isin(sample_ids)]
 
     # Read count filtering
     metrics_data = metrics_data[metrics_data['total_mapped_reads'] > 500000]
@@ -229,7 +224,7 @@ def reassign_cells(cn_data, clone_cn_data, results_prefix):
     logging.info('Calculating clone cell correlation')
     cell_clone_corr = {}
     for cluster_id in clone_cn_matrix.columns:
-        print(cluster_id)
+        logging.info('Calculating correlation for clone {}'.format(cluster_id))
         cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(clone_cn_matrix[cluster_id])
 
     reclusters = pd.DataFrame(cell_clone_corr).idxmax(axis=1).dropna().astype(int)
@@ -242,7 +237,7 @@ def reassign_cells(cn_data, clone_cn_data, results_prefix):
     logging.info('plotting clusters to {}*'.format(results_prefix + '_recluster'))
     plot_clones(cn_data, 'recluster_id', results_prefix + '_recluster')
 
-    return reclusters
+    return [reclusters]
 
 
 def plot_clones(cn_data, cluster_col, plots_prefix):
@@ -269,16 +264,18 @@ def memoize(func):
     @functools.wraps(func)
     def memoized_func(cache_filename, *args, **kwargs):
         if os.path.exists(cache_filename):
+            logging.info('reading existing data from {}'.format(cache_filename))
             with open(cache_filename) as f:
                 data = []
                 with pd.HDFStore(cache_filename) as store:
                     for i in itertools.count():
-                        try:
-                            data.append(store['table_{}'.format(i)])
-                        except KeyError:
+                        key = 'table_{}'.format(i)
+                        if key not in store:
                             break
+                        data.append(store.get('table_{}'.format(i)))
         else:
             data = func(*args, **kwargs)
+            logging.info('writing data to {}'.format(cache_filename))
             with pd.HDFStore(cache_filename, 'w') as store:
                 for i, table in enumerate(data):
                     store.put('table_{}'.format(i), table, format='table')
@@ -302,7 +299,7 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
     sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
 
-    raw_data_filename = results_prefix + '_raw_data.pickle'
+    raw_data_filename = results_prefix + '_raw_data.h5'
 
     logging.info('retrieving cn data')
     cn_data, metrics_data, image_feature_data = retrieve_data_with_cache(
@@ -314,7 +311,7 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
         results_prefix,
     )
 
-    clones_filename = results_prefix + '_clones.pickle'
+    clones_filename = results_prefix + '_clones.h5'
     logging.info('inferring clones')
     shape_check = cn_data.shape
     logging.info('cn_data shape {}'.format(shape_check))
@@ -326,7 +323,7 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     )
     assert cn_data.shape == shape_check
 
-    reassign_clones_filename = results_prefix + '_reassign_clones.pickle'
+    reassign_clones_filename = results_prefix + '_reassign_clones.h5'
     reclusters = reassign_cells_with_cache(
         reassign_clones_filename,
         cn_data,

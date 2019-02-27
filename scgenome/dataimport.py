@@ -21,12 +21,15 @@ standard_hmmcopy_reads_cols = [
 categorical_cols = [
     'cell_id',
     'chr',
+    'sample_id',
+    'library_id',
 ]
 
 
 def import_cn_data(
         tickets,
         local_cache_directory,
+        sample_ids=None,
         ploidy_solution='0',
         additional_reads_cols=None,
         results_storage_name='singlecellblob_results',
@@ -72,6 +75,10 @@ def import_cn_data(
                     for table_name, table_key, read_cols in table_info:
                         filepath = local_results_client.get_url(file_resource['filename'])
                         data = pd.read_hdf(filepath, table_key, columns=read_cols)
+                        data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
+                        data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
+                        if sample_ids is not None:
+                            data = data[data['sample_id'].isin(sample_ids)]
                         for col in categorical_cols:
                             if col in data:
                                 data[col] = pd.Categorical(data[col])
