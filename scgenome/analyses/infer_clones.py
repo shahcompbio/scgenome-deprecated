@@ -258,27 +258,18 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
     fig.savefig(plots_prefix + '_cn_state.pdf')
 
 
-# Until we switch to python3 and can use pickle, cache using hdf5
-# and assume a list of pandas dataframes
 def memoize(func):
     @functools.wraps(func)
     def memoized_func(cache_filename, *args, **kwargs):
         if os.path.exists(cache_filename):
             logging.info('reading existing data from {}'.format(cache_filename))
-            with open(cache_filename) as f:
-                data = []
-                with pd.HDFStore(cache_filename) as store:
-                    for i in itertools.count():
-                        key = 'table_{}'.format(i)
-                        if key not in store:
-                            break
-                        data.append(store.get('table_{}'.format(i)))
+            with open(cache_filename, 'rb') as f:
+                data = pickle.load(f)
         else:
             data = func(*args, **kwargs)
             logging.info('writing data to {}'.format(cache_filename))
-            with pd.HDFStore(cache_filename, 'w') as store:
-                for i, table in enumerate(data):
-                    store.put('table_{}'.format(i), table, format='table')
+            with open(cache_filename, 'wb') as f:
+                pickle.dump(data, f, protocol=4)
         return data
     return memoized_func
 
@@ -299,7 +290,7 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
     sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
 
-    raw_data_filename = results_prefix + '_raw_data.h5'
+    raw_data_filename = results_prefix + '_raw_data.pickle'
 
     logging.info('retrieving cn data')
     cn_data, metrics_data, image_feature_data = retrieve_data_with_cache(
@@ -311,7 +302,7 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
         results_prefix,
     )
 
-    clones_filename = results_prefix + '_clones.h5'
+    clones_filename = results_prefix + '_clones.pickle'
     logging.info('inferring clones')
     shape_check = cn_data.shape
     logging.info('cn_data shape {}'.format(shape_check))
@@ -323,7 +314,7 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     )
     assert cn_data.shape == shape_check
 
-    reassign_clones_filename = results_prefix + '_reassign_clones.h5'
+    reassign_clones_filename = results_prefix + '_reassign_clones.pickle'
     reclusters = reassign_cells_with_cache(
         reassign_clones_filename,
         cn_data,
