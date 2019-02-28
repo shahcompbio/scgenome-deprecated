@@ -193,20 +193,49 @@ def infer_clones(cn_data, metrics_data, results_prefix):
     logging.info('plotting clusters to {}*'.format(results_prefix + '_initial'))
     plot_clones(cn_data, 'cluster_id', results_prefix + '_initial')
 
+    return clusters
+
+
+def filter_clusters(metrics_data, clusters, results_prefix):
+    """ Filter clusters
+    """
+    # Filter clusters
+    breakpoint_data = (
+        metrics_data
+        .merge(clusters[['cell_id', 'cluster_id']])
+        .groupby('cluster_id')['breakpoints']
+        .mean().reset_index()
+        .sort_values('breakpoints'))
+
+    fig = plt.figure(figsize=(8, 8))
+    breakpoint_data['breakpoints'].hist(bins=40)
+    fig.savefig(results_prefix + '_breakpoints_hist.pdf')
+
+    filtered_cluster_ids = breakpoint_data.loc[
+        (breakpoint_data['cluster_id'] >= 0) &
+        (breakpoint_data['breakpoints'] < 50.),
+        ['cluster_id']
+    ].drop_duplicates()
+
+    filtered_clusters = clusters.merge(filtered_cluster_ids)
+
+    return filtered_clusters
+
+
+def reassign_cells(cn_data, clusters, results_prefix):
+    """
+    """
+
+    logging.info('Create clone copy number table')
     clone_cn_data = (
         cn_data
+            .merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
             .groupby(['chr', 'start', 'end', 'cluster_id'])
             .agg({'copy': np.mean, 'state': np.median})
             .reset_index()
     )
     clone_cn_data['state'] = clone_cn_data['state'].round().astype(int)
 
-    return clusters, clone_cn_data
-
-
-def reassign_cells(cn_data, clone_cn_data, results_prefix):
-    """
-    """
     logging.info('Create matrix of cn data for all cells')
     cell_cn_matrix = (
         cn_data
@@ -237,7 +266,7 @@ def reassign_cells(cn_data, clone_cn_data, results_prefix):
     logging.info('plotting clusters to {}*'.format(results_prefix + '_recluster'))
     plot_clones(cn_data, 'recluster_id', results_prefix + '_recluster')
 
-    return [reclusters]
+    return reclusters
 
 
 def plot_clones(cn_data, cluster_col, plots_prefix):
@@ -258,25 +287,17 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
     fig.savefig(plots_prefix + '_cn_state.pdf')
 
 
-def memoize(func):
-    @functools.wraps(func)
-    def memoized_func(cache_filename, *args, **kwargs):
-        if os.path.exists(cache_filename):
-            logging.info('reading existing data from {}'.format(cache_filename))
-            with open(cache_filename, 'rb') as f:
-                data = pickle.load(f)
-        else:
-            data = func(*args, **kwargs)
-            logging.info('writing data to {}'.format(cache_filename))
-            with open(cache_filename, 'wb') as f:
-                pickle.dump(data, f, protocol=4)
-        return data
-    return memoized_func
-
-
-retrieve_data_with_cache = memoize(retrieve_data)
-infer_clones_with_cache = memoize(infer_clones)
-reassign_cells_with_cache = memoize(reassign_cells)
+def memoize(cache_filename, func, *args, **kwargs):
+    if os.path.exists(cache_filename):
+        logging.info('reading existing data from {}'.format(cache_filename))
+        with open(cache_filename, 'rb') as f:
+            data = pickle.load(f)
+    else:
+        data = func(*args, **kwargs)
+        logging.info('writing data to {}'.format(cache_filename))
+        with open(cache_filename, 'wb') as f:
+            pickle.dump(data, f, protocol=4)
+    return data
 
 
 @click.command()
@@ -293,8 +314,9 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     raw_data_filename = results_prefix + '_raw_data.pickle'
 
     logging.info('retrieving cn data')
-    cn_data, metrics_data, image_feature_data = retrieve_data_with_cache(
+    cn_data, metrics_data, image_feature_data = memoize(
         raw_data_filename,
+        retrieve_data,
         tantalus_api,
         library_ids,
         sample_ids,
@@ -306,19 +328,30 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     logging.info('inferring clones')
     shape_check = cn_data.shape
     logging.info('cn_data shape {}'.format(shape_check))
-    clusters, clone_cn_data = infer_clones_with_cache(
+    clusters = memoize(
         clones_filename,
+        infer_clones,
         cn_data,
         metrics_data,
         results_prefix,
     )
     assert cn_data.shape == shape_check
 
+    filtered_clusters_filename = results_prefix + '_filtered_clones.pickle'
+    filtered_clusters = memoize(
+        filtered_clusters_filename,
+        filter_clusters,
+        metrics_data,
+        clusters,
+        results_prefix,
+    )
+
     reassign_clones_filename = results_prefix + '_reassign_clones.pickle'
-    reclusters = reassign_cells_with_cache(
+    reclusters = memoize(
         reassign_clones_filename,
+        reassign_cells,
         cn_data,
-        clone_cn_data,
+        filtered_clusters,
         results_prefix,
     )
 
