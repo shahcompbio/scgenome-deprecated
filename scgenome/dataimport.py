@@ -3,6 +3,7 @@ import pandas as pd
 
 import dbclients.tantalus
 import datamanagement.transfer_files
+from datamanagement.miscellaneous.hdf5helper import read_python2_hdf5_dataframe
 
 
 standard_hmmcopy_reads_cols = [
@@ -14,7 +15,6 @@ standard_hmmcopy_reads_cols = [
     'reads',
     'copy',
     'state',
-    'integer_copy_number',
 ]
 
 
@@ -74,7 +74,9 @@ def import_cn_data(
                 if file_resource['filename'].endswith(h5_suffix):
                     for table_name, table_key, read_cols in table_info:
                         filepath = local_results_client.get_url(file_resource['filename'])
-                        data = pd.read_hdf(filepath, table_key, columns=read_cols)
+                        data = read_python2_hdf5_dataframe(filepath, table_key)
+                        if read_cols is not None:
+                            data = data[read_cols]
                         data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
                         data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
                         if sample_ids is not None:
