@@ -12,7 +12,7 @@ def read_chromosome_lengths(genome_fasta_index):
 class RefGenomeInfo(object):
     def __init__(self, version):
         if version == 'hg19':
-            self.chromosomes = [str(a) for a in xrange(1, 23)] + ['X', 'Y']
+            self.chromosomes = [str(a) for a in range(1, 23)] + ['X', 'Y']
 
             genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/GRCh37-lite.fa.fai')
 

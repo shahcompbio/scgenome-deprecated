@@ -61,7 +61,7 @@ def cluster_labels(cluster_ids):
     labels = counts.index.to_series().astype(str) + ' (' + counts + ')'
     if -1 in labels:
         labels.at[-1] = labels[-1].replace('-1', 'Filt.')
-    return dict(zip(counts.index, labels))
+    return dict(list(zip(counts.index, labels)))
 
 
 def plot_umap_clusters(ax, df):
@@ -105,7 +105,7 @@ def plot_umap_clusters(ax, df):
     label_pos = df.groupby('cluster_id').mean()
     text_labels = [
         ax.text(label_pos.at[c, 'umap1'], label_pos.at[c, 'umap2'], c)
-        for c in labels.keys() if c >= 0
+        for c in list(labels.keys()) if c >= 0
     ]
     adjust_text(
         text_labels, ax=ax, x=df['umap1'], y=df['umap2'],

@@ -178,7 +178,7 @@ def get_unprocessed_cellenone(tantalus_api):
         assert library_id not in datasets
         datasets[library_id] = results
 
-    return datasets.values()
+    return list(datasets.values())
 
 
 def run_analysis(

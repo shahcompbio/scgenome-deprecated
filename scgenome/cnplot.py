@@ -6,8 +6,8 @@ import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as dst
 from matplotlib.colors import ListedColormap
 
-import refgenome
-import utils
+from . import refgenome
+from . import utils
 
 
 def hex_to_rgb(h):
@@ -42,7 +42,7 @@ def plot_cbar(ax):
 
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', raw=False, max_cn=13):
     plot_data = cn_data.merge(utils.chrom_idxs)
-    plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=[2, 3]).fillna(0)
+    plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
     plot_data = plot_data.sort_index(axis=1, level=1)
     if max_cn is not None:
         plot_data[plot_data > max_cn] = max_cn
@@ -116,10 +116,10 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13
     seaborn.despine(ax=ax, offset=10, trim=True)
 
 
-def plot_cluster_cn_matrix(fig, cn_data, cn_field_name):
+def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='cluster_id'):
     plot_data = cn_data.merge(utils.chrom_idxs)
-    plot_data = plot_data.groupby(['chr_index', 'start', 'cluster_id'])[cn_field_name].median().astype(int)
-    plot_data = plot_data.unstack(level=2).fillna(0)
+    plot_data = plot_data.groupby(['chr_index', 'start', cluster_field_name])[cn_field_name].median().astype(int)
+    plot_data = plot_data.unstack(level=[cluster_field_name]).fillna(0)
     plot_data = plot_data.sort_index(axis=1, level=1)
 
     ax = fig.add_axes([0.0,1.,0.1,1.])
@@ -145,7 +145,7 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name):
 
     ax.set(xticks=chrom_mids)
     ax.set(xticklabels=utils.chrom_names)
-    ax.set(yticks=range(len(plot_data.columns.values)))
+    ax.set(yticks=list(range(len(plot_data.columns.values))))
     ax.set(yticklabels=plot_data.columns.values)
 
     for val in chrom_boundaries[:-1]:
