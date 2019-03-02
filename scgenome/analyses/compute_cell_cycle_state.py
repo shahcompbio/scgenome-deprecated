@@ -161,7 +161,7 @@ def run_all_analyses(jira_ticket, cache_directory, results_storage_name, archive
 
     logging.info('processing {} datasets'.format(len(datasets)))
 
-    for hmmcopy_jira_ticket, dataset in list(datasets.items()):
+    for hmmcopy_jira_ticket, dataset in datasets.items():
         logging.info('processing dataset {}'.format(dataset['name']))
 
         try:
