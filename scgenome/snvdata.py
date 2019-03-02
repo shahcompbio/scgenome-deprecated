@@ -37,11 +37,17 @@ def get_snv_results(dest):
     tnc = store['/snv/tri_nucleotide_context']
 
     data = store['/snv_allele_counts']
+    print('total', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(mappability)
+    print('post mappability', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(strelka_results)
+    print('post strelka', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(museq_results)
+    print('post museq', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(cosmic, how='left')
+    print('post cosmic', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(snpeff, how='left')
+    print('post snpeff', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(tnc, how='left')
 
     print('finishing load', data[['chrom', 'coord']].drop_duplicates().shape)
