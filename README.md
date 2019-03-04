@@ -1,4 +1,17 @@
-A repository of code for analyzing single cell genomes
+# A repository of code for analyzing single cell genomes
+
+## Installation
+
+The sisyphus repo is a prerequisite for the scgenome/analyses scripts.  Install as follows:
+
+```
+git clone https://github.com/shahcompbio/sisyphus
+cd sisyphus
+python setup.py develop
+pip install -r requirements.txt
+```
+
+## Scripts
 
 Filter cells and bins:
 ```
