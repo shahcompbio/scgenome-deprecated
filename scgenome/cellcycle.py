@@ -50,7 +50,13 @@ def predict(cn_data):
         corr_data.append(library_corr_data)
     
     corr_data = pd.concat(corr_data, ignore_index=True)
-    
+
+    # For cells with low read counts, some features may
+    # be null.  Mask these cells and set the s phase
+    # prediction to False
+    null_features = corr_data.isnull().any(axis=1)
+    corr_data = corr_data.fillna(0)
+
     model = pickle.load(open(classifier_filename))
     
     features = [
@@ -59,6 +65,9 @@ def predict(cn_data):
     
     X = corr_data[features].values
     y = model.predict(X)
+
+    # Set cells with null features to False
+    y[null_features.values] = False
 
     corr_data['is_s_phase'] = y
     
