@@ -251,22 +251,30 @@ def reassign_cells(cn_data, clusters, results_prefix):
             .unstack(level=['cluster_id']).fillna(0)
     )
 
-    logging.info('Calculating clone cell correlation')
+    distance_metric = 'correlation'
+    distance_method = scipy.spatial.distance.correlation
+
+    logging.info('Calculating clone cell {} distance'.format(distance_metric))
     cell_clone_corr = {}
     for cluster_id in clone_cn_matrix.columns:
-        logging.info('Calculating correlation for clone {}'.format(cluster_id))
+        logging.info('Calculating distance for clone {}'.format(cluster_id))
         cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(
-            clone_cn_matrix[cluster_id], method=scipy.spatial.distance.cityblock)
+            clone_cn_matrix[cluster_id], method=distance_method)
+
+    distance = pd.DataFrame(cell_clone_corr)
+    distance.columns.name = 'cluster_id_' + distance_metric
 
     reclusters = pd.DataFrame(cell_clone_corr).idxmin(axis=1).dropna().astype(int)
-    reclusters.name = 'recluster_id'
+    reclusters.name = 'cluster_id_' + distance_metric
     reclusters = reclusters.reset_index()
 
+    reclusters = reclusters.merge(distance.stack().rename('distance_' + distance_metric).reset_index())
+
     logging.info('merging clusters')
-    cn_data = cn_data.merge(reclusters[['cell_id', 'recluster_id']].drop_duplicates())
+    cn_data = cn_data.merge(reclusters[['cell_id', 'cluster_id_' + distance_metric]].drop_duplicates())
 
     logging.info('plotting clusters to {}*'.format(results_prefix + '_recluster'))
-    plot_clones(cn_data, 'recluster_id', results_prefix + '_recluster')
+    plot_clones(cn_data, 'cluster_id_' + distance_metric, results_prefix + '_recluster')
 
     return reclusters
 
