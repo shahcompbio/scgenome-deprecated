@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pylab
 import sklearn.preprocessing
+import scipy.spatial.distance
 
 import scgenome
 import scgenome.dataimport
@@ -254,9 +255,10 @@ def reassign_cells(cn_data, clusters, results_prefix):
     cell_clone_corr = {}
     for cluster_id in clone_cn_matrix.columns:
         logging.info('Calculating correlation for clone {}'.format(cluster_id))
-        cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(clone_cn_matrix[cluster_id])
+        cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(
+            clone_cn_matrix[cluster_id], method=scipy.spatial.distance.cityblock)
 
-    reclusters = pd.DataFrame(cell_clone_corr).idxmax(axis=1).dropna().astype(int)
+    reclusters = pd.DataFrame(cell_clone_corr).idxmin(axis=1).dropna().astype(int)
     reclusters.name = 'recluster_id'
     reclusters = reclusters.reset_index()
 
