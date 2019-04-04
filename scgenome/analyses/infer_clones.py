@@ -167,20 +167,34 @@ def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory
 
 
 def infer_clones(cn_data, metrics_data, results_prefix):
-    total_cells = len(metrics_data.index)
+    """ Infer clones from copy number data.
+    """
+
+    metrics_data['filter_quality'] = (metrics_data['quality'] > 0.75)
+    metrics_data['filter_reads'] = (metrics_data['total_mapped_reads_hmmcopy'] > 500000)
+
+    # Calculate separation between predicted and normalized copy number
+    cn_data['copy_state_diff'] = np.absolute(cn_data['copy'] - cn_data['state'])
+    copy_state_diff = (cn_data[['cell_id', 'copy_state_diff']]
+        .dropna().groupby('cell_id')['copy_state_diff']
+        .mean().reset_index().dropna())
+    metrics_data = metrics_data.merge(copy_state_diff)
+    metrics_data['filter_copy_state_diff'] = (metrics_data['copy_state_diff'] < 1.)
 
     # Remove s phase cells
-    metrics_data = metrics_data[~metrics_data['is_s_phase']]
-
     # Remove low quality cells
-    metrics_data = metrics_data[metrics_data['quality'] > 0.5]
-
     # Remove low coverage cells
-    metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > 500000]
+    # Remove cells with a large divergence between copy state and norm copy number
+    filtered_cells = metrics_data.loc[
+        (~metrics_data['is_s_phase']) &
+        metrics_data['filter_quality'] &
+        metrics_data['filter_reads'] &
+        metrics_data['filter_copy_state_diff'],
+        ['cell_id']]
 
     logging.info('filtering {} of {} cells'.format(
-        len(metrics_data.index), total_cells))
-    cn_data = cn_data.merge(metrics_data[['cell_id']].drop_duplicates())
+        len(filtered_cells.index), len(metrics.index)))
+    cn_data = cn_data.merge(filtered_cells[['cell_id']].drop_duplicates())
     assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
 
     logging.info('creating copy number matrix')
@@ -199,33 +213,49 @@ def infer_clones(cn_data, metrics_data, results_prefix):
     logging.info('plotting clusters to {}*'.format(results_prefix + '_initial'))
     plot_clones(cn_data, 'cluster_id', results_prefix + '_initial')
 
-    return clusters
+    filter_metrics = metrics_data[[
+        'cell_id',
+        'is_s_phase',
+        'copy_state_diff',
+        'filter_quality',
+        'filter_reads',
+        'filter_copy_state_diff',
+    ]]
+
+    return clusters, filter_metrics
 
 
-def filter_clusters(metrics_data, clusters, results_prefix):
+def filter_clusters(metrics_data, clusters, filter_metrics, cell_clone_distances, results_prefix):
     """ Filter clusters
     """
-    # Filter clusters
-    breakpoint_data = (
-        metrics_data
-        .merge(clusters[['cell_id', 'cluster_id']])
-        .groupby('cluster_id')['breakpoints']
-        .mean().reset_index()
-        .sort_values('breakpoints'))
 
-    fig = plt.figure(figsize=(8, 8))
-    breakpoint_data['breakpoints'].hist(bins=40)
-    fig.savefig(results_prefix + '_breakpoints_hist.pdf')
+    filter_metrics = filter_metrics.merge(cell_clone_distances, on='cell_id')
 
-    filtered_cluster_ids = breakpoint_data.loc[
-        (breakpoint_data['cluster_id'] >= 0) &
-        (breakpoint_data['breakpoints'] < 500.),
-        ['cluster_id']
-    ].drop_duplicates()
+    # Calculate whether the clusters are stable when using correlation
+    # vs cityblock distance as a distance metric.
+    # Note: this will filter cells that have been either erroneously or
+    # correctly assigned the correct ploidy, and have thus been erroneously
+    # assigned to the wrong cluster.  It will successfully filter cells that
+    # have a different ploidy than there actual clone.
+    filter_metrics['filter_same_cluster'] = (
+        (filter_metrics['cluster_id_pearsonr'] == filter_metrics['cluster_id_cityblock'])
+    )
 
-    filtered_clusters = clusters.merge(filtered_cluster_ids)
+    # Strict initial filtering, excluding s phase cells
+    filter_metrics['filter_final'] = (
+        ~(filter_metrics['is_s_phase']) &
+        filter_metrics['filter_quality'] &
+        filter_metrics['filter_reads'] &
+        filter_metrics['filter_same_cluster'] &
+        filter_metrics['filter_copy_state_diff'])
 
-    return filtered_clusters
+    # Add back in 
+    filter_metrics['filter_final'] |= (
+        filter_metrics['is_s_phase'] &
+        filter_metrics['filter_reads'] &
+        filter_metrics['filter_copy_state_diff'])
+
+    return filter_metrics
 
 
 def recalculate_distances(distance_metric, distance_method, clone_cn_matrix, cell_cn_matrix):
@@ -251,8 +281,8 @@ def recalculate_distances(distance_metric, distance_method, clone_cn_matrix, cel
     return reclusters
 
 
-def reassign_cells(cn_data, clusters, results_prefix):
-    """
+def calculate_cell_clone_distances(cn_data, clusters, results_prefix):
+    """ Calculate the distance to the closest clone for multiple metrics.
     """
 
     logging.info('Create clone copy number table')
@@ -279,16 +309,16 @@ def reassign_cells(cn_data, clusters, results_prefix):
             .unstack(level=['cluster_id']).fillna(0)
     )
 
-    correlation1_distances = recalculate_distances(
-        'correlation1',
-        lambda u, v: scipy.spatial.distance.correlation(u, v, centered=False),
+    pearsonr_distances = recalculate_distances(
+        'pearsonr',
+        lambda u, v: 1. - scipy.stats.pearsonr(u, v)[0],
         clone_cn_matrix,
         cell_cn_matrix,
     )
 
-    correlation2_distances = recalculate_distances(
-        'correlation2',
-        lambda u, v: 1. - scipy.stats.pearsonr(u, v)[0],
+    spearmanr_distances = recalculate_distances(
+        'spearmanr',
+        lambda u, v: 1. - scipy.stats.spearmanr(u, v)[0],
         clone_cn_matrix,
         cell_cn_matrix,
     )
@@ -300,13 +330,13 @@ def reassign_cells(cn_data, clusters, results_prefix):
         cell_cn_matrix,
     )
 
-    reclusters = pd.concat([
-        correlation1_distances.set_index('cell_id'),
-        correlation2_distances.set_index('cell_id'),
+    clone_cell_distances = pd.concat([
+        pearsonr_distances.set_index('cell_id'),
+        spearmanr_distances.set_index('cell_id'),
         cityblock_distances.set_index('cell_id'),
     ], axis=1).reset_index()
 
-    return reclusters
+    return clone_cell_distances
 
 
 def plot_clones(cn_data, cluster_col, plots_prefix):
@@ -368,7 +398,7 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     logging.info('inferring clones')
     shape_check = cn_data.shape
     logging.info('cn_data shape {}'.format(shape_check))
-    clusters = memoize(
+    clusters, filter_metrics = memoize(
         clones_filename,
         infer_clones,
         cn_data,
@@ -377,21 +407,23 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     )
     assert cn_data.shape == shape_check
 
+    cell_clone_distances_filename = results_prefix + '_cell_clone_distances.pickle'
+    cell_clone_distances = memoize(
+        cell_clone_distances_filename,
+        calculate_cell_clone_distances,
+        cn_data,
+        clusters,
+        results_prefix,
+    )
+
     filtered_clusters_filename = results_prefix + '_filtered_clones.pickle'
     filtered_clusters = memoize(
         filtered_clusters_filename,
         filter_clusters,
         metrics_data,
         clusters,
-        results_prefix,
-    )
-
-    reassign_clones_filename = results_prefix + '_reassign_clones.pickle'
-    reclusters = memoize(
-        reassign_clones_filename,
-        reassign_cells,
-        cn_data,
-        filtered_clusters,
+        filter_metrics,
+        cell_clone_distances,
         results_prefix,
     )
 
