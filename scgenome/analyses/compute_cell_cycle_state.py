@@ -23,12 +23,19 @@ results_type = 'cell_state_prediction'
 results_version = 'v0.0.1'
 
 
-def get_unprocessed_hmmcopy(tantalus_api):
+def get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=None):
+    if hmmcopy_tickets is None or len(hmmcopy_tickets) == 0:
+        hmmcopy_analyses = list(tantalus_api.list('analysis', analysis_type__name='hmmcopy'))
+
+    else:
+        hmmcopy_analyses = []
+        for ticket in hmmcopy_tickets:
+            hmmcopy_analyses.append(tantalus_api.get('analysis', analysis_type__name='hmmcopy', jira_ticket=ticket))
+
     unprocessed = {}
 
-    for results in tantalus_api.list('results', results_type='hmmcopy'):
-        # Retrieve the jira ticket of the hmmcopy analysis
-        hmmcopy_analysis = tantalus_api.get('analysis', id=results['analysis'])
+    for hmmcopy_analysis in hmmcopy_analyses:
+        results = tantalus_api.get('results', analysis=hmmcopy_analysis['id'])
         jira_ticket = hmmcopy_analysis['jira_ticket']
 
         # Check for an existing analysis with this hmmcopy as input
@@ -154,10 +161,11 @@ def run_analysis(
 @click.argument('cache_directory', nargs=1)
 @click.argument('results_storage_name', nargs=1)
 @click.option('--archive_storage_name', required=False)
-def run_all_analyses(jira_ticket, cache_directory, results_storage_name, archive_storage_name=None):
+@click.option('--hmmcopy_ticket', multiple=True)
+def run_all_analyses(jira_ticket, cache_directory, results_storage_name, archive_storage_name=None, hmmcopy_ticket=None):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
-    datasets = get_unprocessed_hmmcopy(tantalus_api)
+    datasets = get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=hmmcopy_ticket)
 
     logging.info('processing {} datasets'.format(len(datasets)))
 

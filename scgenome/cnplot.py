@@ -78,7 +78,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
     plot_data = plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name, raw=raw, max_cn=max_cn)
 
     ax = fig.add_axes([0.0,0.0,0.05,1.])
-    ax.matshow(plot_data.columns.get_level_values(1)[::-1, np.newaxis], aspect='auto', origin='lower', cmap=plt.get_cmap("Paired"))
+    ax.matshow(plot_data.columns.get_level_values(1)[::-1, np.newaxis], aspect='auto', origin='lower', cmap='hsv')
     ax.grid(False)
     ax.set_xticks([])
     ax.set_yticks([])

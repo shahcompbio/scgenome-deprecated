@@ -5,7 +5,6 @@ import click
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import wget
 import functools
 import itertools
 import pickle
@@ -18,9 +17,23 @@ import sklearn.preprocessing
 import scipy.spatial.distance
 
 import scgenome
-import scgenome.dataimport
+import scgenome.utils
 import scgenome.cncluster
 import scgenome.cnplot
+import scgenome.snvdata
+import scgenome.snpdata
+import scgenome.snvphylo
+import scgenome.dbsearch
+import scgenome.hmmcopy
+import scgenome.cnclones
+import scgenome.pseudobulk
+
+import wgs_analysis.snvs.mutsig
+import wgs_analysis.plots.snv
+import wgs_analysis.annotation.position
+
+import dollo
+import dollo.tasks
 
 import dbclients.tantalus
 from dbclients.basicclient import NotFoundError
@@ -30,127 +43,134 @@ import datamanagement.transfer_files
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
 
+# TODO: thresholds
+museq_score_threshold = None
+strelka_score_threshold = None
+snvs_num_cells_threshold = None
+snvs_sum_alt_threshold = 4
+is_original_cluster_mean_threshold = 0.5
+cluster_size_threshold = 50
+
+# Threshold on total haplotype allele counts
+# for calculating allele specific copy number
+total_allele_counts_threshold = 6
+
+# SA1135
+# museq_score_threshold = 0.5
+# strelka_score_threshold = -np.inf
+
+cn_bin_size = 500000
+
 results_storage_name = 'singlecellblob_results'
 
 
-def get_hmmcopy_analyses(tantalus_api, library_ids):
+def search_hmmcopy_analyses(
+        tantalus_api,
+        library_ids,
+        aligner_name='BWA_ALN_0_5_7',
+):
+    """ Search for hmmcopy results and analyses for a list of libraries.
+    """
     hmmcopy_results = {}
-    hmmcopy_tickets = []
+    hmmcopy_tickets = {}
 
     for library_id in library_ids:
-        logging.info('hmmcopy data for {}'.format(library_id))
-
-        analyses = list(tantalus_api.list(
-            'analysis',
-            analysis_type__name='hmmcopy',
-            input_datasets__library__library_id=library_id,
-        ))
-        aln_analyses = []
-        for analysis in analyses:
-            aligners = set()
-            for dataset_id in analysis['input_datasets']:
-                dataset = tantalus_api.get('sequencedataset', id=dataset_id)
-                aligners.add(dataset['aligner'])
-            if len(aligners) != 1:
-                raise Exception('found {} aligners for analysis {}'.format(
-                    len(aligners), analysis['id']))
-            aligner = aligners.pop()
-            if aligner == 'BWA_ALN_0_5_7':
-                aln_analyses.append(analysis)
-        if len(aln_analyses) != 1:
-            raise Exception('found {} hmmcopy analyses for {}: {}'.format(
-                len(aln_analyses), library_id, [a['id'] for a in aln_analyses]))
-        analysis = aln_analyses[0]
-        results = tantalus_api.get(
-            'resultsdataset',
-            analysis=analysis['id'],
-        )
+        results, analysis = scgenome.dbsearch.search_hmmcopy_results(
+            tantalus_api, library_id, aligner_name=aligner_name)
         hmmcopy_results[library_id] = results
-        hmmcopy_tickets.append(analysis['jira_ticket'])
+        hmmcopy_tickets[library_id] = analysis['jira_ticket']
 
     return hmmcopy_results, hmmcopy_tickets
 
 
-def get_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results):
+def import_cell_cycle_data(
+        tantalus_api,
+        library_ids,
+        hmmcopy_results,
+        results_storage_name='singlecellblob_results',
+):
+    """ Import cell cycle predictions for a list of libraries
+    """
     storage_client = tantalus_api.get_storage_client(results_storage_name)
 
     cell_cycle_data = []
 
     for library_id in library_ids:
-        logging.info('cell cycle data for {}'.format(library_id))
+        results, analysis = scgenome.dbsearch.search_cell_cycle_results(
+            tantalus_api, library_id, hmmcopy_results[library_id])
 
-        classifier = tantalus_api.get(
-            'analysis',
-            analysis_type='cell_state_classifier',
-            version='v0.0.1',
-            input_results__id=hmmcopy_results[library_id]['id'],
-        )
-        features = tantalus_api.get(
-            'resultsdataset',
-            analysis=classifier['id'],
-        )
         file_instances = tantalus_api.get_dataset_file_instances(
-            features['id'], 'resultsdataset', results_storage_name)
+            results['id'], 'resultsdataset', results_storage_name)
         for file_instance in file_instances:
             f = storage_client.open_file(file_instance['file_resource']['filename'])
             data = pd.read_csv(f)
             data['library_id'] = library_id
             cell_cycle_data.append(data)
+
     cell_cycle_data = pd.concat(cell_cycle_data, ignore_index=True, sort=True)
 
     return cell_cycle_data
 
 
-def get_image_feature_data(tantalus_api, library_ids):
+def import_image_feature_data(
+        tantalus_api,
+        library_ids,
+        results_storage_name='singlecellblob_results',
+):
+    """ Import image features for a list of libraries
+    """
     storage_client = tantalus_api.get_storage_client(results_storage_name)
 
     image_feature_data = []
 
     for library_id in library_ids:
         try:
-            features = tantalus_api.get(
-                'results',
-                results_type='CELLENONE_FEATURES',
-                results_version='v0.0.1',
-                libraries__library_id=library_id,
-            )
+            results = scgenome.dbsearch.search_image_feature_results(tantalus_api, library_id)
         except NotFoundError:
             logging.info('no image data for {}'.format(library_id))
             continue
         file_instances = tantalus_api.get_dataset_file_instances(
-            features['id'], 'resultsdataset', results_storage_name)
+            results['id'], 'resultsdataset', results_storage_name)
         for file_instance in file_instances:
             f = storage_client.open_file(file_instance['file_resource']['filename'])
             data = pd.read_csv(f, index_col=0)
             data['library_id'] = library_id
             image_feature_data.append(data)
+
+    if len(image_feature_data) == 0:
+        return pd.DataFrame()
+
     image_feature_data = pd.concat(image_feature_data, ignore_index=True, sort=True)
 
     return image_feature_data
 
 
-def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory, results_prefix):
-    hmmcopy_results, hmmcopy_tickets = get_hmmcopy_analyses(tantalus_api, library_ids)
+def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_prefix):
+    tantalus_api = dbclients.tantalus.TantalusApi()
 
-    results = scgenome.dataimport.import_cn_data(
-        hmmcopy_tickets,
-        local_storage_directory,
-        sample_ids=sample_ids,
-        #ploidy_solution='2',
-        #subsample=0.25,
-    )
+    hmmcopy_results, hmmcopy_tickets = search_hmmcopy_analyses(tantalus_api, library_ids)
 
-    cn_data = results['hmmcopy_reads']
-    metrics_data = results['hmmcopy_metrics']
+    cn_data = []
+    metrics_data = []
 
-    cell_cycle_data = get_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
+    for library_id in library_ids:
+        hmmcopy = scgenome.hmmcopy.HMMCopyData(hmmcopy_tickets[library_id], local_cache_directory)
+        hmmcopy_data = hmmcopy.load_cn_data(sample_ids=sample_ids)
+
+        cn_data.append(hmmcopy_data['hmmcopy_reads'])
+        metrics_data.append(hmmcopy_data['hmmcopy_metrics'])
+
+    cn_data = scgenome.utils.concat_with_categories(cn_data)
+    metrics_data = scgenome.utils.concat_with_categories(metrics_data)
+
+    cell_cycle_data = import_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
     cell_cycle_data['cell_id'] = pd.Categorical(cell_cycle_data['cell_id'], categories=metrics_data['cell_id'].cat.categories)
     metrics_data = metrics_data.merge(cell_cycle_data)
 
-    image_feature_data = get_image_feature_data(tantalus_api, library_ids)
+    image_feature_data = import_image_feature_data(tantalus_api, library_ids)
 
     # Read count filtering
-    metrics_data = metrics_data[metrics_data['total_mapped_reads'] > 500000]
+    metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > 500000]
 
     # Filter by experimental condition
     metrics_data = metrics_data[~metrics_data['experimental_condition'].isin(['NTC'])]
@@ -158,221 +178,182 @@ def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory
     cell_ids = metrics_data['cell_id']
     cn_data = cn_data[cn_data['cell_id'].isin(cell_ids)]
 
+    # TODO: Remove temporary fixup
+    if 'total_mapped_reads_hmmcopy' not in metrics_data:
+         metrics_data['total_mapped_reads_hmmcopy'] = metrics_data['total_mapped_reads']
+    elif metrics_data['total_mapped_reads_hmmcopy'].isnull().any():
+        fix_read_count = metrics_data['total_mapped_reads_hmmcopy'].isnull()
+        metrics_data.loc[fix_read_count, 'total_mapped_reads_hmmcopy'] = (
+            metrics_data.loc[fix_read_count, 'total_mapped_reads'])
+
     return cn_data, metrics_data, image_feature_data
 
 
-def infer_clones(cn_data, metrics_data, results_prefix):
-    total_cells = len(metrics_data.index)
-
-    # Remove s phase cells
-    metrics_data = metrics_data[~metrics_data['is_s_phase']]
-
-    # Remove low quality cells
-    metrics_data = metrics_data[metrics_data['quality'] > 0.5]
-
-    # Remove low coverage cells
-    metrics_data = metrics_data[metrics_data['total_mapped_reads'] > 500000]
-
-    logging.info('filtering {} of {} cells'.format(
-        len(metrics_data.index), total_cells))
-    cn_data = cn_data.merge(metrics_data[['cell_id']].drop_duplicates())
-    assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
-
-    logging.info('creating copy number matrix')
-    cn = (
-        cn_data
-            .set_index(['chr', 'start', 'end', 'cell_id'])['copy']
-            .unstack(level='cell_id').fillna(0)
-    )
-
-    logging.info('clustering copy number')
-    clusters = scgenome.cncluster.umap_hdbscan_cluster(cn)
-
-    logging.info('merging clusters')
-    cn_data = cn_data.merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
-
-    logging.info('plotting clusters to {}*'.format(results_prefix + '_initial'))
-    plot_clones(cn_data, 'cluster_id', results_prefix + '_initial')
-
-    return clusters
-
-
-def filter_clusters(metrics_data, clusters, results_prefix):
-    """ Filter clusters
-    """
-    # Filter clusters
-    breakpoint_data = (
-        metrics_data
-        .merge(clusters[['cell_id', 'cluster_id']])
-        .groupby('cluster_id')['breakpoints']
-        .mean().reset_index()
-        .sort_values('breakpoints'))
-
-    fig = plt.figure(figsize=(8, 8))
-    breakpoint_data['breakpoints'].hist(bins=40)
-    fig.savefig(results_prefix + '_breakpoints_hist.pdf')
-
-    filtered_cluster_ids = breakpoint_data.loc[
-        (breakpoint_data['cluster_id'] >= 0) &
-        (breakpoint_data['breakpoints'] < 50.),
-        ['cluster_id']
-    ].drop_duplicates()
-
-    filtered_clusters = clusters.merge(filtered_cluster_ids)
-
-    return filtered_clusters
-
-
-def reassign_cells(cn_data, clusters, results_prefix):
-    """
+def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory, results_prefix):
+    """ Retrieve SNV, breakpoint and allele data
     """
 
-    logging.info('Create clone copy number table')
-    clone_cn_data = (
-        cn_data
-            .merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
-            .groupby(['chr', 'start', 'end', 'cluster_id'])
-            .agg({'copy': np.mean, 'state': np.median})
-            .reset_index()
-    )
-    clone_cn_data['state'] = clone_cn_data['state'].round().astype(int)
+    pseudobulk = scgenome.pseudobulk.PseudobulkData(ticket_id, local_cache_directory)
 
-    logging.info('Create matrix of cn data for all cells')
-    cell_cn_matrix = (
-        cn_data
-            .set_index(['chr', 'start', 'end', 'cell_id'])['copy']
-            .unstack(level=['cell_id']).fillna(0)
+    snv_data, snv_count_data = scgenome.snvdata.load_snv_data(
+        pseudobulk,
+        museq_filter=museq_score_threshold,
+        strelka_filter=strelka_score_threshold,
+        num_cells_threshold=snvs_num_cells_threshold,
+        sum_alt_threshold=snvs_sum_alt_threshold,
+        figures_prefix=results_prefix + 'snv_loading_',
     )
 
-    logging.info('Create a matrix of cn data for filtered clones')
-    clone_cn_matrix = (
-        clone_cn_data
-            .set_index(['chr', 'start', 'end', 'cluster_id'])['state']
-            .unstack(level=['cluster_id']).fillna(0)
-    )
+    allele_data = pseudobulk.load_haplotype_allele_counts()
+    allele_data = scgenome.snpdata.calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size)
 
-    distance_metric = 'correlation'
-    distance_method = scipy.spatial.distance.correlation
+    breakpoint_data, breakpoint_count_data = pseudobulk.load_breakpoint_data()
 
-    logging.info('Calculating clone cell {} distance'.format(distance_metric))
-    cell_clone_corr = {}
-    for cluster_id in clone_cn_matrix.columns:
-        logging.info('Calculating distance for clone {}'.format(cluster_id))
-        cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(
-            clone_cn_matrix[cluster_id], method=distance_method)
-
-    distance = pd.DataFrame(cell_clone_corr)
-    distance.columns.name = 'cluster_id_' + distance_metric
-
-    reclusters = pd.DataFrame(cell_clone_corr).idxmin(axis=1).dropna().astype(int)
-    reclusters.name = 'cluster_id_' + distance_metric
-    reclusters = reclusters.reset_index()
-
-    reclusters = reclusters.merge(distance.stack().rename('distance_' + distance_metric).reset_index())
-
-    logging.info('merging clusters')
-    cn_data = cn_data.merge(reclusters[['cell_id', 'cluster_id_' + distance_metric]].drop_duplicates())
-
-    logging.info('plotting clusters to {}*'.format(results_prefix + '_recluster'))
-    plot_clones(cn_data, 'cluster_id_' + distance_metric, results_prefix + '_recluster')
-
-    return reclusters
+    return snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data
 
 
-def plot_clones(cn_data, cluster_col, plots_prefix):
-    plot_data = cn_data.copy()
-    bin_filter = (plot_data['gc'] <= 0) | (plot_data['copy'].isnull())
-    plot_data.loc[bin_filter, 'state'] = 0
-    plot_data.loc[plot_data['copy'] > 5, 'copy'] = 5.
-    plot_data.loc[plot_data['copy'] < 0, 'copy'] = 0.
-
-    fig = plt.figure(figsize=(20, 30))
-    matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
-        fig, plot_data, 'copy', cluster_field_name=cluster_col, raw=True)
-    fig.savefig(plots_prefix + '_raw_cn.pdf')
-
-    fig = plt.figure(figsize=(20, 30))
-    matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
-        fig, plot_data, 'state', cluster_field_name=cluster_col)
-    fig.savefig(plots_prefix + '_cn_state.pdf')
-
-
-def memoize(cache_filename, func, *args, **kwargs):
-    if os.path.exists(cache_filename):
-        logging.info('reading existing data from {}'.format(cache_filename))
-        with open(cache_filename, 'rb') as f:
-            data = pickle.load(f)
-    else:
-        data = func(*args, **kwargs)
-        logging.info('writing data to {}'.format(cache_filename))
-        with open(cache_filename, 'wb') as f:
-            pickle.dump(data, f, protocol=4)
-    return data
-
-
-@click.command()
-@click.argument('library_ids_filename')
-@click.argument('sample_ids_filename')
+@click.group()
+@click.pass_context
 @click.argument('results_prefix')
-@click.argument('local_storage_directory')
-def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, local_storage_directory):
-    tantalus_api = dbclients.tantalus.TantalusApi()
+@click.argument('local_cache_directory')
+def infer_clones_cmd(ctx, results_prefix, local_cache_directory):
+    ctx.obj['results_prefix'] = results_prefix
+    ctx.obj['local_cache_directory'] = local_cache_directory
 
-    library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
-    sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
 
-    raw_data_filename = results_prefix + '_raw_data.pickle'
+@infer_clones_cmd.command()
+@click.pass_context
+@click.option('--library_id')
+@click.option('--sample_id')
+@click.option('--library_ids_filename')
+@click.option('--sample_ids_filename')
+def retrieve_cn(
+        ctx,
+        library_id=None,
+        library_ids_filename=None,
+        sample_id=None,
+        sample_ids_filename=None,
+    ):
+
+    results_prefix = ctx.obj['results_prefix']
+    local_cache_directory = ctx.obj['local_cache_directory']
+
+    if library_id is not None:
+        library_ids = [library_id]
+    elif library_ids_filename is not None:
+        library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
+    else:
+        raise Exception('must specify library_id or library_ids_filename')
+
+    if sample_id is not None:
+        sample_ids = [sample_id]
+    elif sample_ids_filename is not None:
+        sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
+    else:
+        raise Exception('must specify sample_id or sample_ids_filename')
 
     logging.info('retrieving cn data')
-    cn_data, metrics_data, image_feature_data = memoize(
-        raw_data_filename,
-        retrieve_data,
-        tantalus_api,
+    cn_data, metrics_data, image_feature_data = retrieve_cn_data(
         library_ids,
         sample_ids,
-        local_storage_directory,
-        results_prefix,
+        local_cache_directory,
+        results_prefix + 'retrieve_cn_',
     )
 
-    clones_filename = results_prefix + '_clones.pickle'
-    logging.info('inferring clones')
-    shape_check = cn_data.shape
-    logging.info('cn_data shape {}'.format(shape_check))
-    clusters = memoize(
-        clones_filename,
-        infer_clones,
+    cn_data.to_pickle(results_prefix + 'cn_data.pickle')
+    metrics_data.to_pickle(results_prefix + 'metrics_data.pickle')
+    image_feature_data.to_pickle(results_prefix + 'image_feature_data.pickle')
+
+
+@infer_clones_cmd.command()
+@click.pass_context
+def cluster_cn(ctx):
+
+    results_prefix = ctx.obj['results_prefix']
+
+    cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
+    metrics_data = pd.read_pickle(results_prefix + 'metrics_data.pickle')
+
+    logging.info('calculating clusters')
+    clusters, filter_metrics = scgenome.cnclones.calculate_clusters(
         cn_data,
         metrics_data,
-        results_prefix,
+        results_prefix + 'calculate_clusters_',
     )
-    assert cn_data.shape == shape_check
 
-    filtered_clusters_filename = results_prefix + '_filtered_clones.pickle'
-    filtered_clusters = memoize(
-        filtered_clusters_filename,
-        filter_clusters,
+    cell_clone_distances = scgenome.cnclones.calculate_cell_clone_distances(
+        cn_data,
+        clusters,
+        results_prefix + 'calculate_cell_clone_distances_',
+    )
+
+    final_clusters = scgenome.cnclones.finalize_clusters(
+        cn_data,
         metrics_data,
         clusters,
-        results_prefix,
+        filter_metrics,
+        cell_clone_distances,
+        results_prefix + 'finalize_clusters_',
     )
 
-    reassign_clones_filename = results_prefix + '_reassign_clones.pickle'
-    reclusters = memoize(
-        reassign_clones_filename,
-        reassign_cells,
+    clusters.to_pickle(results_prefix + 'clusters.pickle')
+    filter_metrics.to_pickle(results_prefix + 'filter_metrics.pickle')
+    cell_clone_distances.to_pickle(results_prefix + 'cell_clone_distances.pickle')
+    final_clusters.to_pickle(results_prefix + 'final_clusters.pickle')
+
+
+@infer_clones_cmd.command()
+@click.pass_context
+@click.argument('pseudobulk_ticket')
+def pseudobulk_analysis(ctx, pseudobulk_ticket):
+
+    results_prefix = ctx.obj['results_prefix']
+    local_cache_directory = ctx.obj['local_cache_directory']
+
+    cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
+    clusters = pd.read_pickle(results_prefix + 'clusters.pickle')
+    final_clusters = pd.read_pickle(results_prefix + 'final_clusters.pickle')
+
+    snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data = retrieve_pseudobulk_data(
+        pseudobulk_ticket,
+        final_clusters,
+        local_cache_directory,
+        results_prefix + 'retrieve_pseudobulk_data_',
+    )
+
+    allele_cn = scgenome.snpdata.calculate_cluster_allele_cn(
         cn_data,
-        filtered_clusters,
-        results_prefix,
+        allele_data,
+        clusters,
+        results_prefix + 'calculate_cluster_allele_cn_',
+    )
+    
+    scgenome.snvdata.run_bulk_snv_analysis(
+        snv_data,
+        snv_count_data,
+        final_clusters[['cell_id']].drop_duplicates(),
+        results_prefix + 'run_bulk_snv_analysis_',
     )
 
-    print(cn_data.head())
-    print(metrics_data.head())
-    print(image_feature_data.head())
-    print(clone_cn_data.head())
-    print(clusters.head())
+    snv_ml_tree, snv_tree_annotations = scgenome.snvphylo.run_snv_phylogenetics(
+        snv_count_data,
+        allele_cn,
+        final_clusters,
+        results_prefix + 'run_snv_phylogenetics_', 
+    )
+
+    snv_data.to_pickle(results_prefix + 'snv_data.pickle')
+    snv_count_data.to_pickle(results_prefix + 'snv_count_data.pickle')
+    allele_data.to_pickle(results_prefix + 'allele_data.pickle')
+    breakpoint_data.to_pickle(results_prefix + 'breakpoint_data.pickle')
+    breakpoint_count_data.to_pickle(results_prefix + 'breakpoint_count_data.pickle')
+
+    allele_cn.to_pickle(results_prefix + 'breakpoint_data.pickle')
+    with open(results_prefix + 'snv_ml_tree.pickle', 'wb') as f:
+        pickle.dump(snv_ml_tree, f)
+    snv_tree_annotations.to_pickle(results_prefix + 'snv_tree_annotations.pickle')
 
 
 if __name__ == '__main__':
     logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
-
-    infer_clones_cmd()
+    infer_clones_cmd(obj={})
