@@ -48,14 +48,19 @@ def get_hmmcopy_analyses(tantalus_api, library_ids):
         aln_analyses = []
         for analysis in analyses:
             aligners = set()
+            is_complete = True
             for dataset_id in analysis['input_datasets']:
                 dataset = tantalus_api.get('sequencedataset', id=dataset_id)
+                if not dataset['is_complete']:
+                    is_complete = False
                 aligners.add(dataset['aligner'])
             if len(aligners) != 1:
+                # HACK: should be an exception but will remove when datasets are cleaned up
+                continue
                 raise Exception('found {} aligners for analysis {}'.format(
                     len(aligners), analysis['id']))
             aligner = aligners.pop()
-            if aligner == 'BWA_ALN_0_5_7':
+            if is_complete and aligner == 'BWA_ALN_0_5_7':
                 aln_analyses.append(analysis)
         if len(aln_analyses) != 1:
             raise Exception('found {} hmmcopy analyses for {}: {}'.format(
@@ -150,7 +155,7 @@ def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory
     image_feature_data = get_image_feature_data(tantalus_api, library_ids)
 
     # Read count filtering
-    metrics_data = metrics_data[metrics_data['total_mapped_reads'] > 500000]
+    metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > 500000]
 
     # Filter by experimental condition
     metrics_data = metrics_data[~metrics_data['experimental_condition'].isin(['NTC'])]
@@ -171,7 +176,7 @@ def infer_clones(cn_data, metrics_data, results_prefix):
     metrics_data = metrics_data[metrics_data['quality'] > 0.5]
 
     # Remove low coverage cells
-    metrics_data = metrics_data[metrics_data['total_mapped_reads'] > 500000]
+    metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > 500000]
 
     logging.info('filtering {} of {} cells'.format(
         len(metrics_data.index), total_cells))
@@ -214,13 +219,36 @@ def filter_clusters(metrics_data, clusters, results_prefix):
 
     filtered_cluster_ids = breakpoint_data.loc[
         (breakpoint_data['cluster_id'] >= 0) &
-        (breakpoint_data['breakpoints'] < 50.),
+        (breakpoint_data['breakpoints'] < 500.),
         ['cluster_id']
     ].drop_duplicates()
 
     filtered_clusters = clusters.merge(filtered_cluster_ids)
 
     return filtered_clusters
+
+
+def recalculate_distances(distance_metric, distance_method, clone_cn_matrix, cell_cn_matrix):
+    """ Recalculate distances to closest cluster using some metric.
+    """
+
+    logging.info('Calculating clone cell {} distance'.format(distance_metric))
+    cell_clone_corr = {}
+    for cluster_id in clone_cn_matrix.columns:
+        logging.info('Calculating distance for clone {}'.format(cluster_id))
+        cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(
+            clone_cn_matrix[cluster_id], method=distance_method)
+
+    distance = pd.DataFrame(cell_clone_corr)
+    distance.columns.name = 'cluster_id_' + distance_metric
+
+    reclusters = pd.DataFrame(cell_clone_corr).idxmin(axis=1).dropna().astype(int)
+    reclusters.name = 'cluster_id_' + distance_metric
+    reclusters = reclusters.reset_index()
+
+    reclusters = reclusters.merge(distance.stack().rename('distance_' + distance_metric).reset_index())
+
+    return reclusters
 
 
 def reassign_cells(cn_data, clusters, results_prefix):
@@ -247,34 +275,36 @@ def reassign_cells(cn_data, clusters, results_prefix):
     logging.info('Create a matrix of cn data for filtered clones')
     clone_cn_matrix = (
         clone_cn_data
-            .set_index(['chr', 'start', 'end', 'cluster_id'])['state']
+            .set_index(['chr', 'start', 'end', 'cluster_id'])['copy']
             .unstack(level=['cluster_id']).fillna(0)
     )
 
-    distance_metric = 'correlation'
-    distance_method = scipy.spatial.distance.correlation
+    correlation1_distances = recalculate_distances(
+        'correlation1',
+        lambda u, v: scipy.spatial.distance.correlation(u, v, centered=False),
+        clone_cn_matrix,
+        cell_cn_matrix,
+    )
 
-    logging.info('Calculating clone cell {} distance'.format(distance_metric))
-    cell_clone_corr = {}
-    for cluster_id in clone_cn_matrix.columns:
-        logging.info('Calculating distance for clone {}'.format(cluster_id))
-        cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(
-            clone_cn_matrix[cluster_id], method=distance_method)
+    correlation2_distances = recalculate_distances(
+        'correlation2',
+        lambda u, v: 1. - scipy.stats.pearsonr(u, v)[0],
+        clone_cn_matrix,
+        cell_cn_matrix,
+    )
 
-    distance = pd.DataFrame(cell_clone_corr)
-    distance.columns.name = 'cluster_id_' + distance_metric
+    cityblock_distances = recalculate_distances(
+        'cityblock',
+        scipy.spatial.distance.cityblock,
+        clone_cn_matrix,
+        cell_cn_matrix,
+    )
 
-    reclusters = pd.DataFrame(cell_clone_corr).idxmin(axis=1).dropna().astype(int)
-    reclusters.name = 'cluster_id_' + distance_metric
-    reclusters = reclusters.reset_index()
-
-    reclusters = reclusters.merge(distance.stack().rename('distance_' + distance_metric).reset_index())
-
-    logging.info('merging clusters')
-    cn_data = cn_data.merge(reclusters[['cell_id', 'cluster_id_' + distance_metric]].drop_duplicates())
-
-    logging.info('plotting clusters to {}*'.format(results_prefix + '_recluster'))
-    plot_clones(cn_data, 'cluster_id_' + distance_metric, results_prefix + '_recluster')
+    reclusters = pd.concat([
+        correlation1_distances.set_index('cell_id'),
+        correlation2_distances.set_index('cell_id'),
+        cityblock_distances.set_index('cell_id'),
+    ], axis=1).reset_index()
 
     return reclusters
 
