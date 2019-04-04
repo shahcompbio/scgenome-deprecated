@@ -127,6 +127,14 @@ def import_cn_data(
             assert isinstance(results_data[col].dtype, pd.api.types.CategoricalDtype)
         results_tables[table_name] = results_data
 
+    if 'total_mapped_reads_hmmcopy' not in results_tables['hmmcopy_metrics']:
+         results_tables['hmmcopy_metrics']['total_mapped_reads_hmmcopy'] = results_tables['hmmcopy_metrics']['total_mapped_reads']
+
+    elif results_tables['hmmcopy_metrics']['total_mapped_reads_hmmcopy'].isnull().any():
+        fix_read_count = results_tables['hmmcopy_metrics']['total_mapped_reads_hmmcopy'].isnull()
+        results_tables['hmmcopy_metrics'].loc[fix_read_count, 'total_mapped_reads_hmmcopy'] = (
+            results_tables['hmmcopy_metrics'].loc[fix_read_count, 'total_mapped_reads'])
+
     return results_tables
 
 
