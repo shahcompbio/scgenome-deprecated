@@ -1,5 +1,6 @@
 import matplotlib
 import seaborn
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.cluster.hierarchy as sch
@@ -77,7 +78,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
     plot_data = plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name, raw=raw, max_cn=max_cn)
 
     ax = fig.add_axes([0.0,0.0,0.05,1.])
-    ax.matshow(plot_data.columns.get_level_values(1)[::-1, np.newaxis], aspect='auto', origin='lower', cmap=plt.get_cmap("Set2"))
+    ax.matshow(plot_data.columns.get_level_values(1)[::-1, np.newaxis], aspect='auto', origin='lower', cmap=plt.get_cmap("Paired"))
     ax.grid(False)
     ax.set_xticks([])
     ax.set_yticks([])
@@ -86,13 +87,10 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
 
 
 def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13):
-    plot_data = cn_data.copy()
+    chromosome_info = refgenome.info.chromosome_info[['chr', 'chromosome_start']].copy()
+    chromosome_info['chr'] = pd.Categorical(chromosome_info['chr'], categories=cn_data['chr'].cat.categories)
+    plot_data = cn_data.merge(chromosome_info)
     plot_data = plot_data[plot_data['chr'].isin(refgenome.info.chromosomes)]
-
-    plot_data.set_index('chr', inplace=True)
-    plot_data['chromosome_start'] = refgenome.info.chromosome_start
-    plot_data.reset_index(inplace=True)
-
     plot_data['start'] = plot_data['start'] + plot_data['chromosome_start']
     plot_data['end'] = plot_data['end'] + plot_data['chromosome_start']
 
