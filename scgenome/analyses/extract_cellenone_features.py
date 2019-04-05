@@ -149,10 +149,15 @@ def process_cellenone_table(tantalus_api, cellenone_dataset, inputs_storage_name
     return cellenone_data
 
 
-def get_unprocessed_cellenone(tantalus_api):
-    datasets = {}
+def get_unprocessed_cellenone(tantalus_api, library_id=None, update=False):
+    if library_id is None:
+        results_list = tantalus_api.list('results', results_type='CELLENONE')
 
-    for results in tantalus_api.list('results', results_type='CELLENONE'):
+    else:
+        results_list = tantalus_api.list('results', results_type='CELLENONE', libraries__library_id=library_id)
+
+    datasets = {}
+    for results in results_list:
         assert len(results['libraries']) <= 1
 
         if len(results['libraries']) == 0:
@@ -173,7 +178,9 @@ def get_unprocessed_cellenone(tantalus_api):
         if features is not None:
             logging.info('library {} has features {}'.format(
                 library_id, features['name']))
-            continue
+
+            if not update:
+                continue
 
         assert library_id not in datasets
         datasets[library_id] = results
@@ -184,7 +191,7 @@ def get_unprocessed_cellenone(tantalus_api):
 def run_analysis(
         tantalus_api, jira_ticket, cellenone_dataset,
         inputs_storage_name, results_storage_name,
-        archive_storage_name=None):
+        archive_storage_name=None, update=False):
 
     results_storage = tantalus_api.get(
         'storage',
@@ -236,7 +243,7 @@ def run_analysis(
     )
 
     results_file_resource, results_file_instance = tantalus_api.add_file(
-        results_storage_name, results_filepath, update=True)
+        results_storage_name, results_filepath, update=update)
     results_file_pk = results_file_resource['id']
 
     results = tantalus_api.get_or_create(
@@ -263,18 +270,20 @@ def run_analysis(
 @click.argument('jira_ticket', nargs=1)
 @click.argument('inputs_storage_name', nargs=1)
 @click.argument('results_storage_name', nargs=1)
-@click.option('--archive_storage_name', required=False)
-def run_all_analyses(jira_ticket, inputs_storage_name, results_storage_name, archive_storage_name=None):
+@click.option('--library_id')
+@click.option('--archive_storage_name')
+@click.option('--update', is_flag=True)
+def run_all_analyses(jira_ticket, inputs_storage_name, results_storage_name, library_id=None, archive_storage_name=None, update=False):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
-    datasets = get_unprocessed_cellenone(tantalus_api)
+    datasets = get_unprocessed_cellenone(tantalus_api, library_id=library_id, update=update)
     for dataset in datasets:
         logging.info('processing dataset {}'.format(dataset['name']))
 
         try:
             run_analysis(
                 tantalus_api, jira_ticket, dataset, inputs_storage_name, results_storage_name,
-                archive_storage_name=archive_storage_name)
+                archive_storage_name=archive_storage_name, update=update)
         except Exception as e:
             logging.warning('processing of dataset {} failed with exception {}'.format(dataset['name'], e))
 
