@@ -129,6 +129,10 @@ def get_image_feature_data(tantalus_api, library_ids):
             data = pd.read_csv(f, index_col=0)
             data['library_id'] = library_id
             image_feature_data.append(data)
+
+    if len(image_feature_data) == 0:
+        return pd.DataFrame()
+
     image_feature_data = pd.concat(image_feature_data, ignore_index=True, sort=True)
 
     return image_feature_data
@@ -376,17 +380,17 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
     fig = plt.figure(figsize=(15, 2))
     scgenome.cnplot.plot_cluster_cn_matrix(
         fig, plot_data, 'state', cluster_field_name=cluster_col)
-    fig.savefig(plots_prefix + '_clone_cn.pdf')
+    fig.savefig(plots_prefix + '_clone_cn.pdf', bbox_inches='tight')
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
         fig, plot_data, 'copy', cluster_field_name=cluster_col, raw=True)
-    fig.savefig(plots_prefix + '_raw_cn.pdf')
+    fig.savefig(plots_prefix + '_raw_cn.pdf', bbox_inches='tight')
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
         fig, plot_data, 'state', cluster_field_name=cluster_col)
-    fig.savefig(plots_prefix + '_cn_state.pdf')
+    fig.savefig(plots_prefix + '_cn_state.pdf', bbox_inches='tight')
 
 
 def memoize(cache_filename, func, *args, **kwargs):
@@ -460,18 +464,13 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
     filtered_clusters = memoize(
         filtered_clusters_filename,
         filter_clusters,
+        cn_data,
         metrics_data,
         clusters,
         filter_metrics,
         cell_clone_distances,
         results_prefix,
     )
-
-    print(cn_data.head())
-    print(metrics_data.head())
-    print(image_feature_data.head())
-    print(clone_cn_data.head())
-    print(clusters.head())
 
 
 if __name__ == '__main__':
