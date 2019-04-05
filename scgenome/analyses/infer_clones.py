@@ -415,6 +415,14 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
         results_prefix,
     )
 
+    # TODO: Remove temporary fixup
+    if 'total_mapped_reads_hmmcopy' not in metrics_data:
+         metrics_data['total_mapped_reads_hmmcopy'] = metrics_data['total_mapped_reads']
+    elif metrics_data['total_mapped_reads_hmmcopy'].isnull().any():
+        fix_read_count = metrics_data['total_mapped_reads_hmmcopy'].isnull()
+        metrics_data.loc[fix_read_count, 'total_mapped_reads_hmmcopy'] = (
+            metrics_data.loc[fix_read_count, 'total_mapped_reads'])
+
     clones_filename = results_prefix + '_clones.pickle'
     logging.info('inferring clones')
     shape_check = cn_data.shape
