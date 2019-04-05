@@ -174,8 +174,9 @@ def infer_clones(cn_data, metrics_data, results_prefix):
     metrics_data['filter_reads'] = (metrics_data['total_mapped_reads_hmmcopy'] > 500000)
 
     # Calculate separation between predicted and normalized copy number
-    cn_data['copy_state_diff'] = np.absolute(cn_data['copy'] - cn_data['state'])
-    copy_state_diff = (cn_data[['cell_id', 'copy_state_diff']]
+    copy_state_diff = cn_data[['cell_id', 'copy', 'state']].copy()
+    copy_state_diff['copy_state_diff'] = np.absolute(copy_state_diff['copy'] - copy_state_diff['state'])
+    copy_state_diff = (copy_state_diff[['cell_id', 'copy_state_diff']]
         .dropna().groupby('cell_id')['copy_state_diff']
         .mean().reset_index().dropna())
     metrics_data = metrics_data.merge(copy_state_diff)
@@ -193,7 +194,7 @@ def infer_clones(cn_data, metrics_data, results_prefix):
         ['cell_id']]
 
     logging.info('filtering {} of {} cells'.format(
-        len(filtered_cells.index), len(metrics.index)))
+        len(filtered_cells.index), len(metrics_data.index)))
     cn_data = cn_data.merge(filtered_cells[['cell_id']].drop_duplicates())
     assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
 
@@ -229,7 +230,15 @@ def filter_clusters(metrics_data, clusters, filter_metrics, cell_clone_distances
     """ Filter clusters
     """
 
-    filter_metrics = filter_metrics.merge(cell_clone_distances, on='cell_id')
+    filtered_clusters = filter_metrics.merge(cell_clone_distances, on='cell_id')
+
+    # Merge in cluster id for those cells that were part of the initial clustering
+    filtered_clusters = filtered_clusters.merge(
+        clusters[['cell_id', 'cluster_id']],
+        how='outer', on='cell_id')
+
+    # Record initial clustering
+    filtered_clusters['initial_cluster_id'] = filtered_clusters['cluster_id']
 
     # Calculate whether the clusters are stable when using correlation
     # vs cityblock distance as a distance metric.
@@ -237,25 +246,37 @@ def filter_clusters(metrics_data, clusters, filter_metrics, cell_clone_distances
     # correctly assigned the correct ploidy, and have thus been erroneously
     # assigned to the wrong cluster.  It will successfully filter cells that
     # have a different ploidy than there actual clone.
-    filter_metrics['filter_same_cluster'] = (
-        (filter_metrics['cluster_id_pearsonr'] == filter_metrics['cluster_id_cityblock'])
+    filtered_clusters['filter_same_cluster'] = (
+        (filtered_clusters['cluster_id_pearsonr'] == filtered_clusters['cluster_id_cityblock'])
     )
 
     # Strict initial filtering, excluding s phase cells
-    filter_metrics['filter_final'] = (
-        ~(filter_metrics['is_s_phase']) &
-        filter_metrics['filter_quality'] &
-        filter_metrics['filter_reads'] &
-        filter_metrics['filter_same_cluster'] &
-        filter_metrics['filter_copy_state_diff'])
+    filtered_clusters['filter_final'] = (
+        ~(filtered_clusters['is_s_phase']) &
+        filtered_clusters['filter_quality'] &
+        filtered_clusters['filter_reads'] &
+        filtered_clusters['filter_same_cluster'] &
+        filtered_clusters['filter_copy_state_diff'])
 
     # Add back in 
-    filter_metrics['filter_final'] |= (
-        filter_metrics['is_s_phase'] &
-        filter_metrics['filter_reads'] &
-        filter_metrics['filter_copy_state_diff'])
+    filtered_clusters['filter_final'] |= (
+        filtered_clusters['is_s_phase'] &
+        filtered_clusters['filter_reads'] &
+        filtered_clusters['filter_copy_state_diff'])
 
-    return filter_metrics
+    # For non s-phase cells, assign cells based on their initial cluster
+    filtered_clusters.loc[filtered_clusters['is_s_phase'], 'cluster_id'] = (
+        filtered_clusters.loc[filtered_clusters['is_s_phase'], 'cluster_id_pearsonr'])
+
+    # Set final clustering to -2 for filtered clusters
+    filtered_clusters.loc[~filtered_clusters['filter_final'], 'cluster_id'] = -2
+
+    filtered_clusters['cluster_id'] = filtered_clusters['cluster_id'].astype(int)
+
+    # Filter both the -1 and -2 clusters
+    filtered_clusters['filter_final'] &= (filtered_clusters['cluster_id'] >= 0)
+
+    return filtered_clusters
 
 
 def recalculate_distances(distance_metric, distance_method, clone_cn_matrix, cell_cn_matrix):
