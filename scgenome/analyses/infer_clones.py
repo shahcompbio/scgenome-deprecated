@@ -226,7 +226,7 @@ def infer_clones(cn_data, metrics_data, results_prefix):
     return clusters, filter_metrics
 
 
-def filter_clusters(metrics_data, clusters, filter_metrics, cell_clone_distances, results_prefix):
+def filter_clusters(cn_data, metrics_data, clusters, filter_metrics, cell_clone_distances, results_prefix):
     """ Filter clusters
     """
 
@@ -275,6 +275,12 @@ def filter_clusters(metrics_data, clusters, filter_metrics, cell_clone_distances
 
     # Filter both the -1 and -2 clusters
     filtered_clusters['filter_final'] &= (filtered_clusters['cluster_id'] >= 0)
+
+    logging.info('merging clusters')
+    cn_data = cn_data.merge(filtered_clusters.query('filter_final')[['cell_id', 'cluster_id']].drop_duplicates())
+
+    logging.info('plotting clusters to {}*'.format(results_prefix + '_filtered'))
+    plot_clones(cn_data, 'cluster_id', results_prefix + '_filtered')
 
     return filtered_clusters
 
@@ -366,6 +372,11 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
     plot_data.loc[bin_filter, 'state'] = 0
     plot_data.loc[plot_data['copy'] > 5, 'copy'] = 5.
     plot_data.loc[plot_data['copy'] < 0, 'copy'] = 0.
+
+    fig = plt.figure(figsize=(15, 2))
+    scgenome.cnplot.plot_cluster_cn_matrix(
+        fig, plot_data, 'state', cluster_field_name=cluster_col)
+    fig.savefig(plots_prefix + '_clone_cn.pdf')
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
