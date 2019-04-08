@@ -170,12 +170,27 @@ def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory
     return cn_data, metrics_data, image_feature_data
 
 
+def calc_prop_hom_del(states):
+    cndist = states.value_counts()
+    cndist = cndist / cndist.sum()
+    if 0 not in cndist:
+        return 0
+    return cndist[0]
+
+
 def infer_clones(cn_data, metrics_data, results_prefix):
     """ Infer clones from copy number data.
     """
 
     metrics_data['filter_quality'] = (metrics_data['quality'] > 0.75)
     metrics_data['filter_reads'] = (metrics_data['total_mapped_reads_hmmcopy'] > 500000)
+
+    # Calculate proportion homozygous deletion state
+    prop_hom_del = cn_data.groupby('cell_id')['state'].apply(calc_prop_hom_del).rename('prop_hom_del').reset_index()
+    metrics_data = metrics_data.merge(prop_hom_del, how='left')
+    metrics_data['prop_hom_del'] = metrics_data['prop_hom_del'].fillna(0)
+    metrics_data['zscore_prop_hom_del'] = scipy.stats.zscore(metrics_data['prop_hom_del'])
+    metrics_data['filter_prop_hom_del'] = (metrics_data['zscore_prop_hom_del'] < 3.)
 
     # Calculate separation between predicted and normalized copy number
     copy_state_diff = cn_data[['cell_id', 'copy', 'state']].copy()
@@ -190,11 +205,13 @@ def infer_clones(cn_data, metrics_data, results_prefix):
     # Remove low quality cells
     # Remove low coverage cells
     # Remove cells with a large divergence between copy state and norm copy number
+    # Remove cells with outlier proportion of homozygous deletion
     filtered_cells = metrics_data.loc[
         (~metrics_data['is_s_phase']) &
         metrics_data['filter_quality'] &
         metrics_data['filter_reads'] &
         metrics_data['filter_copy_state_diff'],
+        metrics_data['filter_prop_hom_del'],
         ['cell_id']]
 
     logging.info('filtering {} of {} cells'.format(
