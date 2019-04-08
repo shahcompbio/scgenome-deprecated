@@ -1,4 +1,5 @@
 import collections
+import logging
 import pandas as pd
 
 import dbclients.tantalus
@@ -136,5 +137,129 @@ def import_cn_data(
             results_tables['hmmcopy_metrics'].loc[fix_read_count, 'total_mapped_reads'])
 
     return results_tables
+
+
+def search_hmmcopy_analyses(
+        tantalus_api,
+        library_ids,
+        aligner_name='BWA_ALN_0_5_7',
+):
+    """ Search for hmmcopy results and analyses for a list of libraries.
+    """
+    hmmcopy_results = {}
+    hmmcopy_tickets = []
+
+    for library_id in library_ids:
+        logging.info('hmmcopy data for {}'.format(library_id))
+
+        analyses = list(tantalus_api.list(
+            'analysis',
+            analysis_type__name='hmmcopy',
+            input_datasets__library__library_id=library_id,
+        ))
+        aln_analyses = []
+        for analysis in analyses:
+            aligners = set()
+            is_complete = True
+            for dataset_id in analysis['input_datasets']:
+                dataset = tantalus_api.get('sequencedataset', id=dataset_id)
+                if not dataset['is_complete']:
+                    is_complete = False
+                aligners.add(dataset['aligner'])
+            if len(aligners) != 1:
+                # HACK: should be an exception but will remove when datasets are cleaned up
+                continue
+                raise Exception('found {} aligners for analysis {}'.format(
+                    len(aligners), analysis['id']))
+            aligner = aligners.pop()
+            if is_complete and aligner == aligner_name:
+                aln_analyses.append(analysis)
+        if len(aln_analyses) != 1:
+            raise Exception('found {} hmmcopy analyses for {}: {}'.format(
+                len(aln_analyses), library_id, [a['id'] for a in aln_analyses]))
+        analysis = aln_analyses[0]
+        results = tantalus_api.get(
+            'resultsdataset',
+            analysis=analysis['id'],
+        )
+        hmmcopy_results[library_id] = results
+        hmmcopy_tickets.append(analysis['jira_ticket'])
+
+    return hmmcopy_results, hmmcopy_tickets
+
+
+def import_cell_cycle_data(
+        tantalus_api,
+        library_ids,
+        hmmcopy_results,
+        results_storage_name='singlecellblob_results',
+):
+    """ Import cell cycle predictions for a list of libraries
+    """
+    storage_client = tantalus_api.get_storage_client(results_storage_name)
+
+    cell_cycle_data = []
+
+    for library_id in library_ids:
+        logging.info('cell cycle data for {}'.format(library_id))
+
+        classifier = tantalus_api.get(
+            'analysis',
+            analysis_type='cell_state_classifier',
+            version='v0.0.1',
+            input_results__id=hmmcopy_results[library_id]['id'],
+        )
+        features = tantalus_api.get(
+            'resultsdataset',
+            analysis=classifier['id'],
+        )
+        file_instances = tantalus_api.get_dataset_file_instances(
+            features['id'], 'resultsdataset', results_storage_name)
+        for file_instance in file_instances:
+            f = storage_client.open_file(file_instance['file_resource']['filename'])
+            data = pd.read_csv(f)
+            data['library_id'] = library_id
+            cell_cycle_data.append(data)
+    cell_cycle_data = pd.concat(cell_cycle_data, ignore_index=True, sort=True)
+
+    return cell_cycle_data
+
+
+def import_image_feature_data(
+        tantalus_api,
+        library_ids,
+        results_storage_name='singlecellblob_results',
+):
+    """ Import image features for a list of libraries
+    """
+    storage_client = tantalus_api.get_storage_client(results_storage_name)
+
+    image_feature_data = []
+
+    for library_id in library_ids:
+        try:
+            features = tantalus_api.get(
+                'results',
+                results_type='CELLENONE_FEATURES',
+                results_version='v0.0.1',
+                libraries__library_id=library_id,
+            )
+        except NotFoundError:
+            logging.info('no image data for {}'.format(library_id))
+            continue
+        file_instances = tantalus_api.get_dataset_file_instances(
+            features['id'], 'resultsdataset', results_storage_name)
+        for file_instance in file_instances:
+            f = storage_client.open_file(file_instance['file_resource']['filename'])
+            data = pd.read_csv(f, index_col=0)
+            data['library_id'] = library_id
+            image_feature_data.append(data)
+
+    if len(image_feature_data) == 0:
+        return pd.DataFrame()
+
+    image_feature_data = pd.concat(image_feature_data, ignore_index=True, sort=True)
+
+    return image_feature_data
 
 
