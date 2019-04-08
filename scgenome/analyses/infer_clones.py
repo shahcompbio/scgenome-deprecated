@@ -100,7 +100,7 @@ def infer_clones(cn_data, metrics_data, results_prefix):
         (~metrics_data['is_s_phase']) &
         metrics_data['filter_quality'] &
         metrics_data['filter_reads'] &
-        metrics_data['filter_copy_state_diff'],
+        metrics_data['filter_copy_state_diff'] &
         metrics_data['filter_prop_hom_del'],
         ['cell_id']]
 
@@ -132,6 +132,9 @@ def infer_clones(cn_data, metrics_data, results_prefix):
         'filter_quality',
         'filter_reads',
         'filter_copy_state_diff',
+        'prop_hom_del',
+        'zscore_prop_hom_del',
+        'filter_prop_hom_del',
     ]]
 
     return clusters, filter_metrics
@@ -167,13 +170,15 @@ def filter_clusters(cn_data, metrics_data, clusters, filter_metrics, cell_clone_
         filtered_clusters['filter_quality'] &
         filtered_clusters['filter_reads'] &
         filtered_clusters['filter_same_cluster'] &
-        filtered_clusters['filter_copy_state_diff'])
+        filtered_clusters['filter_copy_state_diff'] &
+        filtered_clusters['filter_prop_hom_del'])
 
-    # Add back in 
+    # Add back in s phase cells
     filtered_clusters['filter_final'] |= (
         filtered_clusters['is_s_phase'] &
         filtered_clusters['filter_reads'] &
-        filtered_clusters['filter_copy_state_diff'])
+        filtered_clusters['filter_copy_state_diff'] &
+        filtered_clusters['filter_prop_hom_del'])
 
     # For non s-phase cells, assign cells based on their initial cluster
     filtered_clusters.loc[filtered_clusters['is_s_phase'], 'cluster_id'] = (
