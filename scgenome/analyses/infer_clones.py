@@ -224,9 +224,34 @@ def recalculate_distances(distance_metric, distance_method, clone_cn_matrix, cel
     return reclusters
 
 
-def calculate_cell_clone_distances(cn_data, clusters, results_prefix):
+def breakpoint_filter(metrics_data, clusters, max_breakpoints, results_prefix):
+    """ Filter clusters based on breakpoint counts
+    """
+    breakpoint_data = (
+        metrics_data
+        .merge(clusters[['cell_id', 'cluster_id']])
+        .groupby('cluster_id')['breakpoints']
+        .mean().reset_index()
+        .sort_values('breakpoints'))
+
+    fig = plt.figure(figsize=(4, 4))
+    breakpoint_data['breakpoints'].hist(bins=40)
+    fig.savefig(results_prefix + '_breakpoint_hist.pdf', bbox_inches='tight')
+
+    breakpoint_data = breakpoint_data[breakpoint_data['breakpoints'] <= max_breakpoints]
+
+    clusters = clusters[clusters['cluster_id'].isin(breakpoint_data['cluster_id'])]
+
+    return clusters
+
+
+def calculate_cell_clone_distances(cn_data, clusters, results_prefix, breakpoint_filter=None):
     """ Calculate the distance to the closest clone for multiple metrics.
     """
+    if breakpoint_filter is None:
+        clusters = breakpoint_filter(
+             metrics_data, clusters, results_prefix,
+             max_breakpoints=breakpoint_filter)
 
     logging.info('Create clone copy number table')
     clone_cn_data = (
@@ -323,7 +348,14 @@ def memoize(cache_filename, func, *args, **kwargs):
 @click.argument('sample_ids_filename')
 @click.argument('results_prefix')
 @click.argument('local_storage_directory')
-def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, local_storage_directory):
+@click.option('breakpoint_filter', type=int)
+def infer_clones_cmd(
+        library_ids_filename,
+        sample_ids_filename,
+        results_prefix,
+        local_storage_directory,
+        breakpoint_filter=None):
+
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
@@ -370,6 +402,7 @@ def infer_clones_cmd(library_ids_filename, sample_ids_filename, results_prefix, 
         cn_data,
         clusters,
         results_prefix,
+        breakpoint_filter=breakpoint_filter,
     )
 
     filtered_clusters_filename = results_prefix + '_filtered_clones.pickle'
