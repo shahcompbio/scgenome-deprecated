@@ -8,19 +8,16 @@ from datamanagement.miscellaneous.hdf5helper import read_python2_hdf5_dataframe
 def get_highest_snpeff_effect(snpeff_data):
     """ Select the highest ranked effect from snpeff data.
     """
-    print(snpeff_data)
     ordered_effect_impacts = ['HIGH', 'MODERATE', 'LOW', 'MODIFIER']
     snpeff_data = snpeff_data.merge(
         pd.DataFrame({
             'effect_impact': ordered_effect_impacts,
             'effect_impact_rank': range(len(ordered_effect_impacts))}))
-    print(snpeff_data)
     snpeff_data = (
         snpeff_data.sort_values(['chrom', 'coord', 'ref', 'alt', 'effect_impact_rank'], ascending=True)
         .groupby(['chrom', 'coord', 'ref', 'alt'], sort=False)
         .first()
         .reset_index())
-    print(snpeff_data)
     snpeff_data = snpeff_data[['chrom', 'coord', 'ref', 'alt', 'gene_name', 'effect', 'effect_impact']]
     return snpeff_data
 
