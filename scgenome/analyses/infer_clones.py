@@ -68,8 +68,8 @@ def calc_prop_hom_del(states):
     return cndist[0]
 
 
-def infer_clones(cn_data, metrics_data, results_prefix):
-    """ Infer clones from copy number data.
+def calculate_clusters(cn_data, metrics_data, results_prefix):
+    """ Cluster copy number data.
     """
 
     metrics_data['filter_quality'] = (metrics_data['quality'] > 0.75)
@@ -140,7 +140,28 @@ def infer_clones(cn_data, metrics_data, results_prefix):
     return clusters, filter_metrics
 
 
-def filter_clusters(cn_data, metrics_data, clusters, filter_metrics, cell_clone_distances, results_prefix):
+def breakpoint_filter(metrics_data, clusters, max_breakpoints, results_prefix):
+    """ Filter clusters based on breakpoint counts
+    """
+    breakpoint_data = (
+        metrics_data
+        .merge(clusters[['cell_id', 'cluster_id']])
+        .groupby('cluster_id')['breakpoints']
+        .mean().reset_index()
+        .sort_values('breakpoints'))
+
+    fig = plt.figure(figsize=(4, 4))
+    breakpoint_data['breakpoints'].hist(bins=40)
+    fig.savefig(results_prefix + '_breakpoint_hist.pdf', bbox_inches='tight')
+
+    breakpoint_data = breakpoint_data[breakpoint_data['breakpoints'] <= max_breakpoints]
+
+    clusters = clusters[clusters['cluster_id'].isin(breakpoint_data['cluster_id'])]
+
+    return clusters
+
+
+def annotate_clusters(cn_data, metrics_data, clusters, filter_metrics, cell_clone_distances, results_prefix):
     """ Filter clusters
     """
 
@@ -212,37 +233,11 @@ def recalculate_distances(distance_metric, distance_method, clone_cn_matrix, cel
         cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(
             clone_cn_matrix[cluster_id], method=distance_method)
 
-    distance = pd.DataFrame(cell_clone_corr)
-    distance.columns.name = 'cluster_id_' + distance_metric
+    distances = pd.DataFrame(cell_clone_corr)
+    distances.columns.name = 'cluster_id'
+    distances = distances.stack().rename(distance_metric).reset_index()
 
-    reclusters = pd.DataFrame(cell_clone_corr).idxmin(axis=1).dropna().astype(int)
-    reclusters.name = 'cluster_id_' + distance_metric
-    reclusters = reclusters.reset_index()
-
-    reclusters = reclusters.merge(distance.stack().rename('distance_' + distance_metric).reset_index())
-
-    return reclusters
-
-
-def breakpoint_filter(metrics_data, clusters, max_breakpoints, results_prefix):
-    """ Filter clusters based on breakpoint counts
-    """
-    breakpoint_data = (
-        metrics_data
-        .merge(clusters[['cell_id', 'cluster_id']])
-        .groupby('cluster_id')['breakpoints']
-        .mean().reset_index()
-        .sort_values('breakpoints'))
-
-    fig = plt.figure(figsize=(4, 4))
-    breakpoint_data['breakpoints'].hist(bins=40)
-    fig.savefig(results_prefix + '_breakpoint_hist.pdf', bbox_inches='tight')
-
-    breakpoint_data = breakpoint_data[breakpoint_data['breakpoints'] <= max_breakpoints]
-
-    clusters = clusters[clusters['cluster_id'].isin(breakpoint_data['cluster_id'])]
-
-    return clusters
+    return distances
 
 
 def calculate_cell_clone_distances(cn_data, clusters, results_prefix, breakpoint_filter=None):
@@ -299,9 +294,9 @@ def calculate_cell_clone_distances(cn_data, clusters, results_prefix, breakpoint
     )
 
     clone_cell_distances = pd.concat([
-        pearsonr_distances.set_index('cell_id'),
-        spearmanr_distances.set_index('cell_id'),
-        cityblock_distances.set_index('cell_id'),
+        pearsonr_distances.set_index(['cell_id', 'cluster_id']),
+        spearmanr_distances.set_index(['cell_id', 'cluster_id']),
+        cityblock_distances.set_index(['cell_id', 'cluster_id']),
     ], axis=1).reset_index()
 
     return clone_cell_distances
@@ -382,20 +377,20 @@ def infer_clones_cmd(
         metrics_data.loc[fix_read_count, 'total_mapped_reads_hmmcopy'] = (
             metrics_data.loc[fix_read_count, 'total_mapped_reads'])
 
-    clones_filename = results_prefix + '_clones.pickle'
-    logging.info('inferring clones')
+    clones_filename = results_prefix + '_clusters.pickle'
+    logging.info('calculating clusters')
     shape_check = cn_data.shape
     logging.info('cn_data shape {}'.format(shape_check))
     clusters, filter_metrics = memoize(
         clones_filename,
-        infer_clones,
+        calculate_clusters,
         cn_data,
         metrics_data,
         results_prefix,
     )
     assert cn_data.shape == shape_check
 
-    cell_clone_distances_filename = results_prefix + '_cell_clone_distances.pickle'
+    cell_clone_distances_filename = results_prefix + '_cell_cluster_distances.pickle'
     cell_clone_distances = memoize(
         cell_clone_distances_filename,
         calculate_cell_clone_distances,
@@ -405,10 +400,10 @@ def infer_clones_cmd(
         breakpoint_filter=breakpoint_filter,
     )
 
-    filtered_clusters_filename = results_prefix + '_filtered_clones.pickle'
-    filtered_clusters = memoize(
-        filtered_clusters_filename,
-        filter_clusters,
+    annotate_clusters_filename = results_prefix + '_annotate_clusters.pickle'
+    annotated_clusters = memoize(
+        annotate_clusters_filename,
+        annotate_clusters,
         cn_data,
         metrics_data,
         clusters,
