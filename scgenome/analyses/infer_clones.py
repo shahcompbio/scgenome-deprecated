@@ -348,7 +348,7 @@ def memoize(cache_filename, func, *args, **kwargs):
 @click.argument('sample_ids_filename')
 @click.argument('results_prefix')
 @click.argument('local_storage_directory')
-@click.option('breakpoint_filter', type=int)
+@click.option('--breakpoint_filter', type=int)
 def infer_clones_cmd(
         library_ids_filename,
         sample_ids_filename,
