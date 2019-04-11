@@ -7,7 +7,12 @@ import matplotlib.pyplot as plt
 from adjustText import adjust_text
 
 
-def umap_hdbscan_cluster(cn, n_components=2):
+def umap_hdbscan_cluster(
+        cn,
+        n_components=2,
+        n_neighbors=15,
+        min_dist=0.1,
+):
     """ Cluster using umap and hdbscan.
 
     Args:
@@ -22,10 +27,11 @@ def umap_hdbscan_cluster(cn, n_components=2):
 
     """
     embedding = umap.UMAP(
-        n_neighbors=30,
-        min_dist=0.0,
+        n_neighbors=n_neighbors,
+        min_dist=min_dist,
         n_components=n_components,
         random_state=42,
+        metric='euclidean',
     ).fit_transform(cn.fillna(0).values.T)
 
     clusters = hdbscan.HDBSCAN(
