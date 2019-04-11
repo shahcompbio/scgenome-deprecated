@@ -240,13 +240,9 @@ def recalculate_distances(distance_metric, distance_method, clone_cn_matrix, cel
     return distances
 
 
-def calculate_cell_clone_distances(cn_data, clusters, results_prefix, breakpoint_filter=None):
+def calculate_cell_clone_distances(cn_data, clusters, results_prefix):
     """ Calculate the distance to the closest clone for multiple metrics.
     """
-    if breakpoint_filter is None:
-        clusters = breakpoint_filter(
-             metrics_data, clusters, results_prefix,
-             max_breakpoints=breakpoint_filter)
 
     logging.info('Create clone copy number table')
     clone_cn_data = (
@@ -343,13 +339,12 @@ def memoize(cache_filename, func, *args, **kwargs):
 @click.argument('sample_ids_filename')
 @click.argument('results_prefix')
 @click.argument('local_storage_directory')
-@click.option('--breakpoint_filter', type=int)
 def infer_clones_cmd(
         library_ids_filename,
         sample_ids_filename,
         results_prefix,
         local_storage_directory,
-        breakpoint_filter=None):
+):
 
     tantalus_api = dbclients.tantalus.TantalusApi()
 
@@ -397,7 +392,6 @@ def infer_clones_cmd(
         cn_data,
         clusters,
         results_prefix,
-        breakpoint_filter=breakpoint_filter,
     )
 
     annotate_clusters_filename = results_prefix + '_annotate_clusters.pickle'
