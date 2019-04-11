@@ -47,8 +47,8 @@ def get_snv_results(dest):
     cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
 
     snpeff = read_python2_hdf5_dataframe(dest,'/snv/snpeff')
-    print('snpeff', snpeff.shape)
     snpeff = get_highest_snpeff_effect(snpeff)
+    print('snpeff', snpeff.shape)
 
     tnc = read_python2_hdf5_dataframe(dest,'/snv/tri_nucleotide_context')
 
@@ -56,9 +56,9 @@ def get_snv_results(dest):
     print('total', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(mappability)
     print('post mappability', data[['chrom', 'coord']].drop_duplicates().shape)
-    data = data.merge(strelka_results, how='left')
+    data = data.merge(strelka_results)
     print('post strelka', data[['chrom', 'coord']].drop_duplicates().shape)
-    data = data.merge(museq_results, how='left')
+    data = data.merge(museq_results)
     print('post museq', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(cosmic, how='left')
     print('post cosmic', data[['chrom', 'coord']].drop_duplicates().shape)
