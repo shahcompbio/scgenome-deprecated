@@ -60,6 +60,38 @@ def retrieve_cn_data(tantalus_api, library_ids, sample_ids, local_storage_direct
     return cn_data, metrics_data, image_feature_data
 
 
+def retrieve_pseudobulk_data(tantalus_api, ticket_id, local_storage_directory):
+    tantalus_api = dbclients.tantalus.TantalusApi()
+
+    pseudobulk_results = search_pseudobulk_results(tantalus_api, ticket_id)
+
+    results_storage_name = 'singlecellblob_results'
+
+    datamanagement.transfer_files.cache_dataset(
+        tantalus_api,
+        pseudobulk_results['id'],
+        'resultsdataset',
+        results_storage_name,
+        local_storage_directory,
+    )
+
+
+# TODO: implement
+def read_haplotype_allele_counts():
+    allele_counts = []
+
+    for sample_id, library_id in sample_library:
+        filename = '{}/results/{}_{}_allele_counts.csv'.format(
+            pseudobulk_ticket_id, sample_id, library_id)
+        filepath = local_results_client.get_url(filename)
+        allele_data = pd.read_csv(filepath)
+        allele_counts.append(allele_data)
+
+    allele_counts = pd.concat(allele_counts, ignore_index=True)
+
+    allele_counts.head()
+
+
 def calc_prop_hom_del(states):
     cndist = states.value_counts()
     cndist = cndist / cndist.sum()

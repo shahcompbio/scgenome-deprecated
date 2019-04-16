@@ -188,6 +188,25 @@ def search_hmmcopy_analyses(
     return hmmcopy_results, hmmcopy_tickets
 
 
+def search_pseudobulk_results(
+        tantalus_api,
+        ticket_id,
+):
+    """ Search for pseudobulk results and analysis for a given ticket.
+    """
+    analyses = list(tantalus_api.list(
+        'analysis',
+        jira_ticket=ticket_id,
+    ))
+
+    results = tantalus_api.get(
+        'resultsdataset',
+        analysis=analysis['id'],
+    )
+
+    return results
+
+
 def import_cell_cycle_data(
         tantalus_api,
         library_ids,
