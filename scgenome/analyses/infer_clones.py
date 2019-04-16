@@ -30,7 +30,7 @@ import datamanagement.transfer_files
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
 
-def retrieve_data(tantalus_api, library_ids, sample_ids, local_storage_directory, results_prefix):
+def retrieve_cn_data(tantalus_api, library_ids, sample_ids, local_storage_directory, results_prefix):
     hmmcopy_results, hmmcopy_tickets = scgenome.dataimport.search_hmmcopy_analyses(tantalus_api, library_ids)
 
     results = scgenome.dataimport.import_cn_data(
@@ -161,65 +161,108 @@ def breakpoint_filter(metrics_data, clusters, max_breakpoints, results_prefix):
     return clusters
 
 
-def annotate_clusters(cn_data, metrics_data, clusters, filter_metrics, cell_clone_distances, results_prefix):
-    """ Filter clusters
+is_original_cluster_mean_threshold = 0.5
+cluster_size_threshold = 50
+
+def finalize_clusters(cn_data, metrics_data, clusters, filter_metrics, cell_clone_distances, results_prefix):
+    """ Generate finalized filtered clusters
     """
 
-    filtered_clusters = filter_metrics.merge(cell_clone_distances, on='cell_id')
+    # Calculate the cluster assignment based on correlation
+    correlation_metric = 'pearsonr'
+    correlation_cluster = (
+        cell_clone_distances
+        .set_index(['cluster_id', 'cell_id'])[correlation_metric]
+        .unstack().idxmin().rename(correlation_metric + '_cluster_id').reset_index())
 
-    # Merge in cluster id for those cells that were part of the initial clustering
-    filtered_clusters = filtered_clusters.merge(
-        clusters[['cell_id', 'cluster_id']],
-        how='outer', on='cell_id')
+    # Calculate which cells cluster assignment matches highest correlation cluster
+    cluster_annotation = cell_clone_distances.merge(clusters[['cell_id', 'cluster_id']])
+    cluster_annotation = cluster_annotation.merge(correlation_cluster)
+    cluster_annotation['is_original'] = (cluster_annotation['cluster_id'] == cluster_annotation[correlation_metric + '_cluster_id'])
 
-    # Record initial clustering
-    filtered_clusters['initial_cluster_id'] = filtered_clusters['cluster_id']
+    # Plot the cityblock distance distribution of each cluster separated
+    # by whether the assigned cluster equals the correlation cluster
+    plot_metric = 'cityblock'
+    g = seaborn.factorplot(
+        x='cluster_id', y=plot_metric,
+        hue='is_original', kind='strip',
+        dodge=True, data=cluster_annotation, aspect=3)
+    g.fig.savefig(results_prefix + '_cluster_cityblock_distance.pdf', bbox_inches='tight')
 
-    # Calculate whether the clusters are stable when using correlation
-    # vs cityblock distance as a distance metric.
-    # Note: this will filter cells that have been either erroneously or
-    # correctly assigned the correct ploidy, and have thus been erroneously
-    # assigned to the wrong cluster.  It will successfully filter cells that
-    # have a different ploidy than there actual clone.
-    filtered_clusters['filter_same_cluster'] = (
-        (filtered_clusters['cluster_id_pearsonr'] == filtered_clusters['cluster_id_cityblock'])
-    )
+    # Calculate the proportion of each cluster that would be assigned to
+    # that cluster by maximizing correlation
+    cluster_annotation['is_original_f'] = cluster_annotation['is_original'] * 1.
+    is_original_mean = cluster_annotation.groupby('cluster_id')['is_original_f'].mean().rename('is_original_cluster_mean').reset_index()
+    cluster_annotation = cluster_annotation.merge(is_original_mean)
 
-    # Strict initial filtering, excluding s phase cells
-    filtered_clusters['filter_final'] = (
-        ~(filtered_clusters['is_s_phase']) &
-        filtered_clusters['filter_quality'] &
-        filtered_clusters['filter_reads'] &
-        filtered_clusters['filter_same_cluster'] &
-        filtered_clusters['filter_copy_state_diff'] &
-        filtered_clusters['filter_prop_hom_del'])
+    # Filter cells that are not assigned to the same cluster they
+    # are most correlated with
+    cluster_annotation = cluster_annotation.query('is_original')
 
-    # Add back in s phase cells
-    filtered_clusters['filter_final'] |= (
-        filtered_clusters['is_s_phase'] &
-        filtered_clusters['filter_reads'] &
-        filtered_clusters['filter_copy_state_diff'] &
-        filtered_clusters['filter_prop_hom_del'])
+    # Filter clusters for which more than a given proportion of cells are
+    # assigned to a different cluster than that which they are most
+    # correlated to
+    cluster_annotation = cluster_annotation.query(
+        'is_original_cluster_mean > {}'.format(is_original_cluster_mean_threshold))
 
-    # For non s-phase cells, assign cells based on their initial cluster
-    filtered_clusters.loc[filtered_clusters['is_s_phase'], 'cluster_id'] = (
-        filtered_clusters.loc[filtered_clusters['is_s_phase'], 'cluster_id_pearsonr'])
+    # Filter clusters smaller than a given size
+    cluster_annotation = cluster_annotation.merge(
+        cluster_annotation.groupby('cluster_id').size().rename('cluster_size').reset_index())
+    cluster_annotation = cluster_annotation.query(
+        'cluster_size >= {}'.format(cluster_size_threshold))
 
-    # Set final clustering to -2 for filtered clusters
-    filtered_clusters.loc[~filtered_clusters['filter_final'], 'cluster_id'] = -2
+    # Assign s phase cells to the cluster they are most correlated with
+    cell_filtered_clone_distances = cell_clone_distances.merge(
+        cluster_annotation[['cluster_id']].drop_duplicates())
+    s_phase_cluster = cell_filtered_clone_distances.merge(
+        metrics_data.query('is_s_phase')[['cell_id']])
+    s_phase_cluster = (
+        s_phase_cluster
+        .set_index(['cell_id', 'cluster_id'])['pearsonr']
+        .unstack(level=['cluster_id']).idxmin(axis=1).rename('cluster_id').reset_index())
 
-    filtered_clusters['cluster_id'] = filtered_clusters['cluster_id'].astype(int)
+    # Filter s phase cells
+    s_phase_filter = (filter_metrics
+        .query('is_s_phase')
+        .query('filter_reads')
+        .query('filter_copy_state_diff')
+        .query('filter_prop_hom_del'))[['cell_id']]
+    s_phase_cluster = s_phase_cluster.merge(s_phase_filter)
 
-    # Filter both the -1 and -2 clusters
-    filtered_clusters['filter_final'] &= (filtered_clusters['cluster_id'] >= 0)
+    # Create a merged set of cluster calls
+    final_clusters = pd.concat([
+        cluster_annotation[['cell_id', 'cluster_id']],
+        s_phase_cluster[['cell_id', 'cluster_id']],
+    ], ignore_index=True)
+    assert not final_clusters['cell_id'].duplicated().any()
 
-    logging.info('merging clusters')
-    cn_data = cn_data.merge(filtered_clusters.query('filter_final')[['cell_id', 'cluster_id']].drop_duplicates())
+    # Plotting
+    #
+    
+    # Plot final clusters heatmap
+    logging.info('plotting clusters to {}*'.format(results_prefix + '_filter_final'))
+    plot_cn_data = cn_data.merge(
+        final_clusters[['cell_id', 'cluster_id']])
+    plot_clones(plot_cn_data, 'cluster_id', results_prefix + '_filter_final')
 
-    logging.info('plotting clusters to {}*'.format(results_prefix + '_filtered'))
-    plot_clones(cn_data, 'cluster_id', results_prefix + '_filtered')
+    # Plot s phase proportions
+    s_plot_data = (
+        metrics_data
+        .merge(final_clusters[['cell_id', 'cluster_id']].drop_duplicates())
+        .groupby('cluster_id').agg({'is_s_phase': (np.sum, len, np.mean)}).reset_index())
+    s_plot_data.columns = ['clone', 'sum', 'len', 'proportion']
 
-    return filtered_clusters
+    fig = plt.figure(figsize=(6, 4))
+    ax = fig.add_subplot(211)
+    seaborn.barplot(ax=ax, x='clone', y='proportion', data=s_plot_data, color='0.5')
+    seaborn.despine()
+    ax = fig.add_subplot(212)
+    seaborn.barplot(ax=ax, x='clone', y='len', data=s_plot_data, color='0.5')
+    seaborn.despine()
+    plt.tight_layout()
+    fig.savefig(results_prefix + '_clone_s_phase.pdf', bbox_inches='tight')
+
+    return final_clusters
 
 
 def recalculate_distances(distance_metric, distance_method, clone_cn_matrix, cell_cn_matrix):
@@ -334,29 +377,17 @@ def memoize(cache_filename, func, *args, **kwargs):
     return data
 
 
-@click.command()
-@click.argument('library_ids_filename')
-@click.argument('sample_ids_filename')
-@click.argument('results_prefix')
-@click.argument('local_storage_directory')
-def infer_clones_cmd(
-        library_ids_filename,
-        sample_ids_filename,
-        results_prefix,
-        local_storage_directory,
-):
-
+def infer_clones(library_ids, sample_ids, results_prefix, local_storage_directory):
+    """ Run clonal inference on a set of libraries 
+    """
     tantalus_api = dbclients.tantalus.TantalusApi()
-
-    library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
-    sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
 
     raw_data_filename = results_prefix + '_raw_data.pickle'
 
     logging.info('retrieving cn data')
     cn_data, metrics_data, image_feature_data = memoize(
         raw_data_filename,
-        retrieve_data,
+        retrieve_cn_data,
         tantalus_api,
         library_ids,
         sample_ids,
@@ -394,16 +425,65 @@ def infer_clones_cmd(
         results_prefix,
     )
 
-    annotate_clusters_filename = results_prefix + '_annotate_clusters.pickle'
-    annotated_clusters = memoize(
-        annotate_clusters_filename,
-        annotate_clusters,
+    final_clusters_filename = results_prefix + '_final_clusters.pickle'
+    final_clusters = memoize(
+        final_clusters_filename,
+        finalize_clusters,
         cn_data,
         metrics_data,
         clusters,
         filter_metrics,
         cell_clone_distances,
         results_prefix,
+    )
+
+
+@click.group()
+def infer_clones_cmd():
+    pass
+
+
+@infer_clones_cmd.command('singlelib')
+@click.argument('library_id')
+@click.argument('sample_id')
+@click.argument('results_prefix')
+@click.argument('local_storage_directory')
+def infer_clones_singlelib_cmd(
+        library_id,
+        sample_id,
+        results_prefix,
+        local_storage_directory,
+):
+    library_ids = [library_id]
+    sample_ids = [sample_id]
+
+    infer_clones(
+        library_ids,
+        sample_ids,
+        results_prefix,
+        local_storage_directory,
+    )
+
+
+@infer_clones_cmd.command('multilib')
+@click.argument('library_ids_filename')
+@click.argument('sample_ids_filename')
+@click.argument('results_prefix')
+@click.argument('local_storage_directory')
+def infer_clones_multilib_cmd(
+        library_ids_filename,
+        sample_ids_filename,
+        results_prefix,
+        local_storage_directory,
+):
+    library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
+    sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
+
+    infer_clones(
+        library_ids,
+        sample_ids,
+        results_prefix,
+        local_storage_directory,
     )
 
 
