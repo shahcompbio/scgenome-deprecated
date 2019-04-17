@@ -18,11 +18,10 @@ def get_highest_snpeff_effect(snpeff_data):
         .groupby(['chrom', 'coord', 'ref', 'alt'], sort=False)
         .first()
         .reset_index())
-    snpeff_data = snpeff_data[['chrom', 'coord', 'ref', 'alt', 'gene_name', 'effect', 'effect_impact']]
     return snpeff_data
 
 
-def get_snv_results(dest):
+def get_snv_results(dest, museq_filter=0.9, strelka_filter=20.):
     print('starting load')
 
     mappability = read_python2_hdf5_dataframe(dest, '/snv/mappability')
@@ -30,14 +29,10 @@ def get_snv_results(dest):
     mappability['chrom'] = mappability['chrom'].astype(str)
 
     strelka_results = read_python2_hdf5_dataframe(dest, '/strelka/vcf').rename(columns={'score': 'strelka_score'})
-    print('strelka', strelka_results.shape)
-    strelka_results = strelka_results[strelka_results['strelka_score'] > 20.]
     for col in ('chrom', 'ref', 'alt'):
         strelka_results[col] = strelka_results[col].astype(str)
 
     museq_results = read_python2_hdf5_dataframe(dest, '/museq/vcf').rename(columns={'score': 'museq_score'})
-    print('museq', museq_results.shape)
-    museq_results = museq_results[museq_results['museq_score'] > .9]
     for col in ('chrom', 'ref', 'alt'):
         museq_results[col] = museq_results[col].astype(str)
 
@@ -56,15 +51,23 @@ def get_snv_results(dest):
     print('total', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(mappability)
     print('post mappability', data[['chrom', 'coord']].drop_duplicates().shape)
-    data = data.merge(strelka_results)
+    data = data.merge(strelka_results, how='left')
     print('post strelka', data[['chrom', 'coord']].drop_duplicates().shape)
-    data = data.merge(museq_results)
+    data = data.merge(museq_results, how='left')
     print('post museq', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(cosmic, how='left')
     print('post cosmic', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(snpeff, how='left')
     print('post snpeff', data[['chrom', 'coord']].drop_duplicates().shape)
     data = data.merge(tnc, how='left')
+
+    if museq_filter is not None:
+        data = data[data['museq_score'] > museq_filter]
+        print('post museq filter', data[['chrom', 'coord']].drop_duplicates().shape)
+
+    if strelka_filter is not None:
+        data = data[data['strelka_score'] > strelka_filter]
+        print('post strelka filter', data[['chrom', 'coord']].drop_duplicates().shape)
 
     print('finishing load', data[['chrom', 'coord']].drop_duplicates().shape)
 
