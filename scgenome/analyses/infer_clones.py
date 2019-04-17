@@ -21,6 +21,9 @@ import scgenome
 import scgenome.dataimport
 import scgenome.cncluster
 import scgenome.cnplot
+import scgenome.snvdata
+
+from datamanagement.miscellaneous.hdf5helper import read_python2_hdf5_dataframe
 
 import dbclients.tantalus
 from dbclients.basicclient import NotFoundError
@@ -63,7 +66,7 @@ def retrieve_cn_data(tantalus_api, library_ids, sample_ids, local_storage_direct
 def retrieve_pseudobulk_data(tantalus_api, ticket_id, local_storage_directory):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
-    pseudobulk_results = search_pseudobulk_results(tantalus_api, ticket_id)
+    pseudobulk_results = scgenome.dataimport.search_pseudobulk_results(tantalus_api, ticket_id)
 
     results_storage_name = 'singlecellblob_results'
 
@@ -76,20 +79,77 @@ def retrieve_pseudobulk_data(tantalus_api, ticket_id, local_storage_directory):
     )
 
 
-# TODO: implement
-def read_haplotype_allele_counts():
-    allele_counts = []
+def load_haplotype_allele_counts(tantalus_api, pseudobulk_results, local_cache_directory):
+    local_results_client = tantalus_api.get_cache_client(local_cache_directory)
 
-    for sample_id, library_id in sample_library:
-        filename = '{}/results/{}_{}_allele_counts.csv'.format(
-            pseudobulk_ticket_id, sample_id, library_id)
-        filepath = local_results_client.get_url(filename)
-        allele_data = pd.read_csv(filepath)
-        allele_counts.append(allele_data)
+    file_resources = tantalus_api.get_dataset_file_resources(
+        pseudobulk_results['id'], 'resultsdataset')
+
+    allele_counts = []
+    for file_resource in file_resources:
+        if file_resource['filename'].endswith('_allele_counts.csv'):
+            filepath = local_results_client.get_url(filename)
+            allele_data = pd.read_csv(filepath)
+            allele_counts.append(allele_data)
 
     allele_counts = pd.concat(allele_counts, ignore_index=True)
 
-    allele_counts.head()
+    return allele_counts
+
+
+def load_snv_annotation_data(tantalus_api, pseudobulk_results, local_cache_directory):
+    local_results_client = tantalus_api.get_cache_client(local_cache_directory)
+
+    file_resources = tantalus_api.get_dataset_file_resources(
+        pseudobulk_results['id'], 'resultsdataset')
+
+    snv_data = []
+    for file_resource in file_resources:
+        if file_resource['filename'].endswith('_snv_annotations.h5'):
+            filepath = local_results_client.get_url(filename)
+            snv_data.append(scgenome.snvdata.get_snv_results(filepath))
+
+    snv_data = pd.concat(snv_data, ignore_index=True)
+
+
+def load_snv_count_data(tantalus_api, pseudobulk_results, local_cache_directory, positions):
+    local_results_client = tantalus_api.get_cache_client(local_cache_directory)
+
+    file_resources = tantalus_api.get_dataset_file_resources(
+        pseudobulk_results['id'], 'resultsdataset')
+
+    snv_count_data = []
+    for file_resource in file_resources:
+        if file_resource['filename'].endswith('_snv_counts.h5'):
+            filepath = local_results_client.get_url(filename)
+            snv_count_data.append(read_python2_hdf5_dataframe(filepath, '/snv_allele_counts')
+                .merge(positions, how='inner'))
+
+    snv_count_data = pd.concat(snv_count_data, ignore_index=True)
+
+    return snv_count_data
+
+
+def load_snv_data(tantalus_api, pseudobulk_results, local_cache_directory):
+    snv_data = load_snv_annotation_data(
+        tantalus_api, pseudobulk_results, local_cache_directory)
+
+    positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
+
+    snv_count_data = load_snv_annotation_data(
+        tantalus_api, pseudobulk_results, local_cache_directory, positions)
+
+    snv_data = snv_data.drop(['alt_counts', 'ref_counts'], axis=1)
+    snv_data = snv_data.merge(
+        snv_count_data, how='outer',
+        on=['chrom', 'coord', 'ref', 'alt', 'cell_id']).fillna(0)
+    snv_data['total_counts'] = snv_data['ref_counts'] + snv_data['alt_counts']
+    snv_data['sample_id'] = snv_data['cell_id'].apply(lambda a: a.split('-')[0])
+
+    assert not snv_data['coord'].isnull().any()
+    assert not snv_data['alt_counts'].isnull().any()
+
+    return snv_data
 
 
 def calc_prop_hom_del(states):
