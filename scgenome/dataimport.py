@@ -194,10 +194,10 @@ def search_pseudobulk_results(
 ):
     """ Search for pseudobulk results and analysis for a given ticket.
     """
-    analyses = list(tantalus_api.list(
+    analysis = tantalus_api.get(
         'analysis',
         jira_ticket=ticket_id,
-    ))
+    )
 
     results = tantalus_api.get(
         'resultsdataset',
