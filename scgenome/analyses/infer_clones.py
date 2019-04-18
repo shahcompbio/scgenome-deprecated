@@ -23,6 +23,8 @@ import scgenome.cncluster
 import scgenome.cnplot
 import scgenome.snvdata
 
+import wgs_analysis.snvs.mutsig
+
 from datamanagement.miscellaneous.hdf5helper import read_python2_hdf5_dataframe
 
 import dbclients.tantalus
@@ -33,12 +35,12 @@ import datamanagement.transfer_files
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
 
-def retrieve_cn_data(tantalus_api, library_ids, sample_ids, local_storage_directory, results_prefix):
+def retrieve_cn_data(tantalus_api, library_ids, sample_ids, local_cache_directory, results_prefix):
     hmmcopy_results, hmmcopy_tickets = scgenome.dataimport.search_hmmcopy_analyses(tantalus_api, library_ids)
 
     results = scgenome.dataimport.import_cn_data(
         hmmcopy_tickets,
-        local_storage_directory,
+        local_cache_directory,
         sample_ids=sample_ids,
     )
 
@@ -63,9 +65,7 @@ def retrieve_cn_data(tantalus_api, library_ids, sample_ids, local_storage_direct
     return cn_data, metrics_data, image_feature_data
 
 
-def retrieve_pseudobulk_data(tantalus_api, ticket_id, local_storage_directory):
-    tantalus_api = dbclients.tantalus.TantalusApi()
-
+def search_pseudobulk_results(tantalus_api, ticket_id, local_cache_directory):
     pseudobulk_results = scgenome.dataimport.search_pseudobulk_results(tantalus_api, ticket_id)
 
     results_storage_name = 'singlecellblob_results'
@@ -75,8 +75,10 @@ def retrieve_pseudobulk_data(tantalus_api, ticket_id, local_storage_directory):
         pseudobulk_results['id'],
         'resultsdataset',
         results_storage_name,
-        local_storage_directory,
+        local_cache_directory,
     )
+
+    return pseudobulk_results
 
 
 def load_haplotype_allele_counts(tantalus_api, pseudobulk_results, local_cache_directory):
@@ -96,6 +98,10 @@ def load_haplotype_allele_counts(tantalus_api, pseudobulk_results, local_cache_d
 
     return allele_counts
 
+# TODO: thresholds
+museq_score_threshold = 0.5
+strelka_score_threshold = -np.inf
+
 
 def load_snv_annotation_data(tantalus_api, pseudobulk_results, local_cache_directory):
     local_results_client = tantalus_api.get_cache_client(local_cache_directory)
@@ -106,10 +112,15 @@ def load_snv_annotation_data(tantalus_api, pseudobulk_results, local_cache_direc
     snv_data = []
     for file_resource in file_resources:
         if file_resource['filename'].endswith('_snv_annotations.h5'):
-            filepath = local_results_client.get_url(filename)
-            snv_data.append(scgenome.snvdata.get_snv_results(filepath))
+            filepath = local_results_client.get_url(file_resource['filename'])
+            snv_data.append(scgenome.snvdata.get_snv_results(
+                filepath,
+                museq_filter=museq_score_threshold,
+                strelka_filter=strelka_score_threshold))
 
     snv_data = pd.concat(snv_data, ignore_index=True)
+
+    return snv_data
 
 
 def load_snv_count_data(tantalus_api, pseudobulk_results, local_cache_directory, positions):
@@ -121,7 +132,7 @@ def load_snv_count_data(tantalus_api, pseudobulk_results, local_cache_directory,
     snv_count_data = []
     for file_resource in file_resources:
         if file_resource['filename'].endswith('_snv_counts.h5'):
-            filepath = local_results_client.get_url(filename)
+            filepath = local_results_client.get_url(file_resource['filename'])
             snv_count_data.append(read_python2_hdf5_dataframe(filepath, '/snv_allele_counts')
                 .merge(positions, how='inner'))
 
@@ -136,7 +147,7 @@ def load_snv_data(tantalus_api, pseudobulk_results, local_cache_directory):
 
     positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
 
-    snv_count_data = load_snv_annotation_data(
+    snv_count_data = load_snv_count_data(
         tantalus_api, pseudobulk_results, local_cache_directory, positions)
 
     snv_data = snv_data.drop(['alt_counts', 'ref_counts'], axis=1)
@@ -150,6 +161,122 @@ def load_snv_data(tantalus_api, pseudobulk_results, local_cache_directory):
     assert not snv_data['alt_counts'].isnull().any()
 
     return snv_data
+
+
+def retrieve_snv_data(ticket_id, local_cache_directory):
+    tantalus_api = dbclients.tantalus.TantalusApi()
+
+    pseudobulk_results = search_pseudobulk_results(tantalus_api, ticket_id, local_cache_directory)
+    snv_data = load_snv_data(tantalus_api, pseudobulk_results, local_cache_directory)
+
+    return snv_data
+
+
+def run_mutation_signature_analysis(snv_data, results_prefix):
+    """
+    Run a mutation signature analysis
+    """
+    sigs, sig_prob = wgs_analysis.snvs.mutsig.load_signature_probabilities()
+    total_alt_counts = (
+        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts']
+        .sum().astype(int).rename('total_alt_counts').reset_index())
+    snv_data = snv_data.merge(total_alt_counts)
+
+    total_total_counts = (
+        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['total_counts']
+        .sum().astype(int).rename('total_total_counts').reset_index())
+    snv_data = snv_data.merge(total_total_counts)
+
+    snv_data = snv_data[snv_data['total_alt_counts'] > 0]
+    snv_data['num_cells_class'] = '1'
+    snv_data.loc[snv_data['num_cells'] > 1, 'num_cells_class'] = '2-5'
+    snv_data.loc[snv_data['num_cells'] > 5, 'num_cells_class'] = '6-20'
+    snv_data.loc[snv_data['num_cells'] > 20, 'num_cells_class'] = '>20'
+
+    # Per cell count class signatures
+    snv_sig_data = snv_data[snv_data['tri_nucleotide_context'].notnull()]
+    snv_sig_data = snv_sig_data.merge(sigs)
+
+    # Simple filter for variant sample presence
+    snv_sig_data = snv_sig_data[snv_sig_data['alt_counts'] > 0]
+
+    snv_sig_data2 = snv_sig_data.copy()
+    snv_sig_data2['num_cells_class'] = 'All'
+    snv_sig_data2 = pd.concat([snv_sig_data, snv_sig_data2])
+
+    # import IPython; IPython.embed(); raise
+    sample_sig = wgs_analysis.snvs.mutsig.fit_sample_signatures(
+        snv_sig_data2.drop_duplicates(
+            ['chrom', 'coord', 'ref', 'alt', 'num_cells_class']),
+        sig_prob, 'num_cells_class')
+
+    fig = wgs_analysis.snvs.mutsig.plot_signature_heatmap(sample_sig)
+    seaborn.despine(trim=True)
+    fig.savefig(results_prefix + '_num_cell_class_mutsig.pdf', bbox_inches='tight')
+
+    fig = plt.figure(figsize=(4, 4))
+    sample_sig.loc['All', :].sort_values().iloc[-10:,].plot(kind='bar')
+    seaborn.despine(trim=True)
+    fig.savefig(results_prefix + '_top10_mutsig.pdf', bbox_inches='tight')
+
+
+def run_bulk_snv_analysis(snv_data, results_prefix):
+    # import IPython; IPython.embed(); raise
+
+    # Write high impact SNVs to a csv table
+    high_impact = (snv_data.query('effect_impact == "HIGH"').query('is_cosmic == True')
+        [[
+            'chrom', 'coord', 'ref', 'alt',
+            'gene_name', 'effect', 'effect_impact',
+            'is_cosmic', 'museq_score', 'strelka_score',
+        ]]
+        .drop_duplicates())
+    high_impact = high_impact.merge(
+        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts'].sum().reset_index())
+    high_impact = high_impact.merge(
+        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['ref_counts'].sum().reset_index())
+    high_impact = high_impact.merge(
+        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['total_counts'].sum().reset_index())
+    high_impact.to_csv(results_prefix + '_snvs_high_impact.csv')
+
+    # Calculate cell counts
+    cell_counts = (
+        snv_data
+        .query('alt_counts > 0')
+        .drop_duplicates(['chrom', 'coord', 'ref', 'alt', 'cell_id'])
+        .groupby(['chrom', 'coord', 'ref', 'alt']).size().rename('num_cells')
+        .reset_index())
+    fig = plt.figure(figsize=(4, 4))
+    cell_counts['num_cells'].hist(bins=50)
+    fig.savefig(results_prefix + '_snv_cell_counts.pdf', bbox_inches='tight')
+    snv_data = snv_data.merge(cell_counts, how='left')
+    assert not snv_data['num_cells'].isnull().any()
+
+    # Calculate total alt counts for each SNV
+    sum_alt_counts = (
+        snv_data
+        .groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts']
+        .sum().rename('sum_alt_counts')
+        .reset_index())
+    fig = plt.figure(figsize=(4, 4))
+    sum_alt_counts['sum_alt_counts'].hist(bins=50)
+    fig.savefig(results_prefix + '_snv_alt_counts.pdf', bbox_inches='tight')
+
+    # Filter SNVs by num cells in which they are detected and
+    # total alt counts
+    filtered_snvs = cell_counts.query('num_cells >= 2')[['chrom', 'coord', 'ref', 'alt']]
+    filtered_snvs = filtered_snvs.merge(
+        sum_alt_counts.query('sum_alt_counts >= 4')[['chrom', 'coord', 'ref', 'alt']]
+    )
+
+    run_mutation_signature_analysis(snv_data, results_prefix)
+
+    fig = plt.figure(figsize=(10, 3))
+    import wgs_analysis.plots.snv
+    import wgs_analysis.annotation.position
+    snv_data = wgs_analysis.annotation.position.annotate_adjacent_distance(snv_data)
+    wgs_analysis.plots.snv.snv_adjacent_distance_plot(plt.gca(), snv_data)
+    fig.savefig(results_prefix + '_snv_adjacent_density.pdf', bbox_inches='tight')
 
 
 def calc_prop_hom_del(states):
@@ -469,7 +596,7 @@ def memoize(cache_filename, func, *args, **kwargs):
     return data
 
 
-def infer_clones(library_ids, sample_ids, results_prefix, local_storage_directory):
+def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, local_cache_directory):
     """ Run clonal inference on a set of libraries 
     """
     tantalus_api = dbclients.tantalus.TantalusApi()
@@ -483,7 +610,7 @@ def infer_clones(library_ids, sample_ids, results_prefix, local_storage_director
         tantalus_api,
         library_ids,
         sample_ids,
-        local_storage_directory,
+        local_cache_directory,
         results_prefix,
     )
 
@@ -529,6 +656,16 @@ def infer_clones(library_ids, sample_ids, results_prefix, local_storage_director
         results_prefix,
     )
 
+    snv_data_filename = results_prefix + '_snv_data.pickle'
+    snv_data = memoize(
+        snv_data_filename,
+        retrieve_snv_data,
+        pseudobulk_ticket,
+        local_cache_directory,
+    )
+
+    run_bulk_snv_analysis(snv_data, results_prefix)
+
 
 @click.group()
 def infer_clones_cmd():
@@ -538,13 +675,15 @@ def infer_clones_cmd():
 @infer_clones_cmd.command('singlelib')
 @click.argument('library_id')
 @click.argument('sample_id')
+@click.argument('pseudobulk_ticket')
 @click.argument('results_prefix')
-@click.argument('local_storage_directory')
+@click.argument('local_cache_directory')
 def infer_clones_singlelib_cmd(
         library_id,
         sample_id,
+        pseudobulk_ticket,
         results_prefix,
-        local_storage_directory,
+        local_cache_directory,
 ):
     library_ids = [library_id]
     sample_ids = [sample_id]
@@ -552,21 +691,24 @@ def infer_clones_singlelib_cmd(
     infer_clones(
         library_ids,
         sample_ids,
+        pseudobulk_ticket,
         results_prefix,
-        local_storage_directory,
+        local_cache_directory,
     )
 
 
 @infer_clones_cmd.command('multilib')
 @click.argument('library_ids_filename')
 @click.argument('sample_ids_filename')
+@click.argument('pseudobulk_ticket')
 @click.argument('results_prefix')
-@click.argument('local_storage_directory')
+@click.argument('local_cache_directory')
 def infer_clones_multilib_cmd(
         library_ids_filename,
         sample_ids_filename,
+        pseudobulk_ticket,
         results_prefix,
-        local_storage_directory,
+        local_cache_directory,
 ):
     library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
     sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
@@ -574,8 +716,9 @@ def infer_clones_multilib_cmd(
     infer_clones(
         library_ids,
         sample_ids,
+        pseudobulk_ticket,
         results_prefix,
-        local_storage_directory,
+        local_cache_directory,
     )
 
 
