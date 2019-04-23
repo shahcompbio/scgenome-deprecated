@@ -32,6 +32,7 @@ import wgs_analysis.plots.snv
 import wgs_analysis.annotation.position
 
 import dollo
+import dollo.tasks
 
 import dbclients.tantalus
 from dbclients.basicclient import NotFoundError
@@ -298,104 +299,16 @@ def run_bulk_snv_analysis(snv_data, results_prefix):
     return snv_data
 
 
-
-import numpy as np
-import pandas as pd
-
-def annotate_copy_number(pos, seg, columns=['major', 'minor'], sample_col='sample_id'):
-    """ Annotate positions with segment specific data 
-    """
-    results = []
-
-    for sample_id in seg[sample_col].unique():
-        sample_pos = pos[pos[sample_col] == sample_id]
-        sample_seg = seg[seg[sample_col] == sample_id]
-
-        for chrom in seg['chr'].unique():
-            _pos = sample_pos[sample_pos['chrom'] == chrom]
-            _seg = sample_seg[sample_seg['chr'] == chrom]
-
-            results.append(find_overlapping_segments(_pos, _seg, columns))
-
-    return pd.concat(results)
-
-
-def find_overlapping_segments(pos, seg, columns):
-    """ Find positions that are contained within segments
-    """
-    seg = seg.sort_values(['start', 'end'])
-
-    if seg.duplicated(['start', 'end']).any():
-        raise ValueError('duplicate columns')
-
-    start_idx = np.searchsorted(seg['start'].values, pos['coord'].values) - 1
-    end_idx = np.searchsorted(seg['end'].values, pos['coord'].values)
-
-    mask = (start_idx == end_idx)
-
-    results = pos.copy()
-
-    for col in columns:
-        results[col] = np.nan
-        results.loc[mask, col] = seg[col].iloc[end_idx[mask]].values
-
-    return results
-
-
 def run_snv_phylogenetics(snv_data, allele_cn, clusters, results_prefix):
-    snv_matrix = snv_data.merge(clusters)
+    """ Run the SNV phylogenetic analysis.
+    """
+    snv_log_likelihoods = scgenome.snvphylo.compute_snv_log_likelihoods(
+        snv_data, allele_cn, clusters)
 
-    snv_matrix = (
-        snv_matrix.groupby(
-            ['chrom', 'coord', 'ref', 'alt', 'cluster_id'],
-            as_index=True, observed=True)[['alt_counts', 'ref_counts']]
-        .sum().unstack().fillna(0).astype(int).stack().reset_index())
-    snv_matrix['total_counts'] = snv_matrix['ref_counts'] + snv_matrix['alt_counts']
-
-    snv_matrix['variant_id'] = snv_matrix.apply(
-        lambda row: ':'.join(row[['chrom', 'coord', 'ref', 'alt']].astype(str).values),
-        axis=1).astype('category')
-
-    # TODO: this should be moved
-    allele_cn['total_cn'] = allele_cn['total_cn'].astype(int)
-    allele_cn['minor_cn'] = allele_cn['minor_cn'].astype(int)
-    allele_cn['major_cn'] = allele_cn['major_cn'].astype(int)
-    allele_cn['chrom'] = allele_cn['chr'].astype('category')
-    allele_cn = allele_cn[[
-        'chrom', 'start', 'end', 'cluster_id',
-        'total_cn', 'minor_cn', 'major_cn',
-    ]].drop_duplicates()
+    ml_tree, tree_annotations = scgenome.snvphylo.compute_dollo_ml_tree(
+        snv_log_likelihoods)
 
     import IPython; IPython.embed(); raise
-
-    # Merge segment copy number into SNV table
-    scgenome.utils.union_categories(
-        allele_cn, snv_matrix,
-        cols=['chrom'])
-    snv_cn_data = annotate_copy_number(
-        snv_matrix, allele_cn,
-        columns=['major_cn', 'minor_cn', 'total_cn'],
-        sample_col='cluster_id')
-
-
-    scgenome.snvphylo.compute_log_likelihoods(snv_cn_data)
-
-#####
-
-    trees = dollo.tasks.create_trees(snv_matrix, sample_col='cluster_id')
-    results = dollo.tasks.compute_tree_log_likelihoods(
-        snv_matrix, trees,
-        sample_col='cluster_id', variant_col='variant_id')
-    results_table = pd.DataFrame(
-        [(i, v['log_likelihood']) for i, v in results.items()],
-        columns=['tree_id', 'log_likelihood'])
-    ml_tree_id = results_table.set_index('tree_id')['log_likelihood'].idxmax()
-    tree_annotations = dollo.run.annotate_posteriors(
-        snv_matrix, trees[ml_tree_id],
-        sample_col='cluster_id', variant_col='variant_id')
-
-#####
-
     snv_matrix['vaf'] = snv_matrix['alt_counts'] / snv_matrix['total_counts']
     snv_matrix['alt_counts'] = snv_matrix['alt_counts'].clip_upper(10)
     snv_matrix['is_present'] = (snv_matrix['alt_counts'] > 0) * 1
