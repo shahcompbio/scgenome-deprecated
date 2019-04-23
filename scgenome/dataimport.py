@@ -207,6 +207,33 @@ def search_pseudobulk_results(
     return results
 
 
+def get_pseudobulk_sample_libraries(
+    tantalus_api,
+    ticket_id,
+):
+    """ Get a list of library / sample pairs for a pseudobulk library.
+    """
+    analysis = tantalus_api.get(
+        'analysis',
+        jira_ticket=ticket_id,
+    )
+
+    sample_libraries = []
+    for dataset_id in analysis['input_datasets']:
+        dataset = tantalus_api.get('sequencedataset', id=dataset_id)
+
+        sample_id = dataset['sample']['sample_id']
+        library_id = dataset['library']['library_id']
+
+        if library_id == analysis['args']['matched_normal_library']:
+            assert sample_id == analysis['args']['matched_normal_sample']
+            continue
+
+        sample_libraries.append((sample_id, library_id))
+
+    return sample_libraries
+
+
 def import_cell_cycle_data(
         tantalus_api,
         library_ids,

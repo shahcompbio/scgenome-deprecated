@@ -5,10 +5,39 @@ import pandas as pd
 import numpy as np
 from hmmlearn._hmmc import _viterbi
 from scipy.stats import binom
+import scgenome.refgenome as refgenome
+from matplotlib import collections  as mc
 
 from . import refgenome
 
 
+def load_haplotype_allele_counts(dataset_filepaths):
+    """ Load the haplotype allele count data from the pseudobulk results paths
+    """
+    allele_counts = []
+    for filepath in dataset_filepaths:
+        if filepath.endswith('_allele_counts.csv'):
+            logging.info('Loading haplotype allele counts from {}'.format(filepath))
+
+            data = pd.read_csv(
+                filepath,
+                dtype={
+                    'chromosome': 'category',
+                    'cell_id': 'category',
+                })
+
+            logging.info('Loaded haplotype allele counts table with shape {}'.format(data.shape))
+
+            allele_counts.append(data)
+
+    allele_counts = scgenome.utils.concat_with_categories(allele_counts, ignore_index=True)
+
+    logging.info('Loaded all haplotype allele counts table with shape {}'.format(allele_counts.shape))
+
+    return allele_counts
+
+
+# TODO: possibly deprecated
 def get_clone_snp_count(het_counts, cluster_df):
     cell_ids = het_counts['cell_ids']
     cell_ids.set_index('cell_id', inplace=True)
@@ -36,6 +65,7 @@ def get_clone_snp_count(het_counts, cluster_df):
     return snp_data
 
 
+# TODO: possibly deprecated
 def calculate_haplotype_allele_counts(snp_data, haps, bin_size):
     haps['swap'] = (haps['allele'] == haps['allele_id'])
     haps = haps[['chromosome', 'position', 'hap_label', 'swap']].drop_duplicates().rename(columns={'position': 'coord'})
@@ -62,7 +92,41 @@ def calculate_haplotype_allele_counts(snp_data, haps, bin_size):
     return hap_data
 
 
-def plot_cell_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, size_field_name=None, size_scale=1.):
+def plot_vaf_cn_profile(ax, hap_data, allele_cn):
+    """ Plot genome wide VAF and predicted CN state for haplotype alleles.
+    """
+    allele_cn = allele_cn.copy()
+
+    plot_vaf_profile(
+        ax, hap_data, 'maf',
+        size_field_name='total_counts_sum',
+        size_scale=100.,
+    )   
+
+    allele_cn['cn_ratio'] = allele_cn['minor_cn'] / allele_cn['total_cn']
+
+    allele_cn = allele_cn[allele_cn['chr'].isin(refgenome.info.chromosomes)]
+
+    allele_cn.set_index('chr', inplace=True)
+    allele_cn['chromosome_start'] = refgenome.info.chromosome_start
+    allele_cn.reset_index(inplace=True)
+
+    allele_cn['start'] = allele_cn['start'] + allele_cn['chromosome_start']
+    allele_cn['end'] = allele_cn['end'] + allele_cn['chromosome_start']
+
+    lines = np.zeros((allele_cn.shape[0], 2, 2))
+    lines[:, 0, 0] = allele_cn['start'].values
+    lines[:, 1, 0] = allele_cn['end'].values
+    lines[:, 0, 1] = allele_cn['cn_ratio'].values
+    lines[:, 1, 1] = allele_cn['cn_ratio'].values
+
+    lc = mc.LineCollection(lines, colors='b', linewidths=1.)
+    ax.add_collection(lc)
+
+
+def plot_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, size_field_name=None, size_scale=1.):
+    """ Plot genome wide VAF profile for haplotype alleles
+    """
     plot_data = cn_data.copy()
     plot_data = plot_data[plot_data['chr'].isin(refgenome.info.chromosomes)]
 
@@ -100,6 +164,9 @@ def plot_cell_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, siz
 
 
 def infer_allele_cn(clone_cn_data, hap_data):
+    """ HMM inference of clone and allele specific copy number based on haplotype
+    allele read counts.
+    """
     cn = clone_cn_data.merge(
         hap_data,
         on=['chr', 'start', 'end', 'cluster_id'],
@@ -145,4 +212,35 @@ def infer_allele_cn(clone_cn_data, hap_data):
     allele_cn['major_cn'] = allele_cn['total_cn'] - allele_cn['minor_cn']
 
     return allele_cn
+
+
+def calculate_cluster_allele_counts(allele_data, clusters):
+    """ Calculate allele specific haplotype allele counts per cluster
+    """
+    index_cols = [
+        'chromosome',
+        'start',
+        'end',
+        'hap_label',
+    ]
+
+    # Create allele 1 and 2 counts matrix
+    allele_data = allele_data.set_index(index_cols + ['cell_id', 'allele_id'])['readcount'].unstack(fill_value=0)
+    allele_data.rename(columns={0: 'allele_1', 1: 'allele_2'}, inplace=True)
+    allele_data.reset_index(inplace=True)
+
+    # Merge clusters and 
+    scgenome.utils.union_categories(
+        allele_data, clusters,
+        cols=['cell_id'])
+    allele_data = allele_data.merge(clusters[['cell_id', 'cluster_id']])
+    allele_data = allele_data.groupby(
+        index_cols + ['cluster_id'],
+        as_index=True, observed=True)[['allele_1', 'allele_2']].sum().reset_index()
+
+    allele_data['total'] = allele_data['allele_1'] + allele_data['allele_2']
+    allele_data['start'] = (allele_data['start'] / cn_bin_size).astype(int) * cn_bin_size + 1
+    allele_data['end'] = allele_data['start'] + cn_bin_size - 1
+
+    return allele_data
 
