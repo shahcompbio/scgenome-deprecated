@@ -158,8 +158,8 @@ def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory, results
         dataset_filepaths,
         museq_filter=museq_score_threshold,
         strelka_filter=strelka_score_threshold,
-        snvs_num_cells_threshold=snvs_num_cells_threshold,
-        snvs_sum_alt_threshold=snvs_sum_alt_threshold,
+        num_cells_threshold=snvs_num_cells_threshold,
+        sum_alt_threshold=snvs_sum_alt_threshold,
         figures_prefix=results_prefix + 'snv_loading_',
     )
 

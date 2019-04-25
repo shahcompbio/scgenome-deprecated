@@ -162,8 +162,8 @@ def load_snv_data(
         dataset_filepaths,
         museq_filter=None,
         strelka_filter=None,
-        snvs_num_cells_threshold=None,
-        snvs_sum_alt_threshold=None,
+        num_cells_threshold=None,
+        sum_alt_threshold=None,
         figures_prefix=None,
 ):
     snv_data = load_snv_annotation_data(
@@ -210,19 +210,19 @@ def load_snv_data(
         fig.savefig(figures_prefix + '_snv_alt_counts.pdf', bbox_inches='tight')
 
     # Filter SNVs by num cells in which they are detected
-    if snvs_num_cells_threshold is not None:
+    if num_cells_threshold is not None:
         filtered_cell_counts = cell_counts.query(
-            'num_cells >= {}'.format(snvs_num_cells_threshold))
+            'num_cells >= {}'.format(num_cells_threshold))
         logging.info('Filtering {} of {} SNVs by num_cells >= {}'.format(
-            len(filtered_cell_counts.index), len(cell_counts.index), snvs_num_cells_threshold))
+            len(filtered_cell_counts.index), len(cell_counts.index), num_cells_threshold))
         snv_data = snv_data.merge(filtered_cell_counts[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
 
     # Filter SNVs by total alt counts
-    if snvs_sum_alt_threshold is not None:
+    if sum_alt_threshold is not None:
         filtered_sum_alt_counts = sum_alt_counts.query(
-            'sum_alt_counts >= {}'.format(snvs_sum_alt_threshold))
+            'sum_alt_counts >= {}'.format(sum_alt_threshold))
         logging.info('Filtering {} of {} SNVs by num_cells >= {}'.format(
-            len(filtered_sum_alt_counts.index), len(sum_alt_counts.index), snvs_sum_alt_threshold))
+            len(filtered_sum_alt_counts.index), len(sum_alt_counts.index), sum_alt_threshold))
         snv_data = snv_data.merge(filtered_sum_alt_counts[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
 
     snv_count_data = snv_count_data.merge(snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
