@@ -50,6 +50,10 @@ snvs_sum_alt_threshold = 4
 is_original_cluster_mean_threshold = 0.5
 cluster_size_threshold = 50
 
+# Threshold on total haplotype allele counts
+# for calculating allele specific copy number
+total_allele_counts_threshold = 6
+
 # SA1135
 # museq_score_threshold = 0.5
 # strelka_score_threshold = -np.inf
@@ -113,6 +117,8 @@ def calculate_cluster_allele_cn(cn_data, allele_data, clusters, results_prefix):
         'allele_2': 'allele_2_sum',
     })
 
+    allele_data = allele_data[allele_data['total_counts_sum'] >= total_allele_counts_threshold]
+
     allele_cn = scgenome.snpdata.infer_allele_cn(clone_cn_data, allele_data)
 
     allele_data['maf'] = (
@@ -132,36 +138,9 @@ def calculate_cluster_allele_cn(cn_data, allele_data, clusters, results_prefix):
     return allele_cn
 
 
-def infer_allele_cn(allele_data, clone_cn_data, results_prefix):
-    """ Infer allele and cluster specific copy number from haplotype allele counts
+def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory, results_prefix):
+    """ Retrieve SNV, breakpoint and allele data
     """
-    import IPython; IPython.embed(); raise
-
-    data = allele_counts.rename(columns={
-        'chromosome': 'chr',
-        'total': 'total_counts_sum',
-        'allele_1': 'allele_1_sum',
-        'allele_2': 'allele_2_sum',
-    })
-
-    hap_data = data.copy()
-
-    hap_data = hap_data[hap_data['total_counts_sum'] > 5].copy()
-
-    hap_data['maf'] = (
-        np.minimum(hap_data['allele_1_sum'], hap_data['allele_2_sum']) /
-        hap_data['total_counts_sum'].astype(float))
-
-    allele_cn = scgenome.snpdata.infer_allele_cn(clone_cn_data, data)
-
-    allele_cn['maf'] = (
-        np.minimum(allele_cn['allele_1_sum'], allele_cn['allele_2_sum']) /
-        allele_cn['total_counts_sum'].astype(float))
-
-    allele_cn.query('chr == "4"').query('total_counts_sum > 100').head()
-
-
-def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     results = scgenome.dataimport.search_pseudobulk_results(tantalus_api, ticket_id)
@@ -175,15 +154,22 @@ def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory):
         local_cache_directory,
     )
 
-    snv_data = scgenome.snvdata.load_snv_data(dataset_filepaths)
+    snv_data, snv_count_data = scgenome.snvdata.load_snv_data(
+        dataset_filepaths,
+        museq_filter=museq_score_threshold,
+        strelka_filter=strelka_score_threshold,
+        snvs_num_cells_threshold=snvs_num_cells_threshold,
+        snvs_sum_alt_threshold=snvs_sum_alt_threshold,
+        figures_prefix=results_prefix + 'snv_loading_',
+    )
 
     allele_data = scgenome.snpdata.load_haplotype_allele_counts(dataset_filepaths)
-    allele_data = scgenome.snpdata.calculate_cluster_allele_counts(allele_data, clusters)
+    allele_data = scgenome.snpdata.calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size)
 
     breakpoint_data, breakpoint_count_data = scgenome.breakpointdata.load_breakpoint_data(
         dataset_filepaths, sample_libraries)
 
-    return snv_data, allele_data, breakpoint_data, breakpoint_count_data
+    return snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data
 
 
 def run_mutation_signature_analysis(snv_data, results_prefix):
@@ -191,17 +177,8 @@ def run_mutation_signature_analysis(snv_data, results_prefix):
     Run a mutation signature analysis
     """
     sigs, sig_prob = wgs_analysis.snvs.mutsig.load_signature_probabilities()
-    total_alt_counts = (
-        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts']
-        .sum().astype(int).rename('total_alt_counts').reset_index())
-    snv_data = snv_data.merge(total_alt_counts)
 
-    total_total_counts = (
-        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['total_counts']
-        .sum().astype(int).rename('total_total_counts').reset_index())
-    snv_data = snv_data.merge(total_total_counts)
-
-    snv_data = snv_data[snv_data['total_alt_counts'] > 0]
+    snv_data = snv_data[snv_data['num_cells'] > 0]
     snv_data['num_cells_class'] = '1'
     snv_data.loc[snv_data['num_cells'] > 1, 'num_cells_class'] = '2-5'
     snv_data.loc[snv_data['num_cells'] > 5, 'num_cells_class'] = '6-20'
@@ -210,9 +187,6 @@ def run_mutation_signature_analysis(snv_data, results_prefix):
     # Per cell count class signatures
     snv_sig_data = snv_data[snv_data['tri_nucleotide_context'].notnull()]
     snv_sig_data = snv_sig_data.merge(sigs)
-
-    # Simple filter for variant sample presence
-    snv_sig_data = snv_sig_data[snv_sig_data['alt_counts'] > 0]
 
     snv_sig_data2 = snv_sig_data.copy()
     snv_sig_data2['num_cells_class'] = 'All'
@@ -234,7 +208,7 @@ def run_mutation_signature_analysis(snv_data, results_prefix):
     fig.savefig(results_prefix + '_top10_mutsig.pdf', bbox_inches='tight')
 
 
-def run_bulk_snv_analysis(snv_data, results_prefix):
+def run_bulk_snv_analysis(snv_data, snv_count_data, results_prefix):
     # Write high impact SNVs to a csv table
     high_impact = (snv_data.query('effect_impact == "HIGH"').query('is_cosmic == True')
         [[
@@ -244,49 +218,12 @@ def run_bulk_snv_analysis(snv_data, results_prefix):
         ]]
         .drop_duplicates())
     high_impact = high_impact.merge(
-        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts'].sum().reset_index())
+        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts'].sum().reset_index())
     high_impact = high_impact.merge(
-        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['ref_counts'].sum().reset_index())
+        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['ref_counts'].sum().reset_index())
     high_impact = high_impact.merge(
-        snv_data.groupby(['chrom', 'coord', 'ref', 'alt'])['total_counts'].sum().reset_index())
+        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['total_counts'].sum().reset_index())
     high_impact.to_csv(results_prefix + '_snvs_high_impact.csv')
-
-    # Calculate cell counts
-    cell_counts = (
-        snv_data
-        .query('alt_counts > 0')
-        .drop_duplicates(['chrom', 'coord', 'ref', 'alt', 'cell_id'])
-        .groupby(['chrom', 'coord', 'ref', 'alt']).size().rename('num_cells')
-        .reset_index())
-    fig = plt.figure(figsize=(4, 4))
-    cell_counts['num_cells'].hist(bins=50)
-    fig.savefig(results_prefix + '_snv_cell_counts.pdf', bbox_inches='tight')
-    snv_data = snv_data.merge(cell_counts, how='left')
-    assert not snv_data['num_cells'].isnull().any()
-
-    # Calculate total alt counts for each SNV
-    sum_alt_counts = (
-        snv_data
-        .groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts']
-        .sum().rename('sum_alt_counts')
-        .reset_index())
-    fig = plt.figure(figsize=(4, 4))
-    sum_alt_counts['sum_alt_counts'].hist(bins=50)
-    fig.savefig(results_prefix + '_snv_alt_counts.pdf', bbox_inches='tight')
-
-    # Filter SNVs by num cells in which they are detected
-    filtered_cell_counts = cell_counts.query(
-        'num_cells >= {}'.format(snvs_num_cells_threshold))
-    logging.info('Filtering {} of {} SNVs by num_cells >= {}'.format(
-        len(filtered_cell_counts.index), len(cell_counts.index), snvs_num_cells_threshold))
-    snv_data = snv_data.merge(filtered_cell_counts[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
-
-    # Filter SNVs by total alt counts
-    filtered_sum_alt_counts = sum_alt_counts.query(
-        'sum_alt_counts >= {}'.format(snvs_sum_alt_threshold))
-    logging.info('Filtering {} of {} SNVs by num_cells >= {}'.format(
-        len(filtered_sum_alt_counts.index), len(sum_alt_counts.index), snvs_sum_alt_threshold))
-    snv_data = snv_data.merge(filtered_sum_alt_counts[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
 
     run_mutation_signature_analysis(snv_data, results_prefix)
 
@@ -296,30 +233,19 @@ def run_bulk_snv_analysis(snv_data, results_prefix):
     wgs_analysis.plots.snv.snv_adjacent_distance_plot(plt.gca(), snv_data)
     fig.savefig(results_prefix + '_snv_adjacent_density.pdf', bbox_inches='tight')
 
-    return snv_data
 
-
-def run_snv_phylogenetics(snv_data, allele_cn, clusters, results_prefix):
+def run_snv_phylogenetics(snv_count_data, allele_cn, clusters, results_prefix):
     """ Run the SNV phylogenetic analysis.
     """
     snv_log_likelihoods = scgenome.snvphylo.compute_snv_log_likelihoods(
-        snv_data, allele_cn, clusters)
+        snv_count_data, allele_cn, clusters)
 
     ml_tree, tree_annotations = scgenome.snvphylo.compute_dollo_ml_tree(
         snv_log_likelihoods)
 
     import IPython; IPython.embed(); raise
-    snv_matrix['vaf'] = snv_matrix['alt_counts'] / snv_matrix['total_counts']
-    snv_matrix['alt_counts'] = snv_matrix['alt_counts'].clip_upper(10)
-    snv_matrix['is_present'] = (snv_matrix['alt_counts'] > 0) * 1
-    snv_matrix['is_absent'] = (snv_matrix['alt_counts'] == 0) * 1
-    snv_matrix['is_het'] = (snv_matrix['alt_counts'] < 0.99 * snv_matrix['total_counts']) * snv_matrix['is_present']
-    snv_matrix['is_hom'] = (snv_matrix['alt_counts'] >= 0.99 * snv_matrix['total_counts']) * snv_matrix['is_present']
-    snv_matrix['state'] = snv_matrix['is_hom'] * 3 + snv_matrix['is_het'] * 2 + snv_matrix['is_absent']
-    snv_presence_matrix = snv_matrix.set_index(['chrom', 'coord', 'cluster_id'])['is_present'].unstack(fill_value=0)
-    print(snv_presence_matrix.shape)
 
-    g = seaborn.clustermap(snv_presence_matrix, rasterized=True, row_cluster=True, figsize=(4, 12))
+
 
 
 def calc_prop_hom_del(states):
@@ -333,7 +259,6 @@ def calc_prop_hom_del(states):
 def calculate_clusters(cn_data, metrics_data, results_prefix):
     """ Cluster copy number data.
     """
-
     metrics_data['filter_quality'] = (metrics_data['quality'] > 0.75)
     metrics_data['filter_reads'] = (metrics_data['total_mapped_reads_hmmcopy'] > 500000)
 
@@ -697,12 +622,13 @@ def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, loc
         results_prefix,
     )
 
-    snv_data, allele_data, breakpoint_data, breakpoint_count_data = memoizer(
+    snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data = memoizer(
         'pseudobulk_data',
         retrieve_pseudobulk_data,
         pseudobulk_ticket,
         final_clusters,
         local_cache_directory,
+        results_prefix,
     )
 
     allele_cn = memoizer(
@@ -714,17 +640,18 @@ def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, loc
         results_prefix,
     )
     
-    filtered_snv_data = memoizer(
+    memoizer(
         'snv_filtering',
         run_bulk_snv_analysis,
         snv_data,
+        snv_count_data,
         results_prefix,
     )
 
     snv_phylogeny = memoizer(
         'snv_phylogeny',
         run_snv_phylogenetics,
-        filtered_snv_data,
+        snv_count_data,
         allele_cn,
         final_clusters,
         results_prefix, 

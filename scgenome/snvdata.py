@@ -2,8 +2,10 @@ import os
 import wget
 import logging
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from datamanagement.miscellaneous.hdf5helper import read_python2_hdf5_dataframe
+import scgenome.utils
 
 
 def get_highest_snpeff_effect(snpeff_data):
@@ -30,7 +32,6 @@ categorical_columns = [
     'chrom',
     'ref',
     'alt',
-    'cell_id',
     'gene_name',
     'effect',
     'effect_impact',
@@ -75,10 +76,10 @@ def get_snv_results(dest, museq_filter=None, strelka_filter=None):
 
     tnc = read_python2_hdf5_dataframe(dest,'/snv/tri_nucleotide_context')
 
-    data = read_python2_hdf5_dataframe(dest, '/snv_allele_counts')
-    logging.info('total snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
+    # data = read_python2_hdf5_dataframe(dest, '/snv_allele_counts')
+    # logging.info('total snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
 
-    data = data.merge(mappability)
+    data = mappability#data.merge(mappability)
     logging.info('post mappability with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
 
     data = data.merge(strelka_results, how='left')
@@ -109,16 +110,14 @@ def get_snv_results(dest, museq_filter=None, strelka_filter=None):
     return data
 
 
-# TODO: separate tables for snv annotations and snv counts
-
-def load_snv_annotation_data(dataset_filepaths):
+def load_snv_annotation_data(dataset_filepaths, museq_filter=None, strelka_filter=None):
     snv_data = []
     for filepath in dataset_filepaths:
         if filepath.endswith('_snv_annotations.h5'):
-            snv_data.append(scgenome.snvdata.get_snv_results(
+            snv_data.append(get_snv_results(
                 filepath,
-                museq_filter=museq_score_threshold,
-                strelka_filter=strelka_score_threshold))
+                museq_filter=museq_filter,
+                strelka_filter=strelka_filter))
 
     snv_data = scgenome.utils.concat_with_categories(snv_data, ignore_index=True)
 
@@ -129,7 +128,7 @@ def load_snv_count_data(dataset_filepaths, positions):
     snv_count_data = []
 
     for filepath in dataset_filepaths:
-        if filepath.endswith('_snv_allele_counts.csv.gz'):
+        if filepath.endswith('_snv_union_counts.csv.gz'):
             logging.info('Loading snv counts from {}'.format(filepath))
 
             data = pd.read_csv(
@@ -159,34 +158,76 @@ def load_snv_count_data(dataset_filepaths, positions):
     return snv_count_data
 
 
-def load_snv_data(dataset_filepaths):
-    snv_data = load_snv_annotation_data(dataset_filepaths)
+def load_snv_data(
+        dataset_filepaths,
+        museq_filter=None,
+        strelka_filter=None,
+        snvs_num_cells_threshold=None,
+        snvs_sum_alt_threshold=None,
+        figures_prefix=None,
+):
+    snv_data = load_snv_annotation_data(
+        dataset_filepaths,
+        museq_filter=museq_filter,
+        strelka_filter=strelka_filter)
+
+    assert not snv_data['coord'].isnull().any()
 
     positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
 
     snv_count_data = load_snv_count_data(dataset_filepaths, positions)
+    snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
+    snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
 
-    # Ignore counts based on individual libraries
-    snv_data = snv_data.drop(['alt_counts', 'ref_counts'], axis=1)
+    assert not snv_count_data['alt_counts'].isnull().any()
 
-    # Merge counts from union set of SNVs
-    scgenome.utils.union_categories(
-        snv_data, snv_count_data,
-        cols=['chrom', 'ref', 'alt', 'cell_id'])
-    snv_data = snv_data.merge(
-        snv_count_data, how='outer',
-        on=['chrom', 'coord', 'ref', 'alt', 'cell_id'])
+    # Calculate cell counts
+    cell_counts = (
+        snv_count_data
+        .query('alt_counts > 0')
+        .drop_duplicates(['chrom', 'coord', 'ref', 'alt', 'cell_id'])
+        .groupby(['chrom', 'coord', 'ref', 'alt']).size().rename('num_cells')
+        .reset_index())
 
-    snv_data['ref_counts'] = snv_data['ref_counts'].fillna(0)
-    snv_data['alt_counts'] = snv_data['alt_counts'].fillna(0)
-    snv_data['total_counts'] = snv_data['ref_counts'] + snv_data['alt_counts']
-    assert 'sample_id' not in snv_data
-    snv_data['sample_id'] = snv_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
+    if figures_prefix is not None:
+        fig = plt.figure(figsize=(4, 4))
+        cell_counts['num_cells'].hist(bins=50)
+        fig.savefig(figures_prefix + '_snv_cell_counts.pdf', bbox_inches='tight')
 
-    assert not snv_data['coord'].isnull().any()
-    assert not snv_data['alt_counts'].isnull().any()
+    snv_data = snv_data.merge(cell_counts, how='left')
+    assert not snv_data['num_cells'].isnull().any()
 
-    return snv_data
+    # Calculate total alt counts for each SNV
+    sum_alt_counts = (
+        snv_count_data
+        .groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts']
+        .sum().rename('sum_alt_counts')
+        .reset_index())
+
+    if figures_prefix is not None:
+        fig = plt.figure(figsize=(4, 4))
+        sum_alt_counts['sum_alt_counts'].hist(bins=50)
+        fig.savefig(figures_prefix + '_snv_alt_counts.pdf', bbox_inches='tight')
+
+    # Filter SNVs by num cells in which they are detected
+    if snvs_num_cells_threshold is not None:
+        filtered_cell_counts = cell_counts.query(
+            'num_cells >= {}'.format(snvs_num_cells_threshold))
+        logging.info('Filtering {} of {} SNVs by num_cells >= {}'.format(
+            len(filtered_cell_counts.index), len(cell_counts.index), snvs_num_cells_threshold))
+        snv_data = snv_data.merge(filtered_cell_counts[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
+
+    # Filter SNVs by total alt counts
+    if snvs_sum_alt_threshold is not None:
+        filtered_sum_alt_counts = sum_alt_counts.query(
+            'sum_alt_counts >= {}'.format(snvs_sum_alt_threshold))
+        logging.info('Filtering {} of {} SNVs by num_cells >= {}'.format(
+            len(filtered_sum_alt_counts.index), len(sum_alt_counts.index), snvs_sum_alt_threshold))
+        snv_data = snv_data.merge(filtered_sum_alt_counts[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
+
+    snv_count_data = snv_count_data.merge(snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
+
+    return snv_data, snv_count_data
 
 
 

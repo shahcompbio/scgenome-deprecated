@@ -1,14 +1,15 @@
 import matplotlib
 import seaborn
+import logging
 import scipy.special
 import pandas as pd
 import numpy as np
 from hmmlearn._hmmc import _viterbi
 from scipy.stats import binom
-import scgenome.refgenome as refgenome
 from matplotlib import collections  as mc
 
-from . import refgenome
+import scgenome.refgenome
+import scgenome.utils
 
 
 def load_haplotype_allele_counts(dataset_filepaths):
@@ -105,10 +106,10 @@ def plot_vaf_cn_profile(ax, hap_data, allele_cn):
 
     allele_cn['cn_ratio'] = allele_cn['minor_cn'] / allele_cn['total_cn']
 
-    allele_cn = allele_cn[allele_cn['chr'].isin(refgenome.info.chromosomes)]
+    allele_cn = allele_cn[allele_cn['chr'].isin(scgenome.refgenome.info.chromosomes)]
 
     allele_cn.set_index('chr', inplace=True)
-    allele_cn['chromosome_start'] = refgenome.info.chromosome_start
+    allele_cn['chromosome_start'] = scgenome.refgenome.info.chromosome_start
     allele_cn.reset_index(inplace=True)
 
     allele_cn['start'] = allele_cn['start'] + allele_cn['chromosome_start']
@@ -128,10 +129,10 @@ def plot_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, size_fie
     """ Plot genome wide VAF profile for haplotype alleles
     """
     plot_data = cn_data.copy()
-    plot_data = plot_data[plot_data['chr'].isin(refgenome.info.chromosomes)]
+    plot_data = plot_data[plot_data['chr'].isin(scgenome.refgenome.info.chromosomes)]
 
     plot_data.set_index('chr', inplace=True)
-    plot_data['chromosome_start'] = refgenome.info.chromosome_start
+    plot_data['chromosome_start'] = scgenome.refgenome.info.chromosome_start
     plot_data.reset_index(inplace=True)
 
     plot_data['start'] = plot_data['start'] + plot_data['chromosome_start']
@@ -150,15 +151,15 @@ def plot_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, size_fie
     ax.scatter(
         plot_data['start'], plot_data[value_field_name], c=c, s=s, alpha=0.1, cmap=cmap)
 
-    ax.set_xlim((-0.5, refgenome.info.chromosome_end.max()))
+    ax.set_xlim((-0.5, scgenome.refgenome.info.chromosome_end.max()))
     ax.set_xlabel('chromosome')
-    ax.set_xticks([0] + list(refgenome.info.chromosome_end.values))
+    ax.set_xticks([0] + list(scgenome.refgenome.info.chromosome_end.values))
     ax.set_xticklabels([])
     ax.set_yticks([0., 0.1, 0.2, 0.3, 0.4, 0.5])
     ax.xaxis.tick_bottom()
     ax.yaxis.tick_left()
-    ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_mid))
-    ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.chromosomes))
+    ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(scgenome.refgenome.info.chromosome_mid))
+    ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(scgenome.refgenome.info.chromosomes))
 
     seaborn.despine(ax=ax, offset=10, trim=True)
 
@@ -214,7 +215,7 @@ def infer_allele_cn(clone_cn_data, hap_data):
     return allele_cn
 
 
-def calculate_cluster_allele_counts(allele_data, clusters):
+def calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size):
     """ Calculate allele specific haplotype allele counts per cluster
     """
     index_cols = [

@@ -1,8 +1,10 @@
-from scipy.misc import logsumexp as log_sum_exp
+import logging
+import seaborn
 
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
+import scipy.stats
+import scipy.misc
 
 import dollo.tasks
 import dollo.run
@@ -46,6 +48,39 @@ def find_overlapping_segments(pos, seg, columns):
         results.loc[mask, col] = seg[col].iloc[end_idx[mask]].values
 
     return results
+
+
+def snv_hierarchical_clustering_figure(snv_data, allele_cn, clusters):
+    """ Compute log likelihoods of presence absence for SNVs
+    """
+    snv_matrix = snv_data.merge(clusters)
+
+    snv_matrix = (
+        snv_matrix.groupby(
+            ['chrom', 'coord', 'ref', 'alt', 'cluster_id'],
+            as_index=True, observed=True)[['alt_counts', 'ref_counts']]
+        .sum().unstack().fillna(0).astype(int).stack().reset_index())
+    snv_matrix['total_counts'] = snv_matrix['ref_counts'] + snv_matrix['alt_counts']
+
+    snv_matrix['vaf'] = snv_matrix['alt_counts'] / snv_matrix['total_counts']
+    snv_matrix['alt_counts'] = snv_matrix['alt_counts'].clip_upper(10)
+    snv_matrix['is_present'] = (snv_matrix['alt_counts'] > 0) * 1
+    snv_matrix['is_absent'] = (snv_matrix['alt_counts'] == 0) * 1
+    snv_matrix['is_het'] = (snv_matrix['alt_counts'] < 0.99 * snv_matrix['total_counts']) * snv_matrix['is_present']
+    snv_matrix['is_hom'] = (snv_matrix['alt_counts'] >= 0.99 * snv_matrix['total_counts']) * snv_matrix['is_present']
+    snv_matrix['state'] = snv_matrix['is_hom'] * 3 + snv_matrix['is_het'] * 2 + snv_matrix['is_absent']
+    snv_presence_matrix = snv_matrix.set_index(['chrom', 'coord', 'cluster_id'])['is_present'].unstack(fill_value=0)
+
+    logging.info(f'snv matrix with shape{snv_presence_matrix.shape}')
+
+    # KLUDGE: currently recursion in dendrograms
+    # breaks with large datasets
+    import sys
+    sys.setrecursionlimit(10000)
+
+    g = seaborn.clustermap(snv_presence_matrix, rasterized=True, row_cluster=True, figsize=(4, 12))
+
+    return g.fig
 
 
 def compute_snv_log_likelihoods(snv_data, allele_cn, clusters):
@@ -112,7 +147,7 @@ def calculate_likelihood_present(row, e_s):
     )
 
 def log_binomial_pdf(x, n, p):
-    return stats.binom.logpmf(x, n, p)
+    return scipy.stats.binom.logpmf(x, n, p)
 
 
 def log_likelihood_absent(e_s, n_v, n_t):
@@ -129,7 +164,7 @@ def log_likelihood_present(c_m, c_t, e_s, n_v, n_t):
         r = c_v / c_t
         conditional_log_likelihoods.append(log_binomial_pdf(n_v, n_t, r))
 
-    return log_sum_exp(conditional_log_likelihoods)
+    return scipy.misc.logsumexp(conditional_log_likelihoods)
 
 
 def compute_dollo_ml_tree(snv_log_likelihoods):
@@ -149,3 +184,86 @@ def compute_dollo_ml_tree(snv_log_likelihoods):
 
     return trees[ml_tree_id], tree_annotations
 
+
+def plot_dollo_ml_tree(tree, nodes):
+    """
+    """
+    leaf_order = []
+    for leaf in tree.leaves:
+        leaf.plot_id = leaf.name
+        leaf_order.append(leaf.name)
+
+    origin_counts = nodes.groupby('node')['ml_origin'].sum()
+
+    for node in tree.nodes:
+        node.origin_count = origin_counts[node.label]
+
+    loss_counts = nodes.groupby('node')['ml_loss'].sum()
+
+    width = 1 + 0.5 * float(len(list(tree.leaves)))
+    fig = plt.figure(figsize=(width/1.5, 6))
+
+    ax = fig.add_subplot(111)
+
+    def func(x, pos):
+        s = '{:0,d}'.format(int(x))
+        return s
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(func))
+
+    wgs_analysis.plots.trees.plot_tree(ax, tree, landscape=False, flip=True, branch_length_attr='origin_count', leaf_name_attr='plot_id')
+
+    ## OV specific
+    # annotate_coords = [
+    #     (7578265, 'TP53'),
+    #     (23520184, 'HTR1D'),
+    #     (40900013, 'C7orf10'),
+    #     (114329967, 'FOXP2'),
+    #     (124266354, 'ZHX1'),
+    #     (5231710, 'INSL4'),
+    # ]
+
+    # patient_snv_gene_names = collections.defaultdict(list)
+
+    # for coord, gene_name in annotate_coords:
+    #     print coord, gene_name
+    #     node = nodes.query('(coord == {}) & (ml_origin == 1)'.format(coord))['node'].values[0]
+    #     patient_snv_gene_names[node].append(gene_name)
+    #     print node
+    #     raise
+    # # patient_snv_gene_names = {
+    # #     0: ['TP53', 'C7orf10', 'FOXP2'],
+    # #     12: [],
+    # #     14: ['LRP1B Del'],
+    # #     1: ['HTR1D', 'MSH2 Inv'],
+    # # }
+
+    for node in tree.nodes:
+
+        x, y = node.branch_line.get_data()
+
+    #     if loss_counts[node.label] != 0:
+    #         loss_counts_text = u'\u2014{}'.format(loss_counts[node.label])
+    #         ax.annotate(loss_counts_text,
+    #                     xy=(x[0], y.mean()), xytext=(x[0] + 0.1, y.mean()), fontsize=8)
+
+        snv_gene_names = patient_snv_gene_names.get(node.label, [])
+
+        positions = np.linspace(0, 1, len(snv_gene_names) + 2)[1:-1]
+
+        for pos, gene_name in zip(positions, snv_gene_names):
+
+            x = pos * node.branch[0][0] + (1 - pos) * node.branch[0][1]
+            y = pos * node.branch[1][0] + (1 - pos) * node.branch[1][1]
+
+            ax.annotate(gene_name, xy=(x, y), xycoords='data',
+                xytext=(x - 0.2, y), textcoords='data', fontsize=8, style='italic',
+                arrowprops=dict(arrowstyle='-', color='black', shrinkB=0),
+                ha='right', va='center',
+                )
+
+#     xtickrelabel = [leaf_name_remap[int(str(a.get_text()))] for a in ax.get_xticklabels()]
+
+    ax.set_ylabel('SNV count')
+#     ax.set_xticklabels(xtickrelabel, rotation=0)
+
+    plt.tight_layout()
