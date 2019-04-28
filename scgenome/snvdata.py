@@ -220,7 +220,7 @@ def load_snv_data(
     if sum_alt_threshold is not None:
         filtered_sum_alt_counts = sum_alt_counts.query(
             'sum_alt_counts >= {}'.format(sum_alt_threshold))
-        logging.info('Filtering {} of {} SNVs by num_cells >= {}'.format(
+        logging.info('Filtering {} of {} SNVs by sum_alt_counts >= {}'.format(
             len(filtered_sum_alt_counts.index), len(sum_alt_counts.index), sum_alt_threshold))
         snv_data = snv_data.merge(filtered_sum_alt_counts[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
 
