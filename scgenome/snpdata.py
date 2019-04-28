@@ -98,7 +98,7 @@ def plot_vaf_cn_profile(ax, hap_data, allele_cn):
     """
     allele_cn = allele_cn.copy()
 
-    plot_vaf_profile(
+    chrom_info = plot_vaf_profile(
         ax, hap_data, 'maf',
         size_field_name='total_counts_sum',
         size_scale=100.,
@@ -123,6 +123,8 @@ def plot_vaf_cn_profile(ax, hap_data, allele_cn):
 
     lc = mc.LineCollection(lines, colors='b', linewidths=1.)
     ax.add_collection(lc)
+
+    return chrom_info
 
 
 def plot_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, size_field_name=None, size_scale=1.):
@@ -162,6 +164,13 @@ def plot_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, size_fie
     ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(scgenome.refgenome.info.chromosomes))
 
     seaborn.despine(ax=ax, offset=10, trim=True)
+
+    chrom_info = (
+        plot_data[['chr', 'chromosome_start']]
+        .drop_duplicates()
+        .set_index('chr')['chromosome_start'])
+
+    return chrom_info
 
 
 def infer_allele_cn(clone_cn_data, hap_data):

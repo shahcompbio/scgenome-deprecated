@@ -1,5 +1,4 @@
 import os
-import wget
 import logging
 import pandas as pd
 import matplotlib.pyplot as plt

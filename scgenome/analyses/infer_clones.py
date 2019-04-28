@@ -5,7 +5,6 @@ import click
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import wget
 import functools
 import itertools
 import pickle
