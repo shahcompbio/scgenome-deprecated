@@ -216,12 +216,18 @@ def infer_allele_cn(clone_cn_data, hap_data):
 
         minor_cn.loc[clone_id, 'minor_cn'] = seq
 
+    minor_cn = minor_cn.reset_index()
+    minor_cn = minor_cn.merge(
+        cn[['chr', 'start', 'end', 'cluster_id', 'total_cn']].drop_duplicates(),
+        how='left')
+    minor_cn['total_cn'] = minor_cn['total_cn'].astype(int)
+    minor_cn['major_cn'] = minor_cn['total_cn'] - minor_cn['minor_cn']
+
     assert minor_cn['minor_cn'].notnull().any()
+    assert minor_cn['major_cn'].notnull().any()
+    assert minor_cn['total_cn'].notnull().any()
 
-    allele_cn = cn.merge(minor_cn.reset_index())
-    allele_cn['major_cn'] = allele_cn['total_cn'] - allele_cn['minor_cn']
-
-    return allele_cn
+    return minor_cn
 
 
 def calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size):
