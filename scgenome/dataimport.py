@@ -4,7 +4,6 @@ import pandas as pd
 
 import dbclients.tantalus
 import datamanagement.transfer_files
-from datamanagement.miscellaneous.hdf5helper import read_python2_hdf5_dataframe
 
 
 standard_hmmcopy_reads_cols = [
@@ -47,17 +46,13 @@ def import_cn_data(
         hmmcopy_reads_cols.extend(additional_reads_cols)
 
     results_info = [
-        ('{}_hmmcopy', '_hmmcopy.h5', [
-            ('hmmcopy_reads', '/hmmcopy/reads/'+ploidy_solution, hmmcopy_reads_cols),
-            ('hmmcopy_metrics', '/hmmcopy/metrics/'+ploidy_solution, None),
-        ]),
-        ('{}_align', '_alignment_metrics.h5', [
-            ('align_metrics', '/alignment/metrics', None),
-        ]),
+        ('{}_hmmcopy', f'_multiplier{ploidy_solution}_reads.csv.gz', 'hmmcopy_reads', hmmcopy_reads_cols),
+        ('{}_hmmcopy', f'_multiplier{ploidy_solution}_metrics.csv.gz', 'hmmcopy_metrics', None),
+        ('{}_align', '_alignment_metrics.csv.gz', 'align_metrics', None),
     ]
 
     for ticket in tickets:
-        for analysis_template, h5_suffix, table_info in results_info:
+        for analysis_template, csv_suffix, table_name, read_cols in results_info:
             results = tantalus_api.get('results', name=analysis_template.format(ticket))
 
             datamanagement.transfer_files.cache_dataset(
@@ -66,26 +61,24 @@ def import_cn_data(
                 'resultsdataset',
                 results_storage_name,
                 local_cache_directory,
-                suffix_filter='.h5',
+                suffix_filter=csv_suffix,
             )
 
             for file_resource_id in results['file_resources']:
                 file_resource = tantalus_api.get('file_resource', id=file_resource_id)
 
-                if file_resource['filename'].endswith(h5_suffix):
-                    for table_name, table_key, read_cols in table_info:
-                        filepath = local_results_client.get_url(file_resource['filename'])
-                        data = read_python2_hdf5_dataframe(filepath, table_key)
-                        if read_cols is not None:
-                            data = data[read_cols]
-                        data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
-                        data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
-                        if sample_ids is not None:
-                            data = data[data['sample_id'].isin(sample_ids)]
-                        for col in categorical_cols:
-                            if col in data:
-                                data[col] = pd.Categorical(data[col])
-                        results_tables[table_name][ticket] = data
+                if file_resource['filename'].endswith(csv_suffix):
+                    filepath = local_results_client.get_url(file_resource['filename'])
+                    data = pd.read_csv(filepath, usecols=read_cols)
+                    data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
+                    data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
+                    if sample_ids is not None:
+                        data = data[data['sample_id'].isin(sample_ids)]
+                    for col in categorical_cols:
+                        if col in data:
+                            data[col] = pd.Categorical(data[col])
+                    assert ticket not in results_tables[table_name]
+                    results_tables[table_name][ticket] = data
 
         if subsample is not None:
             cell_ids = (
