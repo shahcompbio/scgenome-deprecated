@@ -62,7 +62,9 @@ cn_bin_size = 500000
 results_storage_name = 'singlecellblob_results'
 
 
-def retrieve_cn_data(tantalus_api, library_ids, sample_ids, local_cache_directory, results_prefix):
+def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_prefix):
+    tantalus_api = dbclients.tantalus.TantalusApi()
+
     hmmcopy_results, hmmcopy_tickets = scgenome.dataimport.search_hmmcopy_analyses(tantalus_api, library_ids)
 
     results = scgenome.dataimport.import_cn_data(
@@ -78,7 +80,7 @@ def retrieve_cn_data(tantalus_api, library_ids, sample_ids, local_cache_director
     cell_cycle_data['cell_id'] = pd.Categorical(cell_cycle_data['cell_id'], categories=metrics_data['cell_id'].cat.categories)
     metrics_data = metrics_data.merge(cell_cycle_data)
 
-    image_feature_data = scgenome.dataimport.import_image_feature_data(tantalus_api, library_ids)
+    image_feature_data = pd.DataFrame()#scgenome.dataimport.import_image_feature_data(tantalus_api, library_ids)
 
     # Read count filtering
     metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > 500000]
@@ -567,15 +569,12 @@ class Memoizer(object):
 def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, local_cache_directory):
     """ Run clonal inference on a set of libraries 
     """
-    tantalus_api = dbclients.tantalus.TantalusApi()
-
     memoizer = Memoizer(results_prefix + '_')
 
     logging.info('retrieving cn data')
     cn_data, metrics_data, image_feature_data = memoizer(
         'raw_data',
         retrieve_cn_data,
-        tantalus_api,
         library_ids,
         sample_ids,
         local_cache_directory,
