@@ -209,7 +209,13 @@ def run_mutation_signature_analysis(snv_data, results_prefix):
     fig.savefig(results_prefix + '_top10_mutsig.pdf', bbox_inches='tight')
 
 
-def run_bulk_snv_analysis(snv_data, snv_count_data, results_prefix):
+def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_prefix):
+    # Filter cells
+    snv_count_data = snv_count_data.merge(filtered_cell_ids)
+    total_alt_counts = snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts'].sum().reset_index()
+    snv_data = snv_data.merge(
+        total_alt_counts.query('alt_counts > 0')[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
+
     # Write high impact SNVs to a csv table
     high_impact = (snv_data.query('effect_impact == "HIGH"').query('is_cosmic == True')
         [[
@@ -232,7 +238,12 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, results_prefix):
     fig = plt.figure(figsize=(10, 3))
     snv_data = wgs_analysis.annotation.position.annotate_adjacent_distance(snv_data)
     wgs_analysis.plots.snv.snv_adjacent_distance_plot(plt.gca(), snv_data)
-    fig.savefig(results_prefix + '_snv_adjacent_density.pdf', bbox_inches='tight')
+    fig.savefig(results_prefix + '_snv_adjacent_distance.pdf', bbox_inches='tight')
+
+    # Plot snv count as a histogram across the genome
+    fig = plt.figure(figsize=(10, 3))
+    wgs_analysis.plots.snv.snv_count_plot(plt.gca(), snv_data)
+    fig.savefig(results_prefix + '_snv_genome_count.pdf', bbox_inches='tight')
 
 
 def run_snv_phylogenetics(snv_count_data, allele_cn, clusters, results_prefix):
@@ -639,11 +650,12 @@ def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, loc
     )
     
     memoizer(
-        'snv_filtering',
+        'bulk_snv_analysis',
         run_bulk_snv_analysis,
         snv_data,
         snv_count_data,
-        results_prefix,
+        final_clusters[['cell_id']].drop_duplicates(),
+        results_prefix + '_filtered',
     )
 
     snv_phylogeny = memoizer(
