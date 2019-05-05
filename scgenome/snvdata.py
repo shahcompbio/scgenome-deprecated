@@ -1,6 +1,7 @@
 import os
 import logging
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 from datamanagement.miscellaneous.hdf5helper import read_python2_hdf5_dataframe
@@ -75,17 +76,15 @@ def get_snv_results(dest, museq_filter=None, strelka_filter=None):
 
     tnc = read_python2_hdf5_dataframe(dest,'/snv/tri_nucleotide_context')
 
-    # data = read_python2_hdf5_dataframe(dest, '/snv_allele_counts')
-    # logging.info('total snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
+    data = read_python2_hdf5_dataframe(dest, '/snv_allele_counts')
+    data = (
+        data
+        .groupby(['chrom', 'coord', 'ref', 'alt'])[['alt_counts', 'ref_counts']]
+        .sum().rename(columns={'alt_counts': 'alt_counts_sum', 'ref_counts': 'ref_counts_sum'}).reset_index())
+    logging.info('total snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
 
-    data = mappability#data.merge(mappability)
+    data = data.merge(mappability)
     logging.info('post mappability with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-
-    data = data.merge(strelka_results, how='left')
-    logging.info('post strelka with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-
-    data = data.merge(museq_results, how='left')
-    logging.info('post museq with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
 
     data = data.merge(cosmic, how='left')
     logging.info('post cosmic with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
@@ -95,11 +94,19 @@ def get_snv_results(dest, museq_filter=None, strelka_filter=None):
 
     data = data.merge(tnc, how='left')
 
-    data = data[data['museq_score'] > museq_filter]
-    logging.info('post museq filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
+    data = data.merge(strelka_results, how='left')
+    logging.info('post strelka with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
 
-    data = data[data['strelka_score'] > strelka_filter]
-    logging.info('post strelka filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
+    data = data.merge(museq_results, how='left')
+    logging.info('post museq with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
+
+    if museq_filter != -np.inf:
+        data = data[data['museq_score'] > museq_filter]
+        logging.info('post museq filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
+
+    if strelka_filter != -np.inf:
+        data = data[data['strelka_score'] > strelka_filter]
+        logging.info('post strelka filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
 
     logging.info('finishing load with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
 

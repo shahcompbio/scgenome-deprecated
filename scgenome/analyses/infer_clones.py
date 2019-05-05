@@ -173,40 +173,55 @@ def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory, results
     return snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data
 
 
+def plot_mutation_signatures(snv_data, sig_prob, snv_class_col, results_prefix):
+    """
+    Infer mutation signature probabilities and plot.
+    """
+
+    # Add in an all snvs category
+    snv_data_all = snv_data.copy()
+    snv_data_all[snv_class_col] = 'All'
+    snv_data = pd.concat([snv_data, snv_data_all])
+
+    # Generate signature distributions for cell count classes
+    sample_sig = wgs_analysis.snvs.mutsig.fit_sample_signatures(
+        snv_data.drop_duplicates(
+            ['chrom', 'coord', 'ref', 'alt', snv_class_col]),
+        sig_prob, snv_class_col)
+
+    fig = wgs_analysis.snvs.mutsig.plot_signature_heatmap(sample_sig)
+    seaborn.despine(trim=True)
+    fig.savefig(results_prefix + f'_{snv_class_col}_mutsig.pdf', bbox_inches='tight')
+
+    fig = plt.figure(figsize=(4, 4))
+    sample_sig.loc['All', :].sort_values().iloc[-10:,].plot(kind='bar')
+    seaborn.despine(trim=True)
+    fig.savefig(results_prefix + f'_{snv_class_col}_top10_mutsig.pdf', bbox_inches='tight')
+
+
 def run_mutation_signature_analysis(snv_data, results_prefix):
     """
     Run a mutation signature analysis
     """
     sigs, sig_prob = wgs_analysis.snvs.mutsig.load_signature_probabilities()
 
+    snv_data = snv_data[snv_data['tri_nucleotide_context'].notnull()]
+    snv_data = snv_data.merge(sigs)
+
+    # Per cell count class signatures
     snv_data = snv_data[snv_data['num_cells'] > 0]
     snv_data['num_cells_class'] = '1'
     snv_data.loc[snv_data['num_cells'] > 1, 'num_cells_class'] = '2-5'
     snv_data.loc[snv_data['num_cells'] > 5, 'num_cells_class'] = '6-20'
     snv_data.loc[snv_data['num_cells'] > 20, 'num_cells_class'] = '>20'
 
-    # Per cell count class signatures
-    snv_sig_data = snv_data[snv_data['tri_nucleotide_context'].notnull()]
-    snv_sig_data = snv_sig_data.merge(sigs)
+    plot_mutation_signatures(snv_data, sig_prob, 'num_cells_class', results_prefix)
 
-    snv_sig_data2 = snv_sig_data.copy()
-    snv_sig_data2['num_cells_class'] = 'All'
-    snv_sig_data2 = pd.concat([snv_sig_data, snv_sig_data2])
+    # Adjacent distance class signatures
+    snv_data['adjacent_distance_class'] = 'standard'
+    snv_data.loc[snv_data['adjacent_distance'] <= 10000, 'adjacent_distance_class'] = 'hypermutated'
 
-    # Generate signature distributions for cell count classes
-    sample_sig = wgs_analysis.snvs.mutsig.fit_sample_signatures(
-        snv_sig_data2.drop_duplicates(
-            ['chrom', 'coord', 'ref', 'alt', 'num_cells_class']),
-        sig_prob, 'num_cells_class')
-
-    fig = wgs_analysis.snvs.mutsig.plot_signature_heatmap(sample_sig)
-    seaborn.despine(trim=True)
-    fig.savefig(results_prefix + '_num_cell_class_mutsig.pdf', bbox_inches='tight')
-
-    fig = plt.figure(figsize=(4, 4))
-    sample_sig.loc['All', :].sort_values().iloc[-10:,].plot(kind='bar')
-    seaborn.despine(trim=True)
-    fig.savefig(results_prefix + '_top10_mutsig.pdf', bbox_inches='tight')
+    plot_mutation_signatures(snv_data, sig_prob, 'adjacent_distance_class', results_prefix)
 
 
 def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_prefix):
@@ -217,7 +232,7 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
         total_alt_counts.query('alt_counts > 0')[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
 
     # Write high impact SNVs to a csv table
-    high_impact = (snv_data.query('effect_impact == "HIGH"').query('is_cosmic == True')
+    high_impact = (snv_data.query('effect_impact == "HIGH"')
         [[
             'chrom', 'coord', 'ref', 'alt',
             'gene_name', 'effect', 'effect_impact',
@@ -232,11 +247,11 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
         snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['total_counts'].sum().reset_index())
     high_impact.to_csv(results_prefix + '_snvs_high_impact.csv')
 
-    run_mutation_signature_analysis(snv_data, results_prefix)
+    # Annotate adjacent distance
+    snv_data = wgs_analysis.annotation.position.annotate_adjacent_distance(snv_data)
 
     # Plot adjacent distance of SNVs
     fig = plt.figure(figsize=(10, 3))
-    snv_data = wgs_analysis.annotation.position.annotate_adjacent_distance(snv_data)
     wgs_analysis.plots.snv.snv_adjacent_distance_plot(plt.gca(), snv_data)
     fig.savefig(results_prefix + '_snv_adjacent_distance.pdf', bbox_inches='tight')
 
@@ -244,6 +259,10 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
     fig = plt.figure(figsize=(10, 3))
     wgs_analysis.plots.snv.snv_count_plot(plt.gca(), snv_data)
     fig.savefig(results_prefix + '_snv_genome_count.pdf', bbox_inches='tight')
+
+    # Run mutation signature analysis, requires adjacent distance
+    run_mutation_signature_analysis(snv_data, results_prefix)
+
 
 
 def run_snv_phylogenetics(snv_count_data, allele_cn, clusters, results_prefix):
@@ -407,29 +426,36 @@ def finalize_clusters(cn_data, metrics_data, clusters, filter_metrics, cell_clon
     cluster_annotation = cluster_annotation.query(
         'cluster_size >= {}'.format(cluster_size_threshold))
 
-    # Assign s phase cells to the cluster they are most correlated with
-    cell_filtered_clone_distances = cell_clone_distances.merge(
-        cluster_annotation[['cluster_id']].drop_duplicates())
-    s_phase_cluster = cell_filtered_clone_distances.merge(
-        metrics_data.query('is_s_phase')[['cell_id']])
-    s_phase_cluster = (
-        s_phase_cluster
-        .set_index(['cell_id', 'cluster_id'])['pearsonr']
-        .unstack(level=['cluster_id']).idxmin(axis=1).rename('cluster_id').reset_index())
+    # Assign clusters to s phase cells
+    if not metrics_data.query('is_s_phase').empty:
+        # Assign s phase cells to the cluster they are most correlated with
+        cell_filtered_clone_distances = cell_clone_distances.merge(
+            cluster_annotation[['cluster_id']].drop_duplicates())
+        s_phase_cluster = cell_filtered_clone_distances.merge(
+            metrics_data.query('is_s_phase')[['cell_id']])
+        s_phase_cluster = (
+            s_phase_cluster
+            .set_index(['cell_id', 'cluster_id'])['pearsonr']
+            .unstack(level=['cluster_id']).idxmin(axis=1).rename('cluster_id').reset_index())
 
-    # Filter s phase cells
-    s_phase_filter = (filter_metrics
-        .query('is_s_phase')
-        .query('filter_reads')
-        .query('filter_copy_state_diff')
-        .query('filter_prop_hom_del'))[['cell_id']]
-    s_phase_cluster = s_phase_cluster.merge(s_phase_filter)
+        # Filter s phase cells
+        s_phase_filter = (filter_metrics
+            .query('is_s_phase')
+            .query('filter_reads')
+            .query('filter_copy_state_diff')
+            .query('filter_prop_hom_del'))[['cell_id']]
+        s_phase_cluster = s_phase_cluster.merge(s_phase_filter)
 
-    # Create a merged set of cluster calls
-    final_clusters = pd.concat([
-        cluster_annotation[['cell_id', 'cluster_id']],
-        s_phase_cluster[['cell_id', 'cluster_id']],
-    ], ignore_index=True)
+        # Create a merged set of cluster calls
+        final_clusters = pd.concat([
+            cluster_annotation[['cell_id', 'cluster_id']],
+            s_phase_cluster[['cell_id', 'cluster_id']],
+        ], ignore_index=True)
+
+    else:
+        # No s-phase cells
+        final_clusters = cluster_annotation[['cell_id', 'cluster_id']].copy()
+
     assert not final_clusters['cell_id'].duplicated().any()
 
     # Plotting

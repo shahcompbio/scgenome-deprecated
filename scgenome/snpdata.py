@@ -20,8 +20,23 @@ def load_haplotype_allele_counts(dataset_filepaths):
         if filepath.endswith('_allele_counts.csv'):
             logging.info('Loading haplotype allele counts from {}'.format(filepath))
 
+            # HACK: temp fix until the pipeline outputs csv headers
+            names = None
+            firstline = open(filepath).readline()
+            if 'chromosome' not in firstline:
+                names = [
+                    'start',
+                    'end',
+                    'hap_label',
+                    'allele_id',
+                    'readcount',
+                    'chromosome',
+                    'cell_id',
+                ]
+
             data = pd.read_csv(
                 filepath,
+                names=names,
                 dtype={
                     'chromosome': 'category',
                     'cell_id': 'category',
@@ -173,7 +188,7 @@ def plot_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, size_fie
     return chrom_info
 
 
-def infer_allele_cn(clone_cn_data, hap_data):
+def infer_allele_cn(clone_cn_data, hap_data, loh_error_rate=0.01):
     """ HMM inference of clone and allele specific copy number based on haplotype
     allele read counts.
     """
@@ -185,14 +200,31 @@ def infer_allele_cn(clone_cn_data, hap_data):
 
     cn['total_cn'] = cn['total_cn'].astype(int).astype(float)
 
+    total_cn = cn['total_cn'].values
+
     minor_cn = np.tile(np.arange(0, 10, 1), (cn.shape[0], 1))
     n = np.tile(cn['total_counts_sum'].astype(int), (minor_cn.shape[1], 1)).T
     x = np.tile(cn[['allele_1_sum', 'allele_2_sum']].min(axis=1).astype(int), (minor_cn.shape[1], 1)).T
-    p = minor_cn / cn['total_cn'].values[:, np.newaxis]
-    p += 0.01
+    p = minor_cn / total_cn[:, np.newaxis]
+
+    # Add an error term for the loh state
+    # Rational: we can think of each states probability of a minor allele
+    # read as being beta distributed around the expected calculated as
+    # the ratio of minor to total copy number.  For most states the expectation
+    # will be equal to the copy number ratio except for the loh state which will
+    # have the configurable offset from 0 governed by the loh_error_rate term
+    p[:, 0] = loh_error_rate
 
     l = binom.logpmf(x, n, p)
     l = np.logaddexp(l, np.log(0.01))
+
+    # Set the likelihood to be very low for impossible states
+    l[minor_cn > total_cn[:, np.newaxis]] = -1000.
+
+    # Set the likelihood to a low value that is still greater than the
+    # impossible state value if the likelihood is nan.  This will primarily
+    # catch the case where minor copy number equals total copy number, which
+    # is in general not a valid solution unless total copy number is 0
     l[np.isnan(l)] = -100.
 
     minor_cn_data = (pd.DataFrame(l, index=cn.set_index(['cluster_id', 'chr', 'start', 'end', 'hap_label']).index)
