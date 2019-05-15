@@ -4,53 +4,15 @@ import logging
 import scipy.special
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+
 from hmmlearn._hmmc import _viterbi
 from scipy.stats import binom
 from matplotlib import collections  as mc
 
 import scgenome.refgenome
 import scgenome.utils
-
-
-def load_haplotype_allele_counts(dataset_filepaths):
-    """ Load the haplotype allele count data from the pseudobulk results paths
-    """
-    allele_counts = []
-    for filepath in dataset_filepaths:
-        if filepath.endswith('_allele_counts.csv'):
-            logging.info('Loading haplotype allele counts from {}'.format(filepath))
-
-            # HACK: temp fix until the pipeline outputs csv headers
-            names = None
-            firstline = open(filepath).readline()
-            if 'chromosome' not in firstline:
-                names = [
-                    'start',
-                    'end',
-                    'hap_label',
-                    'allele_id',
-                    'readcount',
-                    'chromosome',
-                    'cell_id',
-                ]
-
-            data = pd.read_csv(
-                filepath,
-                names=names,
-                dtype={
-                    'chromosome': 'category',
-                    'cell_id': 'category',
-                })
-
-            logging.info('Loaded haplotype allele counts table with shape {}'.format(data.shape))
-
-            allele_counts.append(data)
-
-    allele_counts = scgenome.utils.concat_with_categories(allele_counts, ignore_index=True)
-
-    logging.info('Loaded all haplotype allele counts table with shape {}'.format(allele_counts.shape))
-
-    return allele_counts
+import scgenome.cnplot
 
 
 # TODO: possibly deprecated
@@ -159,7 +121,7 @@ def plot_vaf_profile(ax, cn_data, value_field_name, cn_field_name=None, size_fie
     cmap = None
     if cn_field_name is not None:
         c = plot_data[cn_field_name]
-        cmap = get_cn_cmap(plot_data[cn_field_name].values)
+        cmap = scgenome.cnplot.get_cn_cmap(plot_data[cn_field_name].values)
 
     s = 1
     if size_field_name is not None:
@@ -291,4 +253,52 @@ def calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size):
     allele_data['end'] = allele_data['start'] + cn_bin_size - 1
 
     return allele_data
+
+
+def calculate_cluster_allele_cn(
+        cn_data, allele_data, clusters, results_prefix,
+        total_allele_counts_threshold=6,
+    ):
+    """ Infer allele and cluster specific copy number from haplotype allele counts
+    """
+    clone_cn_state = (
+        cn_data.merge(clusters[['cell_id', 'cluster_id']])
+        .groupby(['chr', 'start', 'end', 'cluster_id'])['state']
+        .median().astype(int).reset_index())
+
+    clone_cn_copy = (
+        cn_data.merge(clusters[['cell_id', 'cluster_id']])
+        .groupby(['chr', 'start', 'end', 'cluster_id'])['copy']
+        .mean().reset_index())
+
+    clone_cn_data = clone_cn_state.merge(clone_cn_copy)
+
+    clone_cn_data['total_cn'] = clone_cn_data['state']
+
+    allele_data = allele_data.rename(columns={
+        'chromosome': 'chr',
+        'total': 'total_counts_sum',
+        'allele_1': 'allele_1_sum',
+        'allele_2': 'allele_2_sum',
+    })
+
+    allele_data = allele_data[allele_data['total_counts_sum'] >= total_allele_counts_threshold]
+
+    allele_cn = scgenome.snpdata.infer_allele_cn(clone_cn_data, allele_data)
+
+    allele_data['maf'] = (
+        np.minimum(allele_data['allele_1_sum'], allele_data['allele_2_sum']) /
+        allele_data['total_counts_sum'].astype(float))
+
+    for cluster_id in clusters['cluster_id'].unique():
+        cluster_allele_data = allele_data.query('cluster_id == {}'.format(cluster_id))
+        cluster_allele_cn = allele_cn.query('cluster_id == {}'.format(cluster_id))
+
+        fig = plt.figure(figsize=(14, 3))
+        ax = fig.add_subplot(111)
+        scgenome.snpdata.plot_vaf_cn_profile(
+            ax, cluster_allele_data, cluster_allele_cn)
+        fig.savefig(results_prefix + f'cluster_{cluster_id}_allele_cn.pdf')
+
+    return allele_cn
 

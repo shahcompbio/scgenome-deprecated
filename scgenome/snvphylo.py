@@ -9,6 +9,8 @@ import scipy.misc
 import dollo.tasks
 import dollo.run
 
+import scgenome.snvphylo
+
 
 def annotate_copy_number(pos, seg, columns=['major', 'minor'], sample_col='sample_id'):
     """ Annotate positions with segment specific data 
@@ -267,3 +269,16 @@ def plot_dollo_ml_tree(tree, nodes):
 #     ax.set_xticklabels(xtickrelabel, rotation=0)
 
     plt.tight_layout()
+
+
+def run_snv_phylogenetics(snv_count_data, allele_cn, clusters, results_prefix):
+    """ Run the SNV phylogenetic analysis.
+    """
+    snv_log_likelihoods = scgenome.snvphylo.compute_snv_log_likelihoods(
+        snv_count_data, allele_cn, clusters)
+
+    ml_tree, tree_annotations = scgenome.snvphylo.compute_dollo_ml_tree(
+        snv_log_likelihoods)
+
+    return ml_tree, tree_annotations
+

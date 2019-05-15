@@ -18,13 +18,15 @@ import scipy.spatial.distance
 
 import scgenome
 import scgenome.utils
-import scgenome.dataimport
 import scgenome.cncluster
 import scgenome.cnplot
 import scgenome.snvdata
 import scgenome.snpdata
-import scgenome.breakpointdata
 import scgenome.snvphylo
+import scgenome.dbsearch
+import scgenome.hmmcopy
+import scgenome.cnclones
+import scgenome.pseudobulk
 
 import wgs_analysis.snvs.mutsig
 import wgs_analysis.plots.snv
@@ -62,25 +64,110 @@ cn_bin_size = 500000
 results_storage_name = 'singlecellblob_results'
 
 
+def search_hmmcopy_analyses(
+        tantalus_api,
+        library_ids,
+        aligner_name='BWA_ALN_0_5_7',
+):
+    """ Search for hmmcopy results and analyses for a list of libraries.
+    """
+    hmmcopy_results = {}
+    hmmcopy_tickets = {}
+
+    for library_id in library_ids:
+        results, analysis = scgenome.dbsearch.search_hmmcopy_results(
+            tantalus_api, library_id, aligner_name=aligner_name)
+        hmmcopy_results[library_id] = results
+        hmmcopy_tickets[library_id] = analysis['jira_ticket']
+
+    return hmmcopy_results, hmmcopy_tickets
+
+
+def import_cell_cycle_data(
+        tantalus_api,
+        library_ids,
+        hmmcopy_results,
+        results_storage_name='singlecellblob_results',
+):
+    """ Import cell cycle predictions for a list of libraries
+    """
+    storage_client = tantalus_api.get_storage_client(results_storage_name)
+
+    cell_cycle_data = []
+
+    for library_id in library_ids:
+        results, analysis = scgenome.dbsearch.search_cell_cycle_results(
+            tantalus_api, library_id, hmmcopy_results[library_id])
+
+        file_instances = tantalus_api.get_dataset_file_instances(
+            results['id'], 'resultsdataset', results_storage_name)
+        for file_instance in file_instances:
+            f = storage_client.open_file(file_instance['file_resource']['filename'])
+            data = pd.read_csv(f)
+            data['library_id'] = library_id
+            cell_cycle_data.append(data)
+
+    cell_cycle_data = pd.concat(cell_cycle_data, ignore_index=True, sort=True)
+
+    return cell_cycle_data
+
+
+def import_image_feature_data(
+        tantalus_api,
+        library_ids,
+        results_storage_name='singlecellblob_results',
+):
+    """ Import image features for a list of libraries
+    """
+    storage_client = tantalus_api.get_storage_client(results_storage_name)
+
+    image_feature_data = []
+
+    for library_id in library_ids:
+        try:
+            results = scgenome.dbsearch.search_image_feature_results(tantalus_api, library_id)
+        except NotFoundError:
+            logging.info('no image data for {}'.format(library_id))
+            continue
+        file_instances = tantalus_api.get_dataset_file_instances(
+            results['id'], 'resultsdataset', results_storage_name)
+        for file_instance in file_instances:
+            f = storage_client.open_file(file_instance['file_resource']['filename'])
+            data = pd.read_csv(f, index_col=0)
+            data['library_id'] = library_id
+            image_feature_data.append(data)
+
+    if len(image_feature_data) == 0:
+        return pd.DataFrame()
+
+    image_feature_data = pd.concat(image_feature_data, ignore_index=True, sort=True)
+
+    return image_feature_data
+
+
 def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_prefix):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
-    hmmcopy_results, hmmcopy_tickets = scgenome.dataimport.search_hmmcopy_analyses(tantalus_api, library_ids)
+    hmmcopy_results, hmmcopy_tickets = search_hmmcopy_analyses(tantalus_api, library_ids)
 
-    results = scgenome.dataimport.import_cn_data(
-        hmmcopy_tickets,
-        local_cache_directory,
-        sample_ids=sample_ids,
-    )
+    cn_data = []
+    metrics_data = []
 
-    cn_data = results['hmmcopy_reads']
-    metrics_data = results['hmmcopy_metrics']
+    for library_id in library_ids:
+        hmmcopy = scgenome.hmmcopy.HMMCopyData(hmmcopy_tickets[library_id], local_cache_directory)
+        hmmcopy_data = hmmcopy.load_cn_data(sample_ids=sample_ids)
 
-    cell_cycle_data = scgenome.dataimport.import_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
+        cn_data.append(hmmcopy_data['hmmcopy_reads'])
+        metrics_data.append(hmmcopy_data['hmmcopy_metrics'])
+
+    cn_data = scgenome.utils.concat_with_categories(cn_data)
+    metrics_data = scgenome.utils.concat_with_categories(metrics_data)
+
+    cell_cycle_data = import_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
     cell_cycle_data['cell_id'] = pd.Categorical(cell_cycle_data['cell_id'], categories=metrics_data['cell_id'].cat.categories)
     metrics_data = metrics_data.merge(cell_cycle_data)
 
-    image_feature_data = pd.DataFrame()#scgenome.dataimport.import_image_feature_data(tantalus_api, library_ids)
+    image_feature_data = import_image_feature_data(tantalus_api, library_ids)
 
     # Read count filtering
     metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > 500000]
@@ -94,69 +181,14 @@ def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_pre
     return cn_data, metrics_data, image_feature_data
 
 
-def calculate_cluster_allele_cn(cn_data, allele_data, clusters, results_prefix):
-    """ Infer allele and cluster specific copy number from haplotype allele counts
-    """
-    clone_cn_state = (
-        cn_data.merge(clusters[['cell_id', 'cluster_id']])
-        .groupby(['chr', 'start', 'end', 'cluster_id'])['state']
-        .median().astype(int).reset_index())
-
-    clone_cn_copy = (
-        cn_data.merge(clusters[['cell_id', 'cluster_id']])
-        .groupby(['chr', 'start', 'end', 'cluster_id'])['copy']
-        .mean().reset_index())
-
-    clone_cn_data = clone_cn_state.merge(clone_cn_copy)
-
-    clone_cn_data['total_cn'] = clone_cn_data['state']
-
-    allele_data = allele_data.rename(columns={
-        'chromosome': 'chr',
-        'total': 'total_counts_sum',
-        'allele_1': 'allele_1_sum',
-        'allele_2': 'allele_2_sum',
-    })
-
-    allele_data = allele_data[allele_data['total_counts_sum'] >= total_allele_counts_threshold]
-
-    allele_cn = scgenome.snpdata.infer_allele_cn(clone_cn_data, allele_data)
-
-    allele_data['maf'] = (
-        np.minimum(allele_data['allele_1_sum'], allele_data['allele_2_sum']) /
-        allele_data['total_counts_sum'].astype(float))
-
-    for cluster_id in clusters['cluster_id'].unique():
-        cluster_allele_data = allele_data.query('cluster_id == {}'.format(cluster_id))
-        cluster_allele_cn = allele_cn.query('cluster_id == {}'.format(cluster_id))
-
-        fig = plt.figure(figsize=(14, 3))
-        ax = fig.add_subplot(111)
-        scgenome.snpdata.plot_vaf_cn_profile(
-            ax, cluster_allele_data, cluster_allele_cn)
-        fig.savefig(results_prefix + f'cluster_{cluster_id}_allele_cn.pdf')
-
-    return allele_cn
-
-
 def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory, results_prefix):
     """ Retrieve SNV, breakpoint and allele data
     """
-    tantalus_api = dbclients.tantalus.TantalusApi()
 
-    results = scgenome.dataimport.search_pseudobulk_results(tantalus_api, ticket_id)
-    sample_libraries = scgenome.dataimport.get_pseudobulk_sample_libraries(tantalus_api, ticket_id)
-
-    dataset_filepaths = datamanagement.transfer_files.cache_dataset(
-        tantalus_api,
-        results['id'],
-        'resultsdataset',
-        results_storage_name,
-        local_cache_directory,
-    )
+    pseudobulk = scgenome.pseudobulk.PseudobulkData(ticket_id, local_cache_directory)
 
     snv_data, snv_count_data = scgenome.snvdata.load_snv_data(
-        dataset_filepaths,
+        pseudobulk,
         museq_filter=museq_score_threshold,
         strelka_filter=strelka_score_threshold,
         num_cells_threshold=snvs_num_cells_threshold,
@@ -164,426 +196,12 @@ def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory, results
         figures_prefix=results_prefix + 'snv_loading_',
     )
 
-    allele_data = scgenome.snpdata.load_haplotype_allele_counts(dataset_filepaths)
+    allele_data = pseudobulk.load_haplotype_allele_counts()
     allele_data = scgenome.snpdata.calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size)
 
-    breakpoint_data, breakpoint_count_data = scgenome.breakpointdata.load_breakpoint_data(
-        dataset_filepaths, sample_libraries)
+    breakpoint_data, breakpoint_count_data = pseudobulk.load_breakpoint_data()
 
     return snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data
-
-
-def plot_mutation_signatures(snv_data, sig_prob, snv_class_col, results_prefix):
-    """
-    Infer mutation signature probabilities and plot.
-    """
-
-    # Add in an all snvs category
-    snv_data_all = snv_data.copy()
-    snv_data_all[snv_class_col] = 'All'
-    snv_data = pd.concat([snv_data, snv_data_all])
-
-    # Generate signature distributions for cell count classes
-    sample_sig = wgs_analysis.snvs.mutsig.fit_sample_signatures(
-        snv_data.drop_duplicates(
-            ['chrom', 'coord', 'ref', 'alt', snv_class_col]),
-        sig_prob, snv_class_col)
-
-    fig = wgs_analysis.snvs.mutsig.plot_signature_heatmap(sample_sig)
-    seaborn.despine(trim=True)
-    fig.savefig(results_prefix + f'_{snv_class_col}_mutsig.pdf', bbox_inches='tight')
-
-    fig = plt.figure(figsize=(4, 4))
-    sample_sig.loc['All', :].sort_values().iloc[-10:,].plot(kind='bar')
-    seaborn.despine(trim=True)
-    fig.savefig(results_prefix + f'_{snv_class_col}_top10_mutsig.pdf', bbox_inches='tight')
-
-
-def run_mutation_signature_analysis(snv_data, results_prefix):
-    """
-    Run a mutation signature analysis
-    """
-    sigs, sig_prob = wgs_analysis.snvs.mutsig.load_signature_probabilities()
-
-    snv_data = snv_data[snv_data['tri_nucleotide_context'].notnull()]
-    snv_data = snv_data.merge(sigs)
-
-    # Per cell count class signatures
-    snv_data = snv_data[snv_data['num_cells'] > 0]
-    snv_data['num_cells_class'] = '1'
-    snv_data.loc[snv_data['num_cells'] > 1, 'num_cells_class'] = '2-5'
-    snv_data.loc[snv_data['num_cells'] > 5, 'num_cells_class'] = '6-20'
-    snv_data.loc[snv_data['num_cells'] > 20, 'num_cells_class'] = '>20'
-
-    plot_mutation_signatures(snv_data, sig_prob, 'num_cells_class', results_prefix)
-
-    # Adjacent distance class signatures
-    snv_data['adjacent_distance_class'] = 'standard'
-    snv_data.loc[snv_data['adjacent_distance'] <= 10000, 'adjacent_distance_class'] = 'hypermutated'
-
-    plot_mutation_signatures(snv_data, sig_prob, 'adjacent_distance_class', results_prefix)
-
-
-def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_prefix):
-    # Filter cells
-    snv_count_data = snv_count_data.merge(filtered_cell_ids)
-    total_alt_counts = snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts'].sum().reset_index()
-    snv_data = snv_data.merge(
-        total_alt_counts.query('alt_counts > 0')[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
-
-    # Write high impact SNVs to a csv table
-    high_impact = (snv_data.query('effect_impact == "HIGH"')
-        [[
-            'chrom', 'coord', 'ref', 'alt',
-            'gene_name', 'effect', 'effect_impact',
-            'is_cosmic', 'museq_score', 'strelka_score',
-        ]]
-        .drop_duplicates())
-    high_impact = high_impact.merge(
-        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts'].sum().reset_index())
-    high_impact = high_impact.merge(
-        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['ref_counts'].sum().reset_index())
-    high_impact = high_impact.merge(
-        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['total_counts'].sum().reset_index())
-    high_impact.to_csv(results_prefix + '_snvs_high_impact.csv')
-
-    # Annotate adjacent distance
-    snv_data = wgs_analysis.annotation.position.annotate_adjacent_distance(snv_data)
-
-    # Plot adjacent distance of SNVs
-    fig = plt.figure(figsize=(10, 3))
-    wgs_analysis.plots.snv.snv_adjacent_distance_plot(plt.gca(), snv_data)
-    fig.savefig(results_prefix + '_snv_adjacent_distance.pdf', bbox_inches='tight')
-
-    # Plot snv count as a histogram across the genome
-    fig = plt.figure(figsize=(10, 3))
-    wgs_analysis.plots.snv.snv_count_plot(plt.gca(), snv_data)
-    fig.savefig(results_prefix + '_snv_genome_count.pdf', bbox_inches='tight')
-
-    # Run mutation signature analysis, requires adjacent distance
-    run_mutation_signature_analysis(snv_data, results_prefix)
-
-
-
-def run_snv_phylogenetics(snv_count_data, allele_cn, clusters, results_prefix):
-    """ Run the SNV phylogenetic analysis.
-    """
-    snv_log_likelihoods = scgenome.snvphylo.compute_snv_log_likelihoods(
-        snv_count_data, allele_cn, clusters)
-
-    ml_tree, tree_annotations = scgenome.snvphylo.compute_dollo_ml_tree(
-        snv_log_likelihoods)
-
-    import IPython; IPython.embed(); raise
-
-
-
-
-def calc_prop_hom_del(states):
-    cndist = states.value_counts()
-    cndist = cndist / cndist.sum()
-    if 0 not in cndist:
-        return 0
-    return cndist[0]
-
-
-def calculate_clusters(cn_data, metrics_data, results_prefix):
-    """ Cluster copy number data.
-    """
-    metrics_data['filter_quality'] = (metrics_data['quality'] > 0.75)
-    metrics_data['filter_reads'] = (metrics_data['total_mapped_reads_hmmcopy'] > 500000)
-
-    # Calculate proportion homozygous deletion state
-    prop_hom_del = cn_data.groupby('cell_id')['state'].apply(calc_prop_hom_del).rename('prop_hom_del').reset_index()
-    metrics_data = metrics_data.merge(prop_hom_del, how='left')
-    metrics_data['prop_hom_del'] = metrics_data['prop_hom_del'].fillna(0)
-    metrics_data['zscore_prop_hom_del'] = scipy.stats.zscore(metrics_data['prop_hom_del'])
-    metrics_data['filter_prop_hom_del'] = (metrics_data['zscore_prop_hom_del'] < 3.)
-
-    # Calculate separation between predicted and normalized copy number
-    copy_state_diff = cn_data[['cell_id', 'copy', 'state']].copy()
-    copy_state_diff['copy_state_diff'] = np.absolute(copy_state_diff['copy'] - copy_state_diff['state'])
-    copy_state_diff = (copy_state_diff[['cell_id', 'copy_state_diff']]
-        .dropna().groupby('cell_id')['copy_state_diff']
-        .mean().reset_index().dropna())
-    metrics_data = metrics_data.merge(copy_state_diff)
-    metrics_data['filter_copy_state_diff'] = (metrics_data['copy_state_diff'] < 1.)
-
-    # Remove s phase cells
-    # Remove low quality cells
-    # Remove low coverage cells
-    # Remove cells with a large divergence between copy state and norm copy number
-    # Remove cells with outlier proportion of homozygous deletion
-    filtered_cells = metrics_data.loc[
-        (~metrics_data['is_s_phase']) &
-        metrics_data['filter_quality'] &
-        metrics_data['filter_reads'] &
-        metrics_data['filter_copy_state_diff'] &
-        metrics_data['filter_prop_hom_del'],
-        ['cell_id']]
-
-    logging.info('filtering {} of {} cells'.format(
-        len(filtered_cells.index), len(metrics_data.index)))
-    cn_data = cn_data.merge(filtered_cells[['cell_id']].drop_duplicates())
-    assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
-
-    logging.info('creating copy number matrix')
-    cn = (
-        cn_data
-            .set_index(['chr', 'start', 'end', 'cell_id'])['copy']
-            .unstack(level='cell_id').fillna(0)
-    )
-
-    logging.info('clustering copy number')
-    clusters = scgenome.cncluster.umap_hdbscan_cluster(cn)
-
-    logging.info('merging clusters')
-    cn_data = cn_data.merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
-
-    logging.info('plotting clusters to {}*'.format(results_prefix + '_initial'))
-    plot_clones(cn_data, 'cluster_id', results_prefix + '_initial')
-
-    filter_metrics = metrics_data[[
-        'cell_id',
-        'is_s_phase',
-        'copy_state_diff',
-        'filter_quality',
-        'filter_reads',
-        'filter_copy_state_diff',
-        'prop_hom_del',
-        'zscore_prop_hom_del',
-        'filter_prop_hom_del',
-    ]]
-
-    return clusters, filter_metrics
-
-
-def breakpoint_filter(metrics_data, clusters, max_breakpoints, results_prefix):
-    """ Filter clusters based on breakpoint counts
-    """
-    breakpoint_data = (
-        metrics_data
-        .merge(clusters[['cell_id', 'cluster_id']])
-        .groupby('cluster_id')['breakpoints']
-        .mean().reset_index()
-        .sort_values('breakpoints'))
-
-    fig = plt.figure(figsize=(4, 4))
-    breakpoint_data['breakpoints'].hist(bins=40)
-    fig.savefig(results_prefix + '_breakpoint_hist.pdf', bbox_inches='tight')
-
-    breakpoint_data = breakpoint_data[breakpoint_data['breakpoints'] <= max_breakpoints]
-
-    clusters = clusters[clusters['cluster_id'].isin(breakpoint_data['cluster_id'])]
-
-    return clusters
-
-
-def finalize_clusters(cn_data, metrics_data, clusters, filter_metrics, cell_clone_distances, results_prefix):
-    """ Generate finalized filtered clusters
-    """
-
-    # Calculate the cluster assignment based on correlation
-    correlation_metric = 'pearsonr'
-    correlation_cluster = (
-        cell_clone_distances
-        .set_index(['cluster_id', 'cell_id'])[correlation_metric]
-        .unstack().idxmin().rename(correlation_metric + '_cluster_id').reset_index())
-
-    # Calculate which cells cluster assignment matches highest correlation cluster
-    cluster_annotation = cell_clone_distances.merge(clusters[['cell_id', 'cluster_id']])
-    cluster_annotation = cluster_annotation.merge(correlation_cluster)
-    cluster_annotation['is_original'] = (cluster_annotation['cluster_id'] == cluster_annotation[correlation_metric + '_cluster_id'])
-
-    # Plot the cityblock distance distribution of each cluster separated
-    # by whether the assigned cluster equals the correlation cluster
-    plot_metric = 'cityblock'
-    g = seaborn.factorplot(
-        x='cluster_id', y=plot_metric,
-        hue='is_original', kind='strip',
-        dodge=True, data=cluster_annotation, aspect=3)
-    g.fig.savefig(results_prefix + '_cluster_cityblock_distance.pdf', bbox_inches='tight')
-
-    # Calculate the proportion of each cluster that would be assigned to
-    # that cluster by maximizing correlation
-    cluster_annotation['is_original_f'] = cluster_annotation['is_original'] * 1.
-    is_original_mean = cluster_annotation.groupby('cluster_id')['is_original_f'].mean().rename('is_original_cluster_mean').reset_index()
-    cluster_annotation = cluster_annotation.merge(is_original_mean)
-
-    # Filter cells that are not assigned to the same cluster they
-    # are most correlated with
-    cluster_annotation = cluster_annotation.query('is_original')
-
-    # Filter clusters for which more than a given proportion of cells are
-    # assigned to a different cluster than that which they are most
-    # correlated to
-    cluster_annotation = cluster_annotation.query(
-        'is_original_cluster_mean > {}'.format(is_original_cluster_mean_threshold))
-
-    # Filter clusters smaller than a given size
-    cluster_annotation = cluster_annotation.merge(
-        cluster_annotation.groupby('cluster_id').size().rename('cluster_size').reset_index())
-    cluster_annotation = cluster_annotation.query(
-        'cluster_size >= {}'.format(cluster_size_threshold))
-
-    # Assign clusters to s phase cells
-    if not metrics_data.query('is_s_phase').empty:
-        # Assign s phase cells to the cluster they are most correlated with
-        cell_filtered_clone_distances = cell_clone_distances.merge(
-            cluster_annotation[['cluster_id']].drop_duplicates())
-        s_phase_cluster = cell_filtered_clone_distances.merge(
-            metrics_data.query('is_s_phase')[['cell_id']])
-        s_phase_cluster = (
-            s_phase_cluster
-            .set_index(['cell_id', 'cluster_id'])['pearsonr']
-            .unstack(level=['cluster_id']).idxmin(axis=1).rename('cluster_id').reset_index())
-
-        # Filter s phase cells
-        s_phase_filter = (filter_metrics
-            .query('is_s_phase')
-            .query('filter_reads')
-            .query('filter_copy_state_diff')
-            .query('filter_prop_hom_del'))[['cell_id']]
-        s_phase_cluster = s_phase_cluster.merge(s_phase_filter)
-
-        # Create a merged set of cluster calls
-        final_clusters = pd.concat([
-            cluster_annotation[['cell_id', 'cluster_id']],
-            s_phase_cluster[['cell_id', 'cluster_id']],
-        ], ignore_index=True)
-
-    else:
-        # No s-phase cells
-        final_clusters = cluster_annotation[['cell_id', 'cluster_id']].copy()
-
-    assert not final_clusters['cell_id'].duplicated().any()
-
-    # Plotting
-    #
-    
-    # Plot final clusters heatmap
-    logging.info('plotting clusters to {}*'.format(results_prefix + '_filter_final'))
-    plot_cn_data = cn_data.merge(
-        final_clusters[['cell_id', 'cluster_id']])
-    plot_clones(plot_cn_data, 'cluster_id', results_prefix + '_filter_final')
-
-    # Plot s phase proportions
-    s_plot_data = (
-        metrics_data
-        .merge(final_clusters[['cell_id', 'cluster_id']].drop_duplicates())
-        .groupby('cluster_id').agg({'is_s_phase': (np.sum, len, np.mean)}).reset_index())
-    s_plot_data.columns = ['clone', 'sum', 'len', 'proportion']
-
-    fig = plt.figure(figsize=(6, 4))
-    ax = fig.add_subplot(211)
-    seaborn.barplot(ax=ax, x='clone', y='proportion', data=s_plot_data, color='0.5')
-    seaborn.despine()
-    ax = fig.add_subplot(212)
-    seaborn.barplot(ax=ax, x='clone', y='len', data=s_plot_data, color='0.5')
-    seaborn.despine()
-    plt.tight_layout()
-    fig.savefig(results_prefix + '_clone_s_phase.pdf', bbox_inches='tight')
-
-    return final_clusters
-
-
-def recalculate_distances(distance_metric, distance_method, clone_cn_matrix, cell_cn_matrix):
-    """ Recalculate distances to closest cluster using some metric.
-    """
-
-    logging.info('Calculating clone cell {} distance'.format(distance_metric))
-    cell_clone_corr = {}
-    for cluster_id in clone_cn_matrix.columns:
-        logging.info('Calculating distance for clone {}'.format(cluster_id))
-        cell_clone_corr[cluster_id] = cell_cn_matrix.corrwith(
-            clone_cn_matrix[cluster_id], method=distance_method)
-
-    distances = pd.DataFrame(cell_clone_corr)
-    distances.columns.name = 'cluster_id'
-    distances = distances.stack().rename(distance_metric).reset_index()
-
-    return distances
-
-
-def calculate_cell_clone_distances(cn_data, clusters, results_prefix):
-    """ Calculate the distance to the closest clone for multiple metrics.
-    """
-
-    logging.info('Create clone copy number table')
-    clone_cn_data = (
-        cn_data
-            .merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
-            .groupby(['chr', 'start', 'end', 'cluster_id'])
-            .agg({'copy': np.mean, 'state': np.median})
-            .reset_index()
-    )
-    clone_cn_data['state'] = clone_cn_data['state'].round().astype(int)
-
-    logging.info('Create matrix of cn data for all cells')
-    cell_cn_matrix = (
-        cn_data
-            .set_index(['chr', 'start', 'end', 'cell_id'])['copy']
-            .unstack(level=['cell_id']).fillna(0)
-    )
-
-    logging.info('Create a matrix of cn data for filtered clones')
-    clone_cn_matrix = (
-        clone_cn_data
-            .set_index(['chr', 'start', 'end', 'cluster_id'])['copy']
-            .unstack(level=['cluster_id']).fillna(0)
-    )
-
-    pearsonr_distances = recalculate_distances(
-        'pearsonr',
-        lambda u, v: 1. - scipy.stats.pearsonr(u, v)[0],
-        clone_cn_matrix,
-        cell_cn_matrix,
-    )
-
-    spearmanr_distances = recalculate_distances(
-        'spearmanr',
-        lambda u, v: 1. - scipy.stats.spearmanr(u, v)[0],
-        clone_cn_matrix,
-        cell_cn_matrix,
-    )
-
-    cityblock_distances = recalculate_distances(
-        'cityblock',
-        scipy.spatial.distance.cityblock,
-        clone_cn_matrix,
-        cell_cn_matrix,
-    )
-
-    clone_cell_distances = pd.concat([
-        pearsonr_distances.set_index(['cell_id', 'cluster_id']),
-        spearmanr_distances.set_index(['cell_id', 'cluster_id']),
-        cityblock_distances.set_index(['cell_id', 'cluster_id']),
-    ], axis=1).reset_index()
-
-    return clone_cell_distances
-
-
-def plot_clones(cn_data, cluster_col, plots_prefix):
-    plot_data = cn_data.copy()
-    bin_filter = (plot_data['gc'] <= 0) | (plot_data['copy'].isnull())
-    plot_data.loc[bin_filter, 'state'] = 0
-    plot_data.loc[plot_data['copy'] > 5, 'copy'] = 5.
-    plot_data.loc[plot_data['copy'] < 0, 'copy'] = 0.
-
-    fig = plt.figure(figsize=(15, 2))
-    scgenome.cnplot.plot_cluster_cn_matrix(
-        fig, plot_data, 'state', cluster_field_name=cluster_col)
-    fig.savefig(plots_prefix + '_clone_cn.pdf', bbox_inches='tight')
-
-    fig = plt.figure(figsize=(20, 30))
-    matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
-        fig, plot_data, 'copy', cluster_field_name=cluster_col, raw=True)
-    fig.savefig(plots_prefix + '_raw_cn.pdf', bbox_inches='tight')
-
-    fig = plt.figure(figsize=(20, 30))
-    matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
-        fig, plot_data, 'state', cluster_field_name=cluster_col)
-    fig.savefig(plots_prefix + '_cn_state.pdf', bbox_inches='tight')
 
 
 class Memoizer(object):
@@ -631,7 +249,7 @@ def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, loc
     logging.info('cn_data shape {}'.format(shape_check))
     clusters, filter_metrics = memoizer(
         'clusters',
-        calculate_clusters,
+        scgenome.cnclones.calculate_clusters,
         cn_data,
         metrics_data,
         results_prefix,
@@ -640,7 +258,7 @@ def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, loc
 
     cell_clone_distances = memoizer(
         'cell_cluster_distances',
-        calculate_cell_clone_distances,
+        scgenome.cnclones.calculate_cell_clone_distances,
         cn_data,
         clusters,
         results_prefix,
@@ -648,7 +266,7 @@ def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, loc
 
     final_clusters = memoizer(
         'final_clusters',
-        finalize_clusters,
+        scgenome.cnclones.finalize_clusters,
         cn_data,
         metrics_data,
         clusters,
@@ -668,7 +286,7 @@ def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, loc
 
     allele_cn = memoizer(
         'allele_cn',
-        calculate_cluster_allele_cn,
+        scgenome.snpdata.calculate_cluster_allele_cn,
         cn_data,
         allele_data,
         clusters,
@@ -677,7 +295,7 @@ def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, loc
     
     memoizer(
         'bulk_snv_analysis',
-        run_bulk_snv_analysis,
+        scgenome.snvdata.run_bulk_snv_analysis,
         snv_data,
         snv_count_data,
         final_clusters[['cell_id']].drop_duplicates(),
@@ -686,7 +304,7 @@ def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, loc
 
     snv_phylogeny = memoizer(
         'snv_phylogeny',
-        run_snv_phylogenetics,
+        scgenome.snvphylo.run_snv_phylogenetics,
         snv_count_data,
         allele_cn,
         final_clusters,
