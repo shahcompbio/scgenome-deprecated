@@ -139,7 +139,10 @@ def calculate_cluster_allele_cn(cn_data, allele_data, clusters, results_prefix):
     return allele_cn
 
 
-def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory, results_prefix):
+def retrieve_pseudobulk_data(
+        ticket_id, clusters, local_cache_directory, results_prefix,
+        museq_score_threshold=None, strelka_score_threshold=None,
+    ):
     """ Retrieve SNV, breakpoint and allele data
     """
     tantalus_api = dbclients.tantalus.TantalusApi()
