@@ -133,8 +133,8 @@ def load_snv_data(
         pseudobulk (PseudobulkData): pseudbulk data to load from
         museq_score_threshold (float, optional): mutationseq score threshold. Defaults to None.
         strelka_score_threshold (float, optional): strelka score threshold. Defaults to None.
-        snvs_num_cells_threshold (int, optional): minimum number of cells threshold. Defaults to None.
-        snvs_sum_alt_threshold (int, optional): minimum total alt count threshold. Defaults to None.
+        num_cells_threshold (int, optional): minimum number of cells threshold. Defaults to None.
+        sum_alt_threshold (int, optional): minimum total alt count threshold. Defaults to None.
         figures_prefix (str, optional): filename prefix for figures. Defaults to None.
     
     Returns:
