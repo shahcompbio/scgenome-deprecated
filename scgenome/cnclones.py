@@ -69,8 +69,8 @@ def calculate_clusters(cn_data, metrics_data, results_prefix):
     logging.info('merging clusters')
     cn_data = cn_data.merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
 
-    logging.info('plotting clusters to {}*'.format(results_prefix + '_initial'))
-    plot_clones(cn_data, 'cluster_id', results_prefix + '_initial')
+    logging.info('plotting clusters to {}*'.format(results_prefix + 'initial'))
+    plot_clones(cn_data, 'cluster_id', results_prefix + 'initial')
 
     filter_metrics = metrics_data[[
         'cell_id',
@@ -99,7 +99,7 @@ def breakpoint_filter(metrics_data, clusters, max_breakpoints, results_prefix):
 
     fig = plt.figure(figsize=(4, 4))
     breakpoint_data['breakpoints'].hist(bins=40)
-    fig.savefig(results_prefix + '_breakpoint_hist.pdf', bbox_inches='tight')
+    fig.savefig(results_prefix + 'breakpoint_hist.pdf', bbox_inches='tight')
 
     breakpoint_data = breakpoint_data[breakpoint_data['breakpoints'] <= max_breakpoints]
 
@@ -121,12 +121,12 @@ def finalize_clusters(
     correlation_cluster = (
         cell_clone_distances
         .set_index(['cluster_id', 'cell_id'])[correlation_metric]
-        .unstack().idxmin().rename(correlation_metric + '_cluster_id').reset_index())
+        .unstack().idxmin().rename(correlation_metric + 'cluster_id').reset_index())
 
     # Calculate which cells cluster assignment matches highest correlation cluster
     cluster_annotation = cell_clone_distances.merge(clusters[['cell_id', 'cluster_id']])
     cluster_annotation = cluster_annotation.merge(correlation_cluster)
-    cluster_annotation['is_original'] = (cluster_annotation['cluster_id'] == cluster_annotation[correlation_metric + '_cluster_id'])
+    cluster_annotation['is_original'] = (cluster_annotation['cluster_id'] == cluster_annotation[correlation_metric + 'cluster_id'])
 
     # Plot the cityblock distance distribution of each cluster separated
     # by whether the assigned cluster equals the correlation cluster
@@ -135,7 +135,7 @@ def finalize_clusters(
         x='cluster_id', y=plot_metric,
         hue='is_original', kind='strip',
         dodge=True, data=cluster_annotation, aspect=3)
-    g.fig.savefig(results_prefix + '_cluster_cityblock_distance.pdf', bbox_inches='tight')
+    g.fig.savefig(results_prefix + 'cluster_cityblock_distance.pdf', bbox_inches='tight')
 
     # Calculate the proportion of each cluster that would be assigned to
     # that cluster by maximizing correlation
@@ -195,10 +195,10 @@ def finalize_clusters(
     #
     
     # Plot final clusters heatmap
-    logging.info('plotting clusters to {}*'.format(results_prefix + '_filter_final'))
+    logging.info('plotting clusters to {}*'.format(results_prefix + 'filter_final'))
     plot_cn_data = cn_data.merge(
         final_clusters[['cell_id', 'cluster_id']])
-    plot_clones(plot_cn_data, 'cluster_id', results_prefix + '_filter_final')
+    plot_clones(plot_cn_data, 'cluster_id', results_prefix + 'filter_final')
 
     # Plot s phase proportions
     s_plot_data = (
@@ -215,7 +215,7 @@ def finalize_clusters(
     seaborn.barplot(ax=ax, x='clone', y='len', data=s_plot_data, color='0.5')
     seaborn.despine()
     plt.tight_layout()
-    fig.savefig(results_prefix + '_clone_s_phase.pdf', bbox_inches='tight')
+    fig.savefig(results_prefix + 'clone_s_phase.pdf', bbox_inches='tight')
 
     return final_clusters
 
@@ -306,16 +306,16 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
     fig = plt.figure(figsize=(15, 2))
     scgenome.cnplot.plot_cluster_cn_matrix(
         fig, plot_data, 'state', cluster_field_name=cluster_col)
-    fig.savefig(plots_prefix + '_clone_cn.pdf', bbox_inches='tight')
+    fig.savefig(plots_prefix + 'clone_cn.pdf', bbox_inches='tight')
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
         fig, plot_data, 'copy', cluster_field_name=cluster_col, raw=True)
-    fig.savefig(plots_prefix + '_raw_cn.pdf', bbox_inches='tight')
+    fig.savefig(plots_prefix + 'raw_cn.pdf', bbox_inches='tight')
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
         fig, plot_data, 'state', cluster_field_name=cluster_col)
-    fig.savefig(plots_prefix + '_cn_state.pdf', bbox_inches='tight')
+    fig.savefig(plots_prefix + 'cn_state.pdf', bbox_inches='tight')
 
 

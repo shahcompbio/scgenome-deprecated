@@ -46,7 +46,7 @@ LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 # TODO: thresholds
 museq_score_threshold = None
 strelka_score_threshold = None
-snvs_num_cells_threshold = 2
+snvs_num_cells_threshold = None
 snvs_sum_alt_threshold = 4
 is_original_cluster_mean_threshold = 0.5
 cluster_size_threshold = 50
@@ -178,6 +178,14 @@ def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_pre
     cell_ids = metrics_data['cell_id']
     cn_data = cn_data[cn_data['cell_id'].isin(cell_ids)]
 
+    # TODO: Remove temporary fixup
+    if 'total_mapped_reads_hmmcopy' not in metrics_data:
+         metrics_data['total_mapped_reads_hmmcopy'] = metrics_data['total_mapped_reads']
+    elif metrics_data['total_mapped_reads_hmmcopy'].isnull().any():
+        fix_read_count = metrics_data['total_mapped_reads_hmmcopy'].isnull()
+        metrics_data.loc[fix_read_count, 'total_mapped_reads_hmmcopy'] = (
+            metrics_data.loc[fix_read_count, 'total_mapped_reads'])
+
     return cn_data, metrics_data, image_feature_data
 
 
@@ -204,170 +212,148 @@ def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory, results
     return snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data
 
 
-class Memoizer(object):
-    def __init__(self, cache_prefix):
-        self.cache_prefix = cache_prefix
-    def __call__(self, name, func, *args, **kwargs):
-        cache_filename = self.cache_prefix + name + '.pickle'
-        if os.path.exists(cache_filename):
-            logging.info('reading existing data from {}'.format(cache_filename))
-            with open(cache_filename, 'rb') as f:
-                data = pickle.load(f)
-        else:
-            data = func(*args, **kwargs)
-            logging.info('writing data to {}'.format(cache_filename))
-            with open(cache_filename, 'wb') as f:
-                pickle.dump(data, f, protocol=4)
-        return data
+@click.group()
+@click.pass_context
+@click.argument('results_prefix')
+@click.argument('local_cache_directory')
+def infer_clones_cmd(ctx, results_prefix, local_cache_directory):
+    ctx.obj['results_prefix'] = results_prefix
+    ctx.obj['local_cache_directory'] = local_cache_directory
 
 
-def infer_clones(library_ids, sample_ids, pseudobulk_ticket, results_prefix, local_cache_directory):
-    """ Run clonal inference on a set of libraries 
-    """
-    memoizer = Memoizer(results_prefix + '_')
+@infer_clones_cmd.command()
+@click.pass_context
+@click.option('--library_id')
+@click.option('--sample_id')
+@click.option('--library_ids_filename')
+@click.option('--sample_ids_filename')
+def retrieve_cn(
+        ctx,
+        library_id=None,
+        library_ids_filename=None,
+        sample_id=None,
+        sample_ids_filename=None,
+    ):
+
+    results_prefix = ctx.obj['results_prefix']
+    local_cache_directory = ctx.obj['local_cache_directory']
+
+    if library_id is not None:
+        library_ids = [library_id]
+    elif library_ids_filename is not None:
+        library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
+    else:
+        raise Exception('must specify library_id or library_ids_filename')
+
+    if sample_id is not None:
+        sample_ids = [sample_id]
+    elif sample_ids_filename is not None:
+        sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
+    else:
+        raise Exception('must specify sample_id or sample_ids_filename')
 
     logging.info('retrieving cn data')
-    cn_data, metrics_data, image_feature_data = memoizer(
-        'raw_data',
-        retrieve_cn_data,
+    cn_data, metrics_data, image_feature_data = retrieve_cn_data(
         library_ids,
         sample_ids,
         local_cache_directory,
-        results_prefix,
+        results_prefix + 'retrieve_cn_',
     )
 
-    # TODO: Remove temporary fixup
-    if 'total_mapped_reads_hmmcopy' not in metrics_data:
-         metrics_data['total_mapped_reads_hmmcopy'] = metrics_data['total_mapped_reads']
-    elif metrics_data['total_mapped_reads_hmmcopy'].isnull().any():
-        fix_read_count = metrics_data['total_mapped_reads_hmmcopy'].isnull()
-        metrics_data.loc[fix_read_count, 'total_mapped_reads_hmmcopy'] = (
-            metrics_data.loc[fix_read_count, 'total_mapped_reads'])
+    cn_data.to_pickle(results_prefix + 'cn_data.pickle')
+    metrics_data.to_pickle(results_prefix + 'metrics_data.pickle')
+    image_feature_data.to_pickle(results_prefix + 'image_feature_data.pickle')
+
+
+@infer_clones_cmd.command()
+@click.pass_context
+def cluster_cn(ctx):
+
+    results_prefix = ctx.obj['results_prefix']
+
+    cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
+    metrics_data = pd.read_pickle(results_prefix + 'metrics_data.pickle')
 
     logging.info('calculating clusters')
-    shape_check = cn_data.shape
-    logging.info('cn_data shape {}'.format(shape_check))
-    clusters, filter_metrics = memoizer(
-        'clusters',
-        scgenome.cnclones.calculate_clusters,
+    clusters, filter_metrics = scgenome.cnclones.calculate_clusters(
         cn_data,
         metrics_data,
-        results_prefix,
+        results_prefix + 'calculate_clusters_',
     )
-    assert cn_data.shape == shape_check
 
-    cell_clone_distances = memoizer(
-        'cell_cluster_distances',
-        scgenome.cnclones.calculate_cell_clone_distances,
+    cell_clone_distances = scgenome.cnclones.calculate_cell_clone_distances(
         cn_data,
         clusters,
-        results_prefix,
+        results_prefix + 'calculate_cell_clone_distances_',
     )
 
-    final_clusters = memoizer(
-        'final_clusters',
-        scgenome.cnclones.finalize_clusters,
+    final_clusters = scgenome.cnclones.finalize_clusters(
         cn_data,
         metrics_data,
         clusters,
         filter_metrics,
         cell_clone_distances,
-        results_prefix,
+        results_prefix + 'finalize_clusters_',
     )
 
-    snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data = memoizer(
-        'pseudobulk_data',
-        retrieve_pseudobulk_data,
+    clusters.to_pickle(results_prefix + 'clusters.pickle')
+    filter_metrics.to_pickle(results_prefix + 'filter_metrics.pickle')
+    cell_clone_distances.to_pickle(results_prefix + 'cell_clone_distances.pickle')
+    final_clusters.to_pickle(results_prefix + 'final_clusters.pickle')
+
+
+@infer_clones_cmd.command()
+@click.pass_context
+@click.argument('pseudobulk_ticket')
+def pseudobulk_analysis(ctx, pseudobulk_ticket):
+
+    results_prefix = ctx.obj['results_prefix']
+    local_cache_directory = ctx.obj['local_cache_directory']
+
+    cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
+    clusters = pd.read_pickle(results_prefix + 'clusters.pickle')
+    final_clusters = pd.read_pickle(results_prefix + 'final_clusters.pickle')
+
+    snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data = retrieve_pseudobulk_data(
         pseudobulk_ticket,
         final_clusters,
         local_cache_directory,
-        results_prefix,
+        results_prefix + 'retrieve_pseudobulk_data_',
     )
 
-    allele_cn = memoizer(
-        'allele_cn',
-        scgenome.snpdata.calculate_cluster_allele_cn,
+    allele_cn = scgenome.snpdata.calculate_cluster_allele_cn(
         cn_data,
         allele_data,
         clusters,
-        results_prefix,
+        results_prefix + 'calculate_cluster_allele_cn_',
     )
     
-    memoizer(
-        'bulk_snv_analysis',
-        scgenome.snvdata.run_bulk_snv_analysis,
+    scgenome.snvdata.run_bulk_snv_analysis(
         snv_data,
         snv_count_data,
         final_clusters[['cell_id']].drop_duplicates(),
-        results_prefix + '_filtered',
+        results_prefix + 'run_bulk_snv_analysis_',
     )
 
-    snv_phylogeny = memoizer(
-        'snv_phylogeny',
-        scgenome.snvphylo.run_snv_phylogenetics,
+    snv_ml_tree, snv_tree_annotations = scgenome.snvphylo.run_snv_phylogenetics(
         snv_count_data,
         allele_cn,
         final_clusters,
-        results_prefix, 
+        results_prefix + 'run_snv_phylogenetics_', 
     )
 
+    snv_data.to_pickle(results_prefix + 'snv_data.pickle')
+    snv_count_data.to_pickle(results_prefix + 'snv_count_data.pickle')
+    allele_data.to_pickle(results_prefix + 'allele_data.pickle')
+    breakpoint_data.to_pickle(results_prefix + 'breakpoint_data.pickle')
+    breakpoint_count_data.to_pickle(results_prefix + 'breakpoint_count_data.pickle')
 
-@click.group()
-def infer_clones_cmd():
-    pass
-
-
-@infer_clones_cmd.command('singlelib')
-@click.argument('library_id')
-@click.argument('sample_id')
-@click.argument('pseudobulk_ticket')
-@click.argument('results_prefix')
-@click.argument('local_cache_directory')
-def infer_clones_singlelib_cmd(
-        library_id,
-        sample_id,
-        pseudobulk_ticket,
-        results_prefix,
-        local_cache_directory,
-):
-    library_ids = [library_id]
-    sample_ids = [sample_id]
-
-    infer_clones(
-        library_ids,
-        sample_ids,
-        pseudobulk_ticket,
-        results_prefix,
-        local_cache_directory,
-    )
-
-
-@infer_clones_cmd.command('multilib')
-@click.argument('library_ids_filename')
-@click.argument('sample_ids_filename')
-@click.argument('pseudobulk_ticket')
-@click.argument('results_prefix')
-@click.argument('local_cache_directory')
-def infer_clones_multilib_cmd(
-        library_ids_filename,
-        sample_ids_filename,
-        pseudobulk_ticket,
-        results_prefix,
-        local_cache_directory,
-):
-    library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
-    sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
-
-    infer_clones(
-        library_ids,
-        sample_ids,
-        pseudobulk_ticket,
-        results_prefix,
-        local_cache_directory,
-    )
+    allele_cn.to_pickle(results_prefix + 'breakpoint_data.pickle')
+    with open(results_prefix + 'snv_ml_tree.pickle', 'wb') as f:
+        pickle.dump(snv_ml_tree, f)
+    snv_tree_annotations.to_pickle(results_prefix + 'snv_tree_annotations.pickle')
 
 
 if __name__ == '__main__':
     logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
-
-    infer_clones_cmd()
+    infer_clones_cmd(obj={})

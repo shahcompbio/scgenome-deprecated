@@ -165,7 +165,7 @@ def load_snv_data(
     if figures_prefix is not None:
         fig = plt.figure(figsize=(4, 4))
         cell_counts['num_cells'].hist(bins=50)
-        fig.savefig(figures_prefix + '_snv_cell_counts.pdf', bbox_inches='tight')
+        fig.savefig(figures_prefix + 'snv_cell_counts.pdf', bbox_inches='tight')
 
     snv_data = snv_data.merge(cell_counts, how='left')
     assert not snv_data['num_cells'].isnull().any()
@@ -180,7 +180,7 @@ def load_snv_data(
     if figures_prefix is not None:
         fig = plt.figure(figsize=(4, 4))
         sum_alt_counts['sum_alt_counts'].hist(bins=50)
-        fig.savefig(figures_prefix + '_snv_alt_counts.pdf', bbox_inches='tight')
+        fig.savefig(figures_prefix + 'snv_alt_counts.pdf', bbox_inches='tight')
 
     # Filter SNVs by num cells in which they are detected
     if num_cells_threshold is not None:
@@ -275,7 +275,7 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
         snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['ref_counts'].sum().reset_index())
     high_impact = high_impact.merge(
         snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['total_counts'].sum().reset_index())
-    high_impact.to_csv(results_prefix + '_snvs_high_impact.csv')
+    high_impact.to_csv(results_prefix + 'snvs_high_impact.csv')
 
     # Annotate adjacent distance
     snv_data = wgs_analysis.annotation.position.annotate_adjacent_distance(snv_data)
@@ -283,12 +283,12 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
     # Plot adjacent distance of SNVs
     fig = plt.figure(figsize=(10, 3))
     wgs_analysis.plots.snv.snv_adjacent_distance_plot(plt.gca(), snv_data)
-    fig.savefig(results_prefix + '_snv_adjacent_distance.pdf', bbox_inches='tight')
+    fig.savefig(results_prefix + 'snv_adjacent_distance.pdf', bbox_inches='tight')
 
     # Plot snv count as a histogram across the genome
     fig = plt.figure(figsize=(10, 3))
     wgs_analysis.plots.snv.snv_count_plot(plt.gca(), snv_data)
-    fig.savefig(results_prefix + '_snv_genome_count.pdf', bbox_inches='tight')
+    fig.savefig(results_prefix + 'snv_genome_count.pdf', bbox_inches='tight')
 
     # Run mutation signature analysis, requires adjacent distance
     run_mutation_signature_analysis(snv_data, results_prefix)
