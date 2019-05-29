@@ -43,11 +43,13 @@ import datamanagement.transfer_files
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
 
-# TODO: thresholds
+# SNV Calling thresholds
 museq_score_threshold = None
 strelka_score_threshold = None
-snvs_num_cells_threshold = None
-snvs_sum_alt_threshold = 4
+snvs_num_cells_threshold = 2
+snvs_sum_alt_threshold = 2
+
+# Cluster pruning thresholds
 is_original_cluster_mean_threshold = 0.5
 cluster_size_threshold = 50
 
@@ -55,10 +57,8 @@ cluster_size_threshold = 50
 # for calculating allele specific copy number
 total_allele_counts_threshold = 6
 
-# SA1135
-# museq_score_threshold = 0.5
-# strelka_score_threshold = -np.inf
-
+# This is a global setting that should
+# not be changed
 cn_bin_size = 500000
 
 results_storage_name = 'singlecellblob_results'
