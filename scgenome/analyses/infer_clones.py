@@ -45,7 +45,7 @@ LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 museq_score_threshold = None
 strelka_score_threshold = None
 snvs_num_cells_threshold = 2
-snvs_sum_alt_threshold = 4
+snvs_sum_alt_threshold = 2
 is_original_cluster_mean_threshold = 0.5
 cluster_size_threshold = 50
 
