@@ -117,6 +117,8 @@ def compute_snv_log_likelihoods(snv_data, allele_cn, clusters):
     snv_log_likelihoods = compute_log_likelihoods(
         snv_log_likelihoods)
 
+    snv_log_likelihoods = snv_log_likelihoods.replace(-np.inf, -10000.)
+
     return snv_log_likelihoods
 
 
