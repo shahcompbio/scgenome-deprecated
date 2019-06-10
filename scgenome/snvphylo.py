@@ -179,12 +179,14 @@ def compute_dollo_ml_tree(snv_log_likelihoods):
         sample_col='cluster_id', variant_col='variant_id')
 
     ml_tree_id = results_table.set_index('tree_id')['log_likelihood'].idxmax()
+    tree = results_table.set_index('tree_id').loc[ml_tree_id, 'tree']
 
     tree_annotations = dollo.run.annotate_posteriors(
-        snv_log_likelihoods, trees[ml_tree_id],
-        sample_col='cluster_id', variant_col='variant_id')
+        log_likelihoods, tree,
+        sample_col='cluster_id',
+        variant_col='variant_id')
 
-    return trees[ml_tree_id], tree_annotations
+    return tree, tree_annotations
 
 
 def plot_dollo_ml_tree(tree, nodes):
