@@ -113,6 +113,8 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13
 
     seaborn.despine(ax=ax, offset=10, trim=True)
 
+    return chromosome_info
+
 
 def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='cluster_id'):
     plot_data = cn_data.merge(utils.chrom_idxs)
