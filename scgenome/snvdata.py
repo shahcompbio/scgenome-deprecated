@@ -203,10 +203,15 @@ def load_snv_data(
     return snv_data, snv_count_data
 
 
-def plot_mutation_signatures(snv_data, sig_prob, snv_class_col, results_prefix):
+def plot_mutation_signatures(snv_data, snv_class_col, results_prefix):
     """
     Infer mutation signature probabilities and plot.
     """
+
+    sigs, sig_prob = wgs_analysis.snvs.mutsig.load_signature_probabilities()
+
+    snv_data = snv_data[snv_data['tri_nucleotide_context'].notnull()]
+    snv_data = snv_data.merge(sigs)
 
     # Add in an all snvs category
     snv_data_all = snv_data.copy()
@@ -233,10 +238,6 @@ def run_mutation_signature_analysis(snv_data, results_prefix):
     """
     Run a mutation signature analysis
     """
-    sigs, sig_prob = wgs_analysis.snvs.mutsig.load_signature_probabilities()
-
-    snv_data = snv_data[snv_data['tri_nucleotide_context'].notnull()]
-    snv_data = snv_data.merge(sigs)
 
     # Per cell count class signatures
     snv_data = snv_data[snv_data['num_cells'] > 0]
@@ -245,13 +246,13 @@ def run_mutation_signature_analysis(snv_data, results_prefix):
     snv_data.loc[snv_data['num_cells'] > 5, 'num_cells_class'] = '6-20'
     snv_data.loc[snv_data['num_cells'] > 20, 'num_cells_class'] = '>20'
 
-    plot_mutation_signatures(snv_data, sig_prob, 'num_cells_class', results_prefix)
+    plot_mutation_signatures(snv_data, 'num_cells_class', results_prefix)
 
     # Adjacent distance class signatures
     snv_data['adjacent_distance_class'] = 'standard'
     snv_data.loc[snv_data['adjacent_distance'] <= 10000, 'adjacent_distance_class'] = 'hypermutated'
 
-    plot_mutation_signatures(snv_data, sig_prob, 'adjacent_distance_class', results_prefix)
+    plot_mutation_signatures(snv_data, 'adjacent_distance_class', results_prefix)
 
 
 def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_prefix):
