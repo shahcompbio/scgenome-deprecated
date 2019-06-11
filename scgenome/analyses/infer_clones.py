@@ -189,7 +189,10 @@ def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_pre
     return cn_data, metrics_data, image_feature_data
 
 
-def retrieve_pseudobulk_data(ticket_id, clusters, local_cache_directory, results_prefix):
+def retrieve_pseudobulk_data(
+        ticket_id, clusters, local_cache_directory, results_prefix,
+        museq_score_threshold=None, strelka_score_threshold=None,
+    ):
     """ Retrieve SNV, breakpoint and allele data
     """
 
