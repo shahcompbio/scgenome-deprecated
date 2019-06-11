@@ -40,6 +40,7 @@ class HMMCopyData:
 
         self.results_info = [
             ('hmmcopy_reads', '{}_hmmcopy', f'_multiplier{ploidy_solution}_reads.csv.gz'),
+            ('hmmcopy_segs', '{}_hmmcopy', f'_multiplier{ploidy_solution}_segments.csv.gz'),
             ('hmmcopy_metrics', '{}_hmmcopy', f'_multiplier{ploidy_solution}_metrics.csv.gz'),
             ('align_metrics', '{}_align', '_alignment_metrics.csv.gz'),
         ]
@@ -107,7 +108,7 @@ class HMMCopyData:
             cell_ids = (
                 results_tables['hmmcopy_metrics'][['cell_id']]
                 .drop_duplicates().sample(frac=subsample))
-            for table_name in ('hmmcopy_reads', 'hmmcopy_metrics', 'align_metrics'):
+            for table_name in ('hmmcopy_reads', 'hmmcopy_segs', 'hmmcopy_metrics', 'align_metrics'):
                 results_tables[table_name] = results_tables[table_name].merge(cell_ids)
 
         # For columns that need to be categorical, create a set of categories
@@ -132,20 +133,10 @@ class HMMCopyData:
                 assert not table[col].isnull().any()
                 assert (prev_values == table[col].astype(str).values).all()
 
-        # # Concatenate tables, checking that categorical columns are maintained
-        # for table_name, ticket_tables in results_tables.items():
-        #     print('concatenate', table_name)
-        #     results_data = pd.concat(list(ticket_tables.values()), sort=True)
-        #     for col in categorical_cols:
-        #         if col not in results_data:
-        #             continue
-        #         assert isinstance(results_data[col].dtype, pd.api.types.CategoricalDtype)
-        #     results_tables[table_name] = results_data
-
         if 'total_mapped_reads_hmmcopy' not in results_tables['hmmcopy_metrics']:
             results_tables['hmmcopy_metrics']['total_mapped_reads_hmmcopy'] = results_tables['hmmcopy_metrics']['total_mapped_reads']
 
-        elif results_tables['hmmcopy_metrics']['total_mapped_reads_hmmcopy'].isnull().any():
+        elif results_tables['hmmcopy_metrics']['total_mapped_reads_hmmcopy'].isnull().any() and 'total_mapped_reads' in results_tables['hmmcopy_metrics']:
             fix_read_count = results_tables['hmmcopy_metrics']['total_mapped_reads_hmmcopy'].isnull()
             results_tables['hmmcopy_metrics'].loc[fix_read_count, 'total_mapped_reads_hmmcopy'] = (
                 results_tables['hmmcopy_metrics'].loc[fix_read_count, 'total_mapped_reads'])
