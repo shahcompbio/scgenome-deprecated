@@ -83,3 +83,101 @@ where classified is a file with cell classifications, and qndaseq_blacklist is a
 * blacklist
 * residual
 * use
+
+## API
+
+The API allows access to both HMMCopy and Pseudobulk data stored in blob and managed by tantalus.
+
+### Prerequisites
+
+#### Software
+
+You should set up an environment with the requirements from `requirements.txt` including sisyphus.
+
+#### Accounts
+
+You must have a tantalus account and access to azure blob storage.  Tantalus and azure blob credentials should be in your environment.
+
+### HMMCopy Data
+
+The following example code snippet will provide access to HMMCopy data for the OV cell line data:
+
+```
+import dbclients
+import scgenome.hmmcopy
+import scgenome.utils
+
+
+tantalus_api = dbclients.tantalus.TantalusApi()
+
+hmmcopy_tickets = [
+    'SC-1935',
+    'SC-1936',
+    'SC-1937',
+]
+
+sample_ids = [
+    'SA1090',
+    'SA921',
+    'SA922',
+]
+
+local_cache_directory = '/Your/Local/Cache'
+
+cn_data = []
+segs_data = []
+metrics_data = []
+align_metrics_data = []
+
+for jira_ticket in hmmcopy_tickets:
+    analysis = tantalus_api.get(
+        'analysis',
+        analysis_type__name='hmmcopy',
+        jira_ticket=jira_ticket)
+
+    hmmcopy = scgenome.hmmcopy.HMMCopyData(jira_ticket, local_cache_directory)
+
+    hmmcopy_data = hmmcopy.load_cn_data(sample_ids=sample_ids)
+
+    cn_data.append(hmmcopy_data['hmmcopy_reads'])
+    segs_data.append(hmmcopy_data['hmmcopy_segs'])
+    metrics_data.append(hmmcopy_data['hmmcopy_metrics'])
+    align_metrics_data.append(hmmcopy_data['align_metrics'])
+
+cn_data = scgenome.utils.concat_with_categories(cn_data)
+segs_data = scgenome.utils.concat_with_categories(segs_data)
+metrics_data = scgenome.utils.concat_with_categories(metrics_data)
+align_metrics_data = scgenome.utils.concat_with_categories(align_metrics_data)
+```
+
+### Pseudobulk Data
+
+The following example code snippet will provide access to pseudobulk SNV data for the OV cell line data:
+
+```
+import scgenome.snvdata
+import scgenome.pseudobulk
+
+ticket_id = 'SC-1939'
+
+results_prefix = './results'
+
+local_cache_directory = '/Your/Local/Cache'
+
+museq_score_threshold = None
+strelka_score_threshold = None
+snvs_num_cells_threshold = 2
+snvs_sum_alt_threshold = 2
+
+pseudobulk = scgenome.pseudobulk.PseudobulkData(ticket_id, local_cache_directory)
+
+snv_data, snv_count_data = scgenome.snvdata.load_snv_data(
+    pseudobulk,
+    museq_filter=museq_score_threshold,
+    strelka_filter=strelka_score_threshold,
+    num_cells_threshold=snvs_num_cells_threshold,
+    sum_alt_threshold=snvs_sum_alt_threshold,
+    figures_prefix=results_prefix + 'snv_loading_',
+)
+
+```
