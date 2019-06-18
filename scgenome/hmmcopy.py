@@ -81,7 +81,7 @@ class HMMCopyData:
         """
         results_tables = {}
 
-        hmmcopy_reads_cols = standard_hmmcopy_reads_cols
+        hmmcopy_reads_cols = standard_hmmcopy_reads_cols.copy()
         if additional_reads_cols is not None:
             hmmcopy_reads_cols.extend(additional_reads_cols)
 
