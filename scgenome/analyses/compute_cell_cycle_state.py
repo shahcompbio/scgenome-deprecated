@@ -5,22 +5,22 @@ import logging
 import shutil
 import pandas as pd
 
+import cell_cycle_classifier.api
 import dbclients.tantalus
 import datamanagement.transfer_files
 from datamanagement.utils.utils import make_dirs
-import scgenome.dataimport
-import scgenome.cellcycle
+import scgenome.hmmcopy
 
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
 
 analysis_type = 'cell_state_classifier'
-analysis_version = 'v0.0.1'
+analysis_version = 'v0.0.2'
 
 
 results_type = 'cell_state_prediction'
-results_version = 'v0.0.1'
+results_version = 'v0.0.2'
 
 
 def get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=None):
@@ -97,16 +97,20 @@ def run_analysis(
     logging.info('loading data for hmmcopy ticket {}'.format(
         hmmcopy_jira_ticket))
 
-    results = scgenome.dataimport.import_cn_data(
-        [hmmcopy_jira_ticket],
+    hmmcopy = scgenome.hmmcopy.HMMCopyData(
+        hmmcopy_jira_ticket,
         cache_directory,
     )
 
+    results = hmmcopy.load_cn_data()
+
     cn_data = results['hmmcopy_reads']
+    metrics_data = results['hmmcopy_metrics']
+    align_metrics_data = results['align_metrics']
 
     logging.info('calculating cell cycle state')
 
-    cell_cycle_data = scgenome.cellcycle.predict(cn_data)
+    cell_cycle_data = cell_cycle_classifier.api.train_classify(cn_data, metrics_data, align_metrics_data)
     cell_cycle_data.to_csv(results_filepath, index=False)
 
     logging.info('registering results with tantalus')
