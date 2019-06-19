@@ -1,5 +1,6 @@
 import collections
 import logging
+import packaging.version
 import pandas as pd
 
 import dbclients.tantalus
@@ -38,19 +39,38 @@ class HMMCopyData:
         self.local_storage_directory = local_cache_directory
         self.results_storage_name = results_storage_name
 
-        self.results_info = [
-            ('hmmcopy_reads', '{}_hmmcopy', f'_multiplier{ploidy_solution}_reads.csv.gz'),
-            ('hmmcopy_segs', '{}_hmmcopy', f'_multiplier{ploidy_solution}_segments.csv.gz'),
-            ('hmmcopy_metrics', '{}_hmmcopy', f'_multiplier{ploidy_solution}_metrics.csv.gz'),
-            ('align_metrics', '{}_align', '_alignment_metrics.csv.gz'),
+        results_info = [
+            ('hmmcopy_reads', '{}_hmmcopy',),
+            ('hmmcopy_segs', '{}_hmmcopy',),
+            ('hmmcopy_metrics', '{}_hmmcopy',),
+            ('align_metrics', '{}_align',),
         ]
 
         self.results_filepaths = {}
 
         tantalus_api = dbclients.tantalus.TantalusApi()
 
-        for table_name, analysis_template, csv_suffix in self.results_info:
+        for table_name, analysis_template in results_info:
             results = tantalus_api.get('results', name=analysis_template.format(ticket_id))
+            analysis = tantalus_api.get('analysis', id=results['analysis'])
+
+            if packaging.version.parse(analysis['version']) < packaging.version.parse('0.2.25'):
+                suffix_info = {
+                    'hmmcopy_reads': f'_multiplier{ploidy_solution}_reads.csv.gz',
+                    'hmmcopy_segs': f'_multiplier{ploidy_solution}_segments.csv.gz',
+                    'hmmcopy_metrics': f'_multiplier{ploidy_solution}_metrics.csv.gz',
+                    'align_metrics': '_alignment_metrics.csv.gz',
+                }
+
+            else:
+                suffix_info = {
+                    'hmmcopy_reads': f'_reads.csv.gz',
+                    'hmmcopy_segs': f'_segments.csv.gz',
+                    'hmmcopy_metrics': f'_metrics.csv.gz',
+                    'align_metrics': '_alignment_metrics.csv.gz',
+                }
+
+            csv_suffix = suffix_info[table_name]
 
             assert table_name not in self.results_filepaths
 
