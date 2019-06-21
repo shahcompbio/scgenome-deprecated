@@ -44,6 +44,7 @@ class HMMCopyData:
             ('hmmcopy_segs', '{}_hmmcopy',),
             ('hmmcopy_metrics', '{}_hmmcopy',),
             ('align_metrics', '{}_align',),
+            ('annotation_metrics', '{}_annotation',),
         ]
 
         self.results_filepaths = {}
@@ -51,10 +52,20 @@ class HMMCopyData:
         tantalus_api = dbclients.tantalus.TantalusApi()
 
         for table_name, analysis_template in results_info:
-            results = tantalus_api.get('results', name=analysis_template.format(ticket_id))
+            try:
+                results = tantalus_api.get('results', name=analysis_template.format(ticket_id))
+            except dbclients.basicclient.NotFoundError:
+                continue
+
+            if results['analysis'] is None:
+                raise Exception(f'results {results["id"]} is None')
+
             analysis = tantalus_api.get('analysis', id=results['analysis'])
 
             if packaging.version.parse(analysis['version']) < packaging.version.parse('0.2.25'):
+                if table_name == 'annotation_metrics':
+                    continue
+
                 suffix_info = {
                     'hmmcopy_reads': f'_multiplier{ploidy_solution}_reads.csv.gz',
                     'hmmcopy_segs': f'_multiplier{ploidy_solution}_segments.csv.gz',
@@ -62,15 +73,22 @@ class HMMCopyData:
                     'align_metrics': '_alignment_metrics.csv.gz',
                 }
 
+                csv_suffix = suffix_info[table_name]
+
             else:
+                if table_name == 'hmmcopy_reads':
+                    assert len(results['libraries']) == 1
+                    library_id = results['libraries'][0]['library_id']
+
                 suffix_info = {
-                    'hmmcopy_reads': f'_reads.csv.gz',
-                    'hmmcopy_segs': f'_segments.csv.gz',
-                    'hmmcopy_metrics': f'_metrics.csv.gz',
-                    'align_metrics': '_alignment_metrics.csv.gz',
+                    'hmmcopy_reads': f'hmmcopy_autoploidy/{library_id}_reads.csv.gz',
+                    'hmmcopy_segs': f'hmmcopy_autoploidy/{library_id}_segments.csv.gz',
+                    'hmmcopy_metrics': f'hmmcopy_autoploidy/{library_id}_metrics.csv.gz',
+                    'align_metrics': f'alignment/{library_id}_alignment_metrics.csv.gz',
+                    'annotation_metrics': f'annotation/{library_id}_metrics.csv.gz',
                 }
 
-            csv_suffix = suffix_info[table_name]
+                csv_suffix = suffix_info[table_name]
 
             assert table_name not in self.results_filepaths
 

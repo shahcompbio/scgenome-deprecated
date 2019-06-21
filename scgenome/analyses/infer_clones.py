@@ -85,8 +85,7 @@ def search_hmmcopy_analyses(
 
 def import_cell_cycle_data(
         tantalus_api,
-        library_ids,
-        hmmcopy_results,
+        hmmcopy_ticket_ids,
         results_storage_name='singlecellblob_results',
 ):
     """ Import cell cycle predictions for a list of libraries
@@ -95,12 +94,16 @@ def import_cell_cycle_data(
 
     cell_cycle_data = []
 
-    for library_id in library_ids:
-        results, analysis = scgenome.dbsearch.search_cell_cycle_results(
-            tantalus_api, library_id, hmmcopy_results[library_id])
+    for ticket_id in hmmcopy_ticket_ids:
+        results = scgenome.dbsearch.search_cell_cycle_results(
+            tantalus_api, ticket_id)
+
+        assert len(results['libraries']) == 1
+        library_id = results['libraries'][0]['library_id']
 
         file_instances = tantalus_api.get_dataset_file_instances(
             results['id'], 'resultsdataset', results_storage_name)
+
         for file_instance in file_instances:
             f = storage_client.open_file(file_instance['file_resource']['filename'])
             data = pd.read_csv(f)
@@ -145,28 +148,32 @@ def import_image_feature_data(
     return image_feature_data
 
 
-def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_prefix):
+def retrieve_cn_data(hmmcopy_ticket_ids, sample_ids, local_cache_directory, results_prefix):
     tantalus_api = dbclients.tantalus.TantalusApi()
-
-    hmmcopy_results, hmmcopy_tickets = search_hmmcopy_analyses(tantalus_api, library_ids)
 
     cn_data = []
     metrics_data = []
 
-    for library_id in library_ids:
-        hmmcopy = scgenome.hmmcopy.HMMCopyData(hmmcopy_tickets[library_id], local_cache_directory)
+    for jira_ticket_id in hmmcopy_ticket_ids:
+        hmmcopy = scgenome.hmmcopy.HMMCopyData(jira_ticket_id, local_cache_directory)
         hmmcopy_data = hmmcopy.load_cn_data(sample_ids=sample_ids)
 
+        ticket_metrics_data = hmmcopy_data['hmmcopy_metrics']
+
+        if 'annotation_metrics' in hmmcopy_data:
+            ticket_metrics_data = hmmcopy_data['annotation_metrics']
+
         cn_data.append(hmmcopy_data['hmmcopy_reads'])
-        metrics_data.append(hmmcopy_data['hmmcopy_metrics'])
+        metrics_data.append(ticket_metrics_data)
 
     cn_data = scgenome.utils.concat_with_categories(cn_data)
     metrics_data = scgenome.utils.concat_with_categories(metrics_data)
 
-    cell_cycle_data = import_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
+    cell_cycle_data = import_cell_cycle_data(tantalus_api, hmmcopy_ticket_ids)
     cell_cycle_data['cell_id'] = pd.Categorical(cell_cycle_data['cell_id'], categories=metrics_data['cell_id'].cat.categories)
     metrics_data = metrics_data.merge(cell_cycle_data)
 
+    library_ids = metrics_data['library_id'].unique()
     image_feature_data = import_image_feature_data(tantalus_api, library_ids)
 
     # Read count filtering
@@ -230,10 +237,10 @@ def infer_clones_cmd(ctx, results_prefix, local_cache_directory):
 @click.option('--sample_id')
 @click.option('--library_ids_filename')
 @click.option('--sample_ids_filename')
-def retrieve_cn(
+def retrieve_cn_cmd(
         ctx,
-        library_id=None,
-        library_ids_filename=None,
+        hmmcopy_ticket_id=None,
+        hmmcopy_ticket_ids_filename=None,
         sample_id=None,
         sample_ids_filename=None,
     ):
@@ -241,12 +248,12 @@ def retrieve_cn(
     results_prefix = ctx.obj['results_prefix']
     local_cache_directory = ctx.obj['local_cache_directory']
 
-    if library_id is not None:
-        library_ids = [library_id]
-    elif library_ids_filename is not None:
-        library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
+    if hmmcopy_ticket_id is not None:
+        hmmcopy_ticket_ids = [hmmcopy_ticket_id]
+    elif hmmcopy_ticket_ids_filename is not None:
+        hmmcopy_ticket_ids = [l.strip() for l in open(hmmcopy_ticket_ids_filename).readlines()]
     else:
-        raise Exception('must specify library_id or library_ids_filename')
+        raise Exception('must specify hmmcopy_ticket_id or hmmcopy_ticket_ids_filename')
 
     if sample_id is not None:
         sample_ids = [sample_id]
@@ -255,9 +262,13 @@ def retrieve_cn(
     else:
         raise Exception('must specify sample_id or sample_ids_filename')
 
+    retrieve_cn(hmmcopy_ticket_ids, sample_ids, results_prefix, local_cache_directory)
+
+
+def retrieve_cn(hmmcopy_ticket_ids, sample_ids, results_prefix, local_cache_directory):
     logging.info('retrieving cn data')
     cn_data, metrics_data, image_feature_data = retrieve_cn_data(
-        library_ids,
+        hmmcopy_ticket_ids,
         sample_ids,
         local_cache_directory,
         results_prefix + 'retrieve_cn_',
@@ -270,10 +281,12 @@ def retrieve_cn(
 
 @infer_clones_cmd.command()
 @click.pass_context
-def cluster_cn(ctx):
-
+def cluster_cn_cmd(ctx):
     results_prefix = ctx.obj['results_prefix']
+    cluster_cn(results_prefix)
 
+
+def cluster_cn(results_prefix):
     cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
     metrics_data = pd.read_pickle(results_prefix + 'metrics_data.pickle')
 
@@ -308,11 +321,12 @@ def cluster_cn(ctx):
 @infer_clones_cmd.command()
 @click.pass_context
 @click.argument('pseudobulk_ticket')
-def pseudobulk_analysis(ctx, pseudobulk_ticket):
-
+def pseudobulk_analysis_cmd(ctx, pseudobulk_ticket):
     results_prefix = ctx.obj['results_prefix']
     local_cache_directory = ctx.obj['local_cache_directory']
 
+
+def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory):
     cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
     clusters = pd.read_pickle(results_prefix + 'clusters.pickle')
     final_clusters = pd.read_pickle(results_prefix + 'final_clusters.pickle')

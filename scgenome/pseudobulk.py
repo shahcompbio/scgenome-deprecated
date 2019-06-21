@@ -17,6 +17,7 @@ class PseudobulkData:
     ):
         tantalus_api = dbclients.tantalus.TantalusApi()
 
+        self.ticket_id = ticket_id
         self.results = search_pseudobulk_results(tantalus_api, ticket_id)
         self.sample_libraries = get_pseudobulk_sample_libraries(tantalus_api, ticket_id)
 
@@ -44,7 +45,7 @@ class PseudobulkData:
             sample_lib_filepaths = list(filter(lambda a: a.endswith(sample_lib_suffix), self.dataset_filepaths))
 
             if len(sample_lib_filepaths) != 1:
-                raise ValueError(f'found {len(sample_lib_filepaths)} {suffix} files for {sample_id}, {library_id}')
+                raise ValueError(f'found {len(sample_lib_filepaths)} {suffix} files for {sample_id}, {library_id}, {self.ticket_id}')
 
             sample_lib_filepath = sample_lib_filepaths[0]
 
