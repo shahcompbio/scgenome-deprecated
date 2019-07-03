@@ -1,3 +1,4 @@
+import logging
 import matplotlib
 import seaborn
 import pandas as pd
@@ -7,8 +8,8 @@ import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as dst
 from matplotlib.colors import ListedColormap
 
-from . import refgenome
-from . import utils
+from scgenome import refgenome
+from scgenome import utils
 
 
 def hex_to_rgb(h):
@@ -41,10 +42,25 @@ def plot_cbar(ax):
     ax.set_yticklabels(np.arange(len(color_reference))[::-1])
 
 
+def _secondary_clustering(data):
+    D = dst.squareform(dst.pdist(data.T, 'cityblock'))
+    Y = sch.linkage(D, method='complete')
+    Z = sch.dendrogram(Y, color_threshold=-1, no_plot=True)
+    idx = np.array(Z['leaves'])
+    ordering = np.zeros(idx.shape[0], dtype=int)
+    ordering[idx] = np.arange(idx.shape[0])
+    return ordering
+
+
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', raw=False, max_cn=13):
     plot_data = cn_data.merge(utils.chrom_idxs)
     plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
-    plot_data = plot_data.sort_index(axis=1, level=1)
+
+    ordering = _secondary_clustering(plot_data.values)
+    ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
+    plot_data = plot_data.T.set_index(ordering, append=True).T
+
+    plot_data = plot_data.sort_index(axis=1, level=[1, 2])
     if max_cn is not None:
         plot_data[plot_data > max_cn] = max_cn
 
@@ -121,6 +137,8 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='clus
     plot_data = plot_data.groupby(['chr_index', 'start', cluster_field_name])[cn_field_name].median().astype(int)
     plot_data = plot_data.unstack(level=[cluster_field_name]).fillna(0)
     plot_data = plot_data.sort_index(axis=1, level=1)
+
+    logging.info(f'matrix with size {plot_data.T.shape}')
 
     ax = fig.add_axes([0.0,1.,0.1,1.])
     D = dst.squareform(dst.pdist(plot_data.T, 'cityblock'))
