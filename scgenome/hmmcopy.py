@@ -58,7 +58,7 @@ class HMMCopyData:
                 continue
 
             if results['analysis'] is None:
-                raise Exception(f'results {results["id"]} is None')
+                raise Exception(f'results {results["id"]} has analysis {results["analysis"]}')
 
             analysis = tantalus_api.get('analysis', id=results['analysis'])
 
