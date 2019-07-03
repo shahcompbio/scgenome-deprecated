@@ -148,7 +148,14 @@ def import_image_feature_data(
     return image_feature_data
 
 
-def retrieve_cn_data(hmmcopy_ticket_ids, sample_ids, local_cache_directory, results_prefix):
+def retrieve_cn_data(
+        hmmcopy_ticket_ids,
+        sample_ids,
+        local_cache_directory,
+        results_prefix,
+        read_count_threshold=500000,
+    ):
+
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     cn_data = []
@@ -177,7 +184,7 @@ def retrieve_cn_data(hmmcopy_ticket_ids, sample_ids, local_cache_directory, resu
     image_feature_data = import_image_feature_data(tantalus_api, library_ids)
 
     # Read count filtering
-    metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > 500000]
+    metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > read_count_threshold]
 
     # Filter by experimental condition
     metrics_data = metrics_data[~metrics_data['experimental_condition'].isin(['NTC'])]
@@ -286,7 +293,7 @@ def cluster_cn_cmd(ctx):
     cluster_cn(results_prefix)
 
 
-def cluster_cn(results_prefix):
+def cluster_cn(results_prefix, cluster_size_threshold=50):
     cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
     metrics_data = pd.read_pickle(results_prefix + 'metrics_data.pickle')
 
@@ -310,6 +317,7 @@ def cluster_cn(results_prefix):
         filter_metrics,
         cell_clone_distances,
         results_prefix + 'finalize_clusters_',
+        cluster_size_threshold=cluster_size_threshold,
     )
 
     clusters.to_pickle(results_prefix + 'clusters.pickle')
