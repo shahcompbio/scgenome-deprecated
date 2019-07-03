@@ -66,6 +66,10 @@ def calculate_clusters(cn_data, metrics_data, results_prefix):
     logging.info('clustering copy number')
     clusters = scgenome.cncluster.umap_hdbscan_cluster(cn)
 
+    fig = plt.figure(figsize=(4, 4))
+    scgenome.cncluster.plot_umap_clusters(plt.gca(), clusters)
+    fig.savefig(results_prefix + 'initial_cn_umap.pdf', bbox_inches='tight')
+
     logging.info('merging clusters')
     cn_data = cn_data.merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
 
