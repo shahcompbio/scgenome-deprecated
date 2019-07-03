@@ -204,7 +204,7 @@ class PseudobulkData:
         
         breakpoint_data = []
 
-        for sample_id, library_id, filepath in self.get_pseudobulk_files('destruct.tsv'):
+        for sample_id, library_id, filepath in self.get_pseudobulk_files('destruct.csv.gz'):
             data = pd.read_csv(filepath, sep='\t')
             data['library_id'] = library_id
             data['sample_id'] = sample_id
@@ -217,8 +217,8 @@ class PseudobulkData:
 
         breakpoint_count_data = []
 
-        for sample_id, library_id, filepath in self.get_pseudobulk_files('cell_counts_destruct.csv'):
-            data = pd.read_csv(filepath)
+        for sample_id, library_id, filepath in self.get_pseudobulk_files('cell_counts_destruct.csv.gz'):
+            data = pd.read_csv(filepath, names=['cluster_id', 'cell_id', 'read_count'])
             data['library_id'] = library_id
             data['sample_id'] = sample_id
             breakpoint_count_data.append(data)
