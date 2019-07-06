@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from datamanagement.miscellaneous.hdf5helper import read_python2_hdf5_dataframe
 import scgenome.utils
 import wgs_analysis.snvs.mutsig
 import wgs_analysis.plots.snv
@@ -15,19 +14,30 @@ def get_highest_snpeff_effect(snpeff_data):
     """ Select the highest ranked effect from snpeff data.
     """
     ordered_effect_impacts = ['HIGH', 'MODERATE', 'LOW', 'MODIFIER']
-    snpeff_data = snpeff_data.merge(
-        pd.DataFrame({
+
+    ordered_effect_impacts = pd.DataFrame({
             'effect_impact': ordered_effect_impacts,
-            'effect_impact_rank': range(len(ordered_effect_impacts))}))
+            'effect_impact_rank': range(len(ordered_effect_impacts))})
+    ordered_effect_impacts['effect_impact'] = (
+        ordered_effect_impacts['effect_impact'].astype(snpeff_data['effect_impact'].dtype))
+
+    snpeff_data = snpeff_data.merge(ordered_effect_impacts)
+
+    index_cols = ['chrom', 'coord', 'ref', 'alt']
+    value_cols = ['gene_name', 'effect', 'effect_impact', 'amino_acid_change']
+
     snpeff_data = (
-        snpeff_data.sort_values(['chrom', 'coord', 'ref', 'alt', 'effect_impact_rank'], ascending=True)
-        .groupby(['chrom', 'coord', 'ref', 'alt'], sort=False)
-        .first()
+        snpeff_data[index_cols + value_cols + ['effect_impact_rank']]
+        .sort_values(index_cols + ['effect_impact_rank'], ascending=True)
+        .groupby(index_cols, sort=False, observed=True)
+        .nth(0)
         .reset_index())
+
     snpeff_data = snpeff_data[[
         'chrom', 'coord', 'ref', 'alt',
         'gene_name', 'effect', 'effect_impact', 'amino_acid_change',
     ]]
+
     return snpeff_data
 
 
@@ -45,7 +55,7 @@ categorical_columns = [
 default_museq_filter = 0.9
 default_strelka_filter = 20.
 
-def get_snv_results(dest, museq_filter=None, strelka_filter=None):
+def get_snv_results(pseudobulk, museq_filter=None, strelka_filter=None):
     """ Collate snv results into a single table.
     """
 
@@ -56,33 +66,35 @@ def get_snv_results(dest, museq_filter=None, strelka_filter=None):
         strelka_filter = default_strelka_filter
 
     logging.info('starting load')
-    mappability = read_python2_hdf5_dataframe(dest, '/snv/mappability')
+    mappability = pseudobulk.load_snv_annotation_data('mappability')
     mappability = mappability[mappability['mappability'] > 0.99]
     mappability['chrom'] = mappability['chrom'].astype(str)
 
-    strelka_results = read_python2_hdf5_dataframe(dest, '/strelka/vcf').rename(columns={'score': 'strelka_score'})
+    strelka_results = pseudobulk.load_snv_annotation_data('strelka').rename(columns={'score': 'strelka_score'})
     for col in ('chrom', 'ref', 'alt'):
         strelka_results[col] = strelka_results[col].astype(str)
 
-    museq_results = read_python2_hdf5_dataframe(dest, '/museq/vcf').rename(columns={'score': 'museq_score'})
+    museq_results = pseudobulk.load_snv_annotation_data('museq').rename(columns={'score': 'museq_score'})
     for col in ('chrom', 'ref', 'alt'):
         museq_results[col] = museq_results[col].astype(str)
 
-    cosmic = read_python2_hdf5_dataframe(dest,'/snv/cosmic_status')
+    cosmic = pseudobulk.load_snv_annotation_data('cosmic_status')
     logging.info('cosmic table with shape {}'.format(cosmic.shape))
     cosmic['is_cosmic'] = True
     cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
 
-    snpeff = read_python2_hdf5_dataframe(dest,'/snv/snpeff')
+    snpeff = pseudobulk.load_snv_annotation_data('snpeff')
     snpeff = get_highest_snpeff_effect(snpeff)
     logging.info('snpeff table with shape {}'.format(snpeff.shape))
 
-    tnc = read_python2_hdf5_dataframe(dest,'/snv/tri_nucleotide_context')
+    tnc = pseudobulk.load_snv_annotation_data('trinuc')
 
-    data = read_python2_hdf5_dataframe(dest, '/snv_allele_counts')
+    data = pseudobulk.load_snv_annotation_data('allele_counts')
+
+    logging.info('summing snv counts')
     data = (
         data
-        .groupby(['chrom', 'coord', 'ref', 'alt'])[['alt_counts', 'ref_counts']]
+        .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)[['alt_counts', 'ref_counts']]
         .sum().rename(columns={'alt_counts': 'alt_counts_sum', 'ref_counts': 'ref_counts_sum'}).reset_index())
     logging.info('total snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
 
@@ -140,7 +152,8 @@ def load_snv_data(
     Returns:
         pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
     """
-    snv_data = pseudobulk.load_snv_annotation_data(
+    snv_data = get_snv_results(
+        pseudobulk,
         museq_filter=museq_filter,
         strelka_filter=strelka_filter)
 

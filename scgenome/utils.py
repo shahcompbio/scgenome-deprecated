@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import collections
 
 from . import refgenome
@@ -20,6 +21,10 @@ def union_categories(df1, df2, cols):
     for col in cols:
         for df in (df1, df2):
             col_categories[col].update(df[col].values)
+
+    # Remove None and nan as they cannot be in the list of categories
+    for col in col_categories:
+        col_categories[col] = col_categories[col] - set([None, np.nan])
 
     # Create a pandas index for each set of categories
     for col, categories in col_categories.items():
@@ -47,6 +52,10 @@ def concat_with_categories(dfs, **kwargs):
     for df in dfs:
         for col in cat_cols:
             col_categories[col].update(df[col].values)
+
+    # Remove None and nan as they cannot be in the list of categories
+    for col in col_categories:
+        col_categories[col] = col_categories[col] - set([None, np.nan])
 
     # Create a pandas index for each set of categories
     for col, categories in col_categories.items():

@@ -90,23 +90,40 @@ class PseudobulkData:
 
         return snv_count_data
 
-    def load_snv_annotation_data(self, museq_filter=None, strelka_filter=None):
+    def load_snv_annotation_data(self, table_name):
         """ Load SNV annotation data
         
         Args:
-            museq_filter (float, optional): mutationseq score filter. Defaults to None.
-            strelka_filter (float, optional): strelka score filter. Defaults to None.
+            table_name (str): name of annotation table to load.
         
         Returns:
-            pandas.DataFrame: SNVs and annotation per sample / library
+            pandas.DataFrame: SNVs annotation data per sample / library
         """
         
         snv_data = []
-        for sample_id, library_id, filepath in self.get_pseudobulk_files('snv_annotations.h5'):
-            snv_data.append(scgenome.snvdata.get_snv_results(
+        for sample_id, library_id, filepath in self.get_pseudobulk_files(f'snv_{table_name}.csv.gz'):
+            logging.info(f'Loading snv {table_name} annotations from {filepath}')
+
+            data = pd.read_csv(
                 filepath,
-                museq_filter=museq_filter,
-                strelka_filter=strelka_filter))
+                dtype={
+                    'chrom': 'category',
+                    'ref': 'category',
+                    'alt': 'category',
+                    'cell_id': 'category',
+                    'effect': 'category',
+                    'effect_impact': 'category',
+                    'functional_class': 'category',
+                    'codon_change': 'category',
+                    'amino_acid_change': 'category',
+                    'gene_name': 'category',
+                    'transcript_biotype': 'category',
+                    'gene_coding': 'category',
+                    'transcript_id': 'category',
+                    'genotype': 'category',
+                })
+
+            snv_data.append(data)
 
         snv_data = scgenome.utils.concat_with_categories(snv_data, ignore_index=True)
 
