@@ -102,8 +102,8 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
     return plot_data
 
 
-def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13):
-    chromosome_info = refgenome.info.chromosome_info[['chr', 'chromosome_start']].copy()
+def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13, chromosome=None, s=5):
+    chromosome_info = refgenome.info.chromosome_info[['chr', 'chromosome_start', 'chromosome_end']].copy()
     chromosome_info['chr'] = pd.Categorical(chromosome_info['chr'], categories=cn_data['chr'].cat.categories)
     plot_data = cn_data.merge(chromosome_info)
     plot_data = plot_data[plot_data['chr'].isin(refgenome.info.chromosomes)]
@@ -112,7 +112,7 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13
 
     ax.scatter(
         plot_data['start'], plot_data[value_field_name],
-        c=plot_data[cn_field_name], s=1,
+        c=plot_data[cn_field_name], s=s,
         cmap=get_cn_cmap(plot_data[cn_field_name].values),
     )
 
@@ -141,17 +141,18 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='clus
     logging.info(f'matrix with size {plot_data.T.shape}')
 
     ax = fig.add_axes([0.0,1.,0.1,1.])
-    D = dst.squareform(dst.pdist(plot_data.T, 'cityblock'))
-    Y = sch.linkage(D, method='complete')
-    Z = sch.dendrogram(Y, color_threshold=-1, orientation='left')
-    idx = Z['leaves'][::-1]
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.spines['left'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    plot_data = plot_data.iloc[:, idx]
+    if plot_data.shape[1] > 2:
+        D = dst.squareform(dst.pdist(plot_data.T, 'cityblock'))
+        Y = sch.linkage(D, method='complete')
+        Z = sch.dendrogram(Y, color_threshold=-1, orientation='left')
+        idx = Z['leaves'][::-1]
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        plot_data = plot_data.iloc[:, idx]
 
     mat_chrom_idxs = plot_data.index.get_level_values(0).values
     chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [plot_data.shape[0] - 1])
