@@ -256,7 +256,7 @@ def calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size):
 
 
 def calculate_cluster_allele_cn(
-        cn_data, allele_data, clusters, results_prefix,
+        cn_data, allele_data, clusters, plots_prefix,
         total_allele_counts_threshold=6,
     ):
     """ Infer allele and cluster specific copy number from haplotype allele counts
@@ -290,15 +290,18 @@ def calculate_cluster_allele_cn(
         np.minimum(allele_data['allele_1_sum'], allele_data['allele_2_sum']) /
         allele_data['total_counts_sum'].astype(float))
 
+    num_clusters = len(clusters['cluster_id'].unique())
+    fig = plt.figure(figsize=(20, 4 * num_clusters))
+    idx = 1
     for cluster_id in clusters['cluster_id'].unique():
         cluster_allele_data = allele_data.query('cluster_id == {}'.format(cluster_id))
         cluster_allele_cn = allele_cn.query('cluster_id == {}'.format(cluster_id))
 
-        fig = plt.figure(figsize=(14, 3))
-        ax = fig.add_subplot(111)
+        ax = fig.add_subplot(num_clusters, 1, idx)
         scgenome.snpdata.plot_vaf_cn_profile(
             ax, cluster_allele_data, cluster_allele_cn)
-        fig.savefig(results_prefix + f'cluster_{cluster_id}_allele_cn.pdf')
+        idx += 1
+    fig.savefig(plots_prefix + 'allele_cn_profiles.png', bbox_inches='tight')
 
     return allele_cn
 
