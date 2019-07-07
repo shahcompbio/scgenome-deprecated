@@ -53,7 +53,7 @@ def find_overlapping_segments(pos, seg, columns):
 
 
 def snv_hierarchical_clustering_figure(snv_data, allele_cn, clusters):
-    """ Compute log likelihoods of presence absence for SNVs
+    """ Simple hierarhical clustering figure for SNVs
     """
     snv_matrix = snv_data.merge(clusters)
 
