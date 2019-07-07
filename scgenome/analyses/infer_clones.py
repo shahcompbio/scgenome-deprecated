@@ -21,6 +21,7 @@ import scgenome.utils
 import scgenome.cncluster
 import scgenome.cnplot
 import scgenome.snvdata
+import scgenome.breakpointdata
 import scgenome.snpdata
 import scgenome.snvphylo
 import scgenome.dbsearch
@@ -212,6 +213,7 @@ def retrieve_pseudobulk_data(
 
     pseudobulk = scgenome.pseudobulk.PseudobulkData(ticket_id, local_cache_directory)
 
+    logging.info('snv data')
     snv_data, snv_count_data = scgenome.snvdata.load_snv_data(
         pseudobulk,
         museq_filter=museq_score_threshold,
@@ -221,10 +223,38 @@ def retrieve_pseudobulk_data(
         figures_prefix=results_prefix + 'snv_loading_',
     )
 
+    logging.info('allele data')
     allele_data = pseudobulk.load_haplotype_allele_counts()
     allele_data = scgenome.snpdata.calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size)
 
-    breakpoint_data, breakpoint_count_data = pseudobulk.load_breakpoint_data()
+    logging.info('breakpoint data')
+    breakpoint_data, breakpoint_count_data = scgenome.breakpointdata.load_breakpoint_data(pseudobulk)
+
+    logging.info('pre filter breakpoint library portrait')
+    scgenome.breakpointdata.plot_library_portrait(
+        breakpoint_data,
+        results_prefix + 'breakpoints_unfiltered_',
+    )
+
+    logging.info('filter breakpoints')
+    breakpoint_data, breakpoint_count_data = scgenome.breakpointdata.filter_breakpoint_data(
+        breakpoint_data,
+        breakpoint_count_data,
+    )
+
+    logging.info('post filter breakpoint library portrait')
+    scgenome.breakpointdata.plot_library_portrait(
+        breakpoint_data,
+        results_prefix + 'breakpoints_filtered_',
+    )
+
+    logging.info('plot breakpoint clustering')
+    scgenome.breakpointdata.plot_breakpoint_clustering(
+        breakpoint_data,
+        breakpoint_count_data,
+        clusters,
+        results_prefix + 'clone_breakpoints_',
+    )
 
     return snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data
 
@@ -339,6 +369,7 @@ def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory
     clusters = pd.read_pickle(results_prefix + 'clusters.pickle')
     final_clusters = pd.read_pickle(results_prefix + 'final_clusters.pickle')
 
+    logging.info('retrieving pseudobulk data')
     snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data = retrieve_pseudobulk_data(
         pseudobulk_ticket,
         final_clusters,
@@ -346,6 +377,7 @@ def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory
         results_prefix + 'retrieve_pseudobulk_data_',
     )
 
+    logging.info('calculate cluster allele cn')
     allele_cn = scgenome.snpdata.calculate_cluster_allele_cn(
         cn_data,
         allele_data,
@@ -353,6 +385,7 @@ def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory
         results_prefix + 'calculate_cluster_allele_cn_',
     )
     
+    logging.info('bulk snv analysis')
     scgenome.snvdata.run_bulk_snv_analysis(
         snv_data,
         snv_count_data,
@@ -360,6 +393,7 @@ def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory
         results_prefix + 'run_bulk_snv_analysis_',
     )
 
+    logging.info('snv phylogenetics')
     snv_ml_tree, snv_tree_annotations = scgenome.snvphylo.run_snv_phylogenetics(
         snv_count_data,
         allele_cn,

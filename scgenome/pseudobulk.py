@@ -196,16 +196,23 @@ class PseudobulkData:
 
     def load_breakpoint_data(self):
         """ Load breakpoint data from a pseudobulk run.
-        
-        Args:
-            dataset_filepaths (list of str): absolute paths to pseudobulk results files
-            sample_libraries (list of tuples): sample id, library id tuples
         """
-        
         breakpoint_data = []
 
+        bpcols = "prediction_id\tchromosome_1\tstrand_1\tposition_1\tchromosome_2\tstrand_2\t\
+        position_2\thomology\tnum_split\tinserted\tmate_score\ttemplate_length_1\tlog_cdf\t\
+        template_length_2\tlog_likelihood\ttemplate_length_min\tnum_reads\tnum_unique_reads\t\
+        type\tnum_inserted\tsequence\tgene_id_1\tgene_name_1\tgene_location_1\tgene_id_2\t\
+        gene_name_2\tgene_location_2\tdgv_ids\tis_germline\tis_dgv\tnum_patients\tis_filtered\t\
+        dist_filtered\tbalanced\trearrangement_type".replace(' ', '').split('\t')
+
         for sample_id, library_id, filepath in self.get_pseudobulk_files('destruct.csv.gz'):
-            data = pd.read_csv(filepath, sep='\t')
+            data = pd.read_csv(
+                filepath, sep='\t', names=bpcols,
+                dtype={
+                    'chromosome_1': 'str',
+                    'chromosome_2': 'str',
+                })
             data['library_id'] = library_id
             data['sample_id'] = sample_id
             breakpoint_data.append(data)
@@ -215,6 +222,11 @@ class PseudobulkData:
 
         breakpoint_data = pd.concat(breakpoint_data, ignore_index=True)
 
+        return breakpoint_data
+
+    def load_breakpoint_count_data(self):
+        """ Load breakpoint count data from a pseudobulk run.
+        """
         breakpoint_count_data = []
 
         for sample_id, library_id, filepath in self.get_pseudobulk_files('cell_counts_destruct.csv.gz'):
@@ -229,7 +241,7 @@ class PseudobulkData:
         # KLUDGE: normal reads are not filtered properly, filter by their prefix
         breakpoint_count_data = breakpoint_count_data[~breakpoint_count_data['cell_id'].str.startswith('HS')]
 
-        return breakpoint_data, breakpoint_count_data
+        return breakpoint_count_data
 
 
 def search_pseudobulk_results(
