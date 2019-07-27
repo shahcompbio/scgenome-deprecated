@@ -25,17 +25,18 @@ results_version = 'v0.0.2'
 
 def get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=None):
     if hmmcopy_tickets is None or len(hmmcopy_tickets) == 0:
-        hmmcopy_analyses = list(tantalus_api.list('analysis', analysis_type__name='hmmcopy'))
+        hmmcopy_results = list(tantalus_api.list('results', results_type='hmmcopy'))
 
     else:
-        hmmcopy_analyses = []
+        hmmcopy_results = []
         for ticket in hmmcopy_tickets:
-            hmmcopy_analyses.append(tantalus_api.get('analysis', analysis_type__name='hmmcopy', jira_ticket=ticket))
+            hmmcopy_results.append(tantalus_api.get('results', results_type='hmmcopy', analysis__jira_ticket=ticket))
 
     unprocessed = {}
 
-    for hmmcopy_analysis in hmmcopy_analyses:
-        results = tantalus_api.get('results', analysis=hmmcopy_analysis['id'])
+    for results in hmmcopy_results:
+        hmmcopy_analysis = tantalus_api.get('analysis', id=results['analysis'])
+
         jira_ticket = hmmcopy_analysis['jira_ticket']
 
         # Check for an existing analysis with this hmmcopy as input
