@@ -54,7 +54,10 @@ class HMMCopyData:
             results = tantalus_api.get('results', name=analysis_template.format(ticket_id))
             analysis = tantalus_api.get('analysis', id=results['analysis'])
 
+            logging.info(f'version {analysis["version"]} results')
+
             if packaging.version.parse(analysis['version']) < packaging.version.parse('0.2.25'):
+                logging.info(f'using loading for results < 0.2.25')
                 suffix_info = {
                     'hmmcopy_reads': f'_multiplier{ploidy_solution}_reads.csv.gz',
                     'hmmcopy_segs': f'_multiplier{ploidy_solution}_segments.csv.gz',
@@ -63,6 +66,7 @@ class HMMCopyData:
                 }
 
             else:
+                logging.info(f'using loading for results >= 0.2.25')
                 suffix_info = {
                     'hmmcopy_reads': f'_reads.csv.gz',
                     'hmmcopy_segs': f'_segments.csv.gz',
