@@ -2,6 +2,7 @@ import umap
 import hdbscan
 import seaborn
 import pandas as pd
+import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from adjustText import adjust_text
@@ -62,6 +63,32 @@ def get_cluster_palette(n_col):
     return palette
 
 
+def get_cluster_color_map(cluster_ids):
+    num_colors = len(np.unique(cluster_ids[cluster_ids >= 0]))
+    pal = get_cluster_palette(num_colors)
+
+    color_map = {}
+    idx = 0.
+    for cluster_id in np.sort(np.unique(cluster_ids)):
+        if cluster_id < 0:
+            color_map[cluster_id] = (0.75, 0.75, 0.75, 1.0)
+        else:
+            color_map[cluster_id] = pal((idx) / (num_colors - 1))
+            idx += 1
+
+    return color_map
+
+
+def get_cluster_colors(cluster_ids):
+    color_map = get_cluster_color_map(cluster_ids)
+
+    color_mat = []
+    for cluster_id in cluster_ids:
+        color_mat.append(color_map[cluster_id])
+
+    return color_mat
+
+
 def cluster_labels(cluster_ids):
     counts = cluster_ids.value_counts().astype(str)
     labels = counts.index.to_series().astype(str) + ' (' + counts + ')'
@@ -82,31 +109,27 @@ def plot_umap_clusters(ax, df):
 
     """
     labels = cluster_labels(df['cluster_id'])
+    color_map = get_cluster_color_map(df['cluster_id'].values)
 
     if -1 in labels:
         df_noise = df[df['cluster_id'] < 0]
         ax.scatter(
             df_noise['umap1'].values,
             df_noise['umap2'].values,
-            c='0.85',
+            c=color_map[-1],
             s=2,
             label=labels[-1],
         )
 
-    num_colors = len(df[df['cluster_id'] >= 0]['cluster_id'].unique())
-    pal = get_cluster_palette(num_colors)
     text_labels = []
-    idx = 0.
     for cluster_id, cluster_df in df[df['cluster_id'] >= 0].groupby('cluster_id'):
-        c = pal((idx) / (num_colors - 1))
         ax.scatter(
             cluster_df['umap1'].values,
             cluster_df['umap2'].values,
-            c=c,
+            c=color_map[cluster_id],
             s=2,
             label=labels[int(cluster_id)],
         )
-        idx += 1.
 
     label_pos = df.groupby('cluster_id').mean()
     text_labels = [
