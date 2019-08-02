@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 import scgenome.cncluster
+import scgenome.cnplot
 
 
 def calc_prop_hom_del(states):
