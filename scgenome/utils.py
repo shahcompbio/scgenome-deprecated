@@ -13,13 +13,13 @@ chrom_idxs.index.name = 'chr_index'
 chrom_idxs = chrom_idxs.reset_index()
 
 
-def union_categories(df1, df2, cols):
+def union_categories(dfs, cols):
     """ Recreate specified categoricals on the union of categories inplace. 
     """
     # Get a list of categories for each column
     col_categories = collections.defaultdict(set)
     for col in cols:
-        for df in (df1, df2):
+        for df in dfs:
             col_categories[col].update(df[col].values)
 
     # Remove None and nan as they cannot be in the list of categories
@@ -32,7 +32,7 @@ def union_categories(df1, df2, cols):
 
     # Set all categorical columns as having teh same set of categories
     for col in cols:
-        for df in (df1, df2):
+        for df in dfs:
             df[col] = df[col].astype('category')
             df[col] = df[col].cat.set_categories(col_categories[col])
 

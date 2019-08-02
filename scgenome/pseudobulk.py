@@ -76,7 +76,7 @@ class PseudobulkData:
             logging.info('Loaded snv counts table with shape {}'.format(data.shape))
 
             scgenome.utils.union_categories(
-                data, positions,
+                [data, positions],
                 cols=['chrom', 'ref', 'alt'])
             data = data.merge(positions, how='inner')
 
