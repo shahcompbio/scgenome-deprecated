@@ -9,7 +9,9 @@ import cell_cycle_classifier.api
 import dbclients.tantalus
 import datamanagement.transfer_files
 from datamanagement.utils.utils import make_dirs
-import scgenome.hmmcopy
+
+from scgenome.loaders.qc import load_cached_qc_data
+from scgenome.db.qc import cache_qc_results
 
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
@@ -98,12 +100,8 @@ def run_analysis(
     logging.info('loading data for hmmcopy ticket {}'.format(
         hmmcopy_jira_ticket))
 
-    hmmcopy = scgenome.hmmcopy.HMMCopyData(
-        hmmcopy_jira_ticket,
-        cache_directory,
-    )
-
-    results = hmmcopy.load_cn_data()
+    cache_qc_results(hmmcopy_jira_ticket, local_cache_directory)
+    results = load_cached_qc_data(hmmcopy_jira_ticket, local_cache_directory)
 
     cn_data = results['hmmcopy_reads']
     metrics_data = results['hmmcopy_metrics']
