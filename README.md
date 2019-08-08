@@ -104,8 +104,10 @@ The following example code snippet will provide access to HMMCopy data for the O
 
 ```
 import dbclients
-import scgenome.hmmcopy
 import scgenome.utils
+
+from scgenome.loaders.qc import load_cached_qc_data
+from scgenome.db.qc import cache_qc_results
 
 
 tantalus_api = dbclients.tantalus.TantalusApi()
@@ -135,9 +137,8 @@ for jira_ticket in hmmcopy_tickets:
         analysis_type__name='hmmcopy',
         jira_ticket=jira_ticket)
 
-    hmmcopy = scgenome.hmmcopy.HMMCopyData(jira_ticket, local_cache_directory)
-
-    hmmcopy_data = hmmcopy.load_cn_data(sample_ids=sample_ids)
+    cache_qc_results(jira_ticket, local_cache_directory)
+    hmmcopy_data = load_cached_qc_data(jira_ticket, local_cache_directory)
 
     cn_data.append(hmmcopy_data['hmmcopy_reads'])
     segs_data.append(hmmcopy_data['hmmcopy_segs'])

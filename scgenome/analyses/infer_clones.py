@@ -23,10 +23,11 @@ import scgenome.cnplot
 import scgenome.snvdata
 import scgenome.snpdata
 import scgenome.snvphylo
-import scgenome.dbsearch
-import scgenome.hmmcopy
+import scgenome.db.search
 import scgenome.cnclones
 import scgenome.pseudobulk
+import scgenome.db.qc
+import scgenome.loaders.qc
 
 import wgs_analysis.snvs.mutsig
 import wgs_analysis.plots.snv
@@ -61,7 +62,7 @@ total_allele_counts_threshold = 6
 # not be changed
 cn_bin_size = 500000
 
-results_storage_name = 'singlecellblob_results'
+results_storage_name = 'singlecellresults'
 
 
 def search_hmmcopy_analyses(
@@ -75,7 +76,7 @@ def search_hmmcopy_analyses(
     hmmcopy_tickets = {}
 
     for library_id in library_ids:
-        results, analysis = scgenome.dbsearch.search_hmmcopy_results(
+        results, analysis = scgenome.db.search.search_hmmcopy_results(
             tantalus_api, library_id, aligner_name=aligner_name)
         hmmcopy_results[library_id] = results
         hmmcopy_tickets[library_id] = analysis['jira_ticket']
@@ -87,7 +88,7 @@ def import_cell_cycle_data(
         tantalus_api,
         library_ids,
         hmmcopy_results,
-        results_storage_name='singlecellblob_results',
+        results_storage_name='singlecellresults',
 ):
     """ Import cell cycle predictions for a list of libraries
     """
@@ -96,7 +97,7 @@ def import_cell_cycle_data(
     cell_cycle_data = []
 
     for library_id in library_ids:
-        results, analysis = scgenome.dbsearch.search_cell_cycle_results(
+        results, analysis = scgenome.db.search.search_cell_cycle_results(
             tantalus_api, library_id, hmmcopy_results[library_id])
 
         file_instances = tantalus_api.get_dataset_file_instances(
@@ -115,7 +116,7 @@ def import_cell_cycle_data(
 def import_image_feature_data(
         tantalus_api,
         library_ids,
-        results_storage_name='singlecellblob_results',
+        results_storage_name='singlecellresults',
 ):
     """ Import image features for a list of libraries
     """
@@ -125,7 +126,7 @@ def import_image_feature_data(
 
     for library_id in library_ids:
         try:
-            results = scgenome.dbsearch.search_image_feature_results(tantalus_api, library_id)
+            results = scgenome.db.search.search_image_feature_results(tantalus_api, library_id)
         except NotFoundError:
             logging.info('no image data for {}'.format(library_id))
             continue
@@ -154,8 +155,8 @@ def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_pre
     metrics_data = []
 
     for library_id in library_ids:
-        hmmcopy = scgenome.hmmcopy.HMMCopyData(hmmcopy_tickets[library_id], local_cache_directory)
-        hmmcopy_data = hmmcopy.load_cn_data(sample_ids=sample_ids)
+        scgenome.db.qc.cache_qc_results(hmmcopy_tickets[library_id], local_cache_directory)
+        hmmcopy_data = scgenome.loaders.qc.load_cached_qc_data(hmmcopy_tickets[library_id], local_cache_directory)
 
         cn_data.append(hmmcopy_data['hmmcopy_reads'])
         metrics_data.append(hmmcopy_data['hmmcopy_metrics'])

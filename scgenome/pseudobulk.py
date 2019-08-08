@@ -13,7 +13,7 @@ class PseudobulkData:
             self,
             ticket_id,
             local_cache_directory,
-            results_storage_name='singlecellblob_results',
+            results_storage_name='singlecellresults',
     ):
         tantalus_api = dbclients.tantalus.TantalusApi()
 

@@ -34,7 +34,7 @@ class HMMCopyData:
             ticket_id,
             local_cache_directory,
             ploidy_solution='0',
-            results_storage_name='singlecellblob_results',
+            results_storage_name='singlecellresults',
     ):
         self.local_storage_directory = local_cache_directory
         self.results_storage_name = results_storage_name
