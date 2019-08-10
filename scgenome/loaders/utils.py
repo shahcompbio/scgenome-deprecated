@@ -45,6 +45,14 @@ def find_results_directories(
 
         results_type = manifest['meta']['type']
 
+        # KLUDGE: alignment -> align
+        if results_type == 'alignment':
+            results_type = 'align'
+
+        # KLUDGE: 0.3.1 -> v0.3.1
+        if not manifest['meta']['version'].startswith('v'):
+            manifest['meta']['version'] = 'v' + manifest['meta']['version']
+
         if results_type in results_directories:
             raise Exception('found {} and {} with results type {}'.format(
                 results_directories[results_type],

@@ -55,6 +55,7 @@ table_suffixes = {
     'v0.2.20': _table_suffixes_v0_0_0,
     'v0.2.25': _table_suffixes_v0_2_25,
     'v0.3.0': _table_suffixes_v0_2_25,
+    'v0.3.1': _table_suffixes_v0_2_25,
 }
 
 
@@ -81,6 +82,7 @@ _table_fixes = {
     'v0.2.20': _table_fixes_v0_0_0,
     'v0.2.25': _table_fixes_v0_2_25,
     'v0.3.0': _table_fixes_v0_2_25,
+    'v0.3.1': _table_fixes_v0_2_25,
 }
 
 
@@ -110,6 +112,10 @@ def load_hmmcopy_data(
 
     manifest_filename = os.path.join(hmmcopy_results_dir, 'metadata.yaml')
     manifest = yaml.load(open(manifest_filename))
+
+    # KLUDGE: 0.3.1 -> v0.3.1
+    if not manifest['meta']['version'].startswith('v'):
+        manifest['meta']['version'] = 'v' + manifest['meta']['version']
 
     version = manifest['meta']['version']
 
