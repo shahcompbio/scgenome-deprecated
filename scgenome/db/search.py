@@ -7,59 +7,94 @@ import datamanagement.transfer_files
 from dbclients.basicclient import NotFoundError
 
 
-def search_hmmcopy_results(
+def _get_analysis_inputs_info(tantalus_api, analysis):
+    aligners = set()
+    is_complete = True
+    for dataset_id in analysis['input_datasets']:
+        dataset = tantalus_api.get('sequencedataset', id=dataset_id)
+        if not dataset['is_complete']:
+            is_complete = False
+        aligners.add(dataset['aligner'])
+    if len(aligners) != 1:
+        raise Exception('found {} aligners for analysis {}'.format(
+            len(aligners), analysis['id']))
+    aligner = aligners.pop()
+
+    info = {
+        'is_complete': is_complete,
+        'aligner': aligner,
+    }
+
+    return info
+
+
+def search_hmmcopy_analysis(
         tantalus_api,
         library_id,
         aligner_name='BWA_ALN_0_5_7',
-):
+    ):
     """ Search for hmmcopy results and analyses for a specific library.
     """
     logging.info('hmmcopy data for {}'.format(library_id))
 
-    analyses = list(tantalus_api.list(
-        'analysis',
-        analysis_type__name='hmmcopy',
-        input_datasets__library__library_id=library_id,
-    ))
-    aln_analyses = []
-    for analysis in analyses:
-        aligners = set()
-        is_complete = True
-        for dataset_id in analysis['input_datasets']:
-            dataset = tantalus_api.get('sequencedataset', id=dataset_id)
-            if not dataset['is_complete']:
-                is_complete = False
-            aligners.add(dataset['aligner'])
-        if len(aligners) != 1:
-            # HACK: should be an exception but will remove when datasets are cleaned up
-            continue
-            raise Exception('found {} aligners for analysis {}'.format(
-                len(aligners), analysis['id']))
-        aligner = aligners.pop()
-        if is_complete and aligner == aligner_name:
-            aln_analyses.append(analysis)
-    if len(aln_analyses) != 1:
-        raise Exception('found {} hmmcopy analyses for {}: {}'.format(
-            len(aln_analyses), library_id, [a['id'] for a in aln_analyses]))
-    analysis = aln_analyses[0]
-    results = tantalus_api.get(
+    library_results = list(tantalus_api.list(
         'resultsdataset',
-        analysis=analysis['id'],
-    )
+        results_type='hmmcopy',
+        libraries__library_id=library_id,
+    ))
 
-    return results, analysis
+    if len(library_results) == 0:
+        raise ValueError(f'no results for library {library_id}')
+
+    results_analysis = {}
+
+    results_info = []
+
+    for results in library_results:
+        analysis = tantalus_api.get('analysis', id=results['analysis'])
+
+        results_analysis[results['id']] = analysis
+
+        info = _get_analysis_inputs_info(tantalus_api, analysis)
+
+        info['results_id'] = results['id']
+        info['jira_ticket'] = analysis['jira_ticket']
+        info['jira_ticket_number'] = int(analysis['jira_ticket'].split('-')[1])
+
+        results_info.append(info)
+
+    results_info = pd.DataFrame(results_info)
+
+    if aligner_name is not None:
+        results_info = results_info.query(f'aligner == "{aligner_name}"')
+
+    if len(results_info) == 0:
+        raise ValueError(f'no results for library {library_id} with aligner {aligner_name}')
+
+    # If any of the results are true, select amongst those
+    if True in results_info['is_complete']:
+        results_info = results_info.query('is_complete')
+
+    else:
+        logging.warning(f'no complete results for library {library_id}')
+
+    # Select the latest by jira ticket number for multiple
+    if len(results_info) > 1:
+        logging.warning(f'selecting latest of {len(results_info)} results for {library_id} by jira ticket number')
+    results_id = results_info.sort_values('jira_ticket_number').iloc[-1, :]['results_id']
+
+    return results_analysis[results_id]
 
 
 def search_cell_cycle_results(
         tantalus_api,
-        library_id,
         hmmcopy_results,
         version='v0.0.1',
         results_storage_name='singlecellresults',
 ):
     """ Import cell cycle predictions for a list of libraries
     """
-    logging.info('cell cycle data for {}'.format(library_id))
+    logging.info(f'cell cycle data for {library_id}')
 
     analysis = tantalus_api.get(
         'analysis',
@@ -70,7 +105,7 @@ def search_cell_cycle_results(
 
     results = tantalus_api.get(
         'resultsdataset',
-        analysis=analysis['id'],
+        analysis__jira_ticket=analysis['id'],
     )
 
     return results, analysis

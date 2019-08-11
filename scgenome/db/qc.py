@@ -33,7 +33,7 @@ def cache_qc_results(
                 csv_suffixes = scgenome.loaders.annotation.table_suffixes[results['results_version']]
 
             else:
-                raise Exception(f'unsupported results type {results["results_type"]}')
+                continue
 
         for _, csv_suffix in csv_suffixes:
             filepaths = datamanagement.transfer_files.cache_dataset(

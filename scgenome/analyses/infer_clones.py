@@ -65,52 +65,41 @@ cn_bin_size = 500000
 results_storage_name = 'singlecellresults'
 
 
-def search_hmmcopy_analyses(
+def load_cell_cycle_data(
         tantalus_api,
-        library_ids,
-        aligner_name='BWA_ALN_0_5_7',
-):
-    """ Search for hmmcopy results and analyses for a list of libraries.
-    """
-    hmmcopy_results = {}
-    hmmcopy_tickets = {}
-
-    for library_id in library_ids:
-        results, analysis = scgenome.db.search.search_hmmcopy_results(
-            tantalus_api, library_id, aligner_name=aligner_name)
-        hmmcopy_results[library_id] = results
-        hmmcopy_tickets[library_id] = analysis['jira_ticket']
-
-    return hmmcopy_results, hmmcopy_tickets
-
-
-def import_cell_cycle_data(
-        tantalus_api,
-        library_ids,
-        hmmcopy_results,
+        jira_ticket,
+        analysis_version='v0.0.2',
         results_storage_name='singlecellresults',
-):
-    """ Import cell cycle predictions for a list of libraries
+    ):
+    """ Load cell cycle predictions for a matched hmmcopy jira ticket
     """
     storage_client = tantalus_api.get_storage_client(results_storage_name)
 
-    cell_cycle_data = []
+    analysis = tantalus_api.get(
+        'analysis',
+        jira_ticket=jira_ticket,
+        version=analysis_version,
+        analysis_type__name='cell_state_classifier',
+    )
 
-    for library_id in library_ids:
-        results, analysis = scgenome.db.search.search_cell_cycle_results(
-            tantalus_api, library_id, hmmcopy_results[library_id])
+    results = tantalus_api.get(
+        'resultsdataset',
+        analysis=analysis['id'],
+    )
 
-        file_instances = tantalus_api.get_dataset_file_instances(
-            results['id'], 'resultsdataset', results_storage_name)
-        for file_instance in file_instances:
-            f = storage_client.open_file(file_instance['file_resource']['filename'])
-            data = pd.read_csv(f)
-            data['library_id'] = library_id
-            cell_cycle_data.append(data)
+    file_instances = tantalus_api.get_dataset_file_instances(
+        results['id'], 'resultsdataset', results_storage_name,
+        filters={'filename__endswith': '.csv'})
 
-    cell_cycle_data = pd.concat(cell_cycle_data, ignore_index=True, sort=True)
+    if len(file_instances) != 1:
+        raise ValueError(f'found {len(file_instances)} file instances for cell cycle for {jira_ticket}')
 
-    return cell_cycle_data
+    file_instance = file_instances[0]
+
+    f = storage_client.open_file(file_instance['file_resource']['filename'])
+    data = pd.read_csv(f)
+
+    return data
 
 
 def import_image_feature_data(
@@ -146,29 +135,57 @@ def import_image_feature_data(
     return image_feature_data
 
 
-def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_prefix):
-    tantalus_api = dbclients.tantalus.TantalusApi()
+def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory, results_prefix):
+    """ Retrieve comprehensive metrics data for a library
+    """
 
-    hmmcopy_results, hmmcopy_tickets = search_hmmcopy_analyses(tantalus_api, library_ids)
+    logging.info(f'library {library_id}')
+
+    analysis = scgenome.db.search.search_hmmcopy_analysis(tantalus_api, library_id)
+    jira_ticket = analysis['jira_ticket']
+
+    scgenome.db.qc.cache_qc_results(
+        analysis['jira_ticket'],
+        local_cache_directory)
+
+    results = scgenome.loaders.qc.load_cached_qc_data(
+        analysis['jira_ticket'],
+        local_cache_directory)
+
+    cn_data = results['hmmcopy_reads']
+    metrics_data = results['hmmcopy_metrics']
+    align_metrics_data = results['align_metrics']
+
+    metrics_data = metrics_data.merge(align_metrics_data, how='left')
+    assert 'cell_id_x' not in metrics_data
+
+    if 'is_s_phase' not in metrics_data:
+        cell_cycle_data = load_cell_cycle_data(
+            tantalus_api,
+            analysis['jira_ticket'])
+
+        metrics_data = metrics_data.merge(cell_cycle_data, how='left')
+        assert 'cell_id_x' not in metrics_data
+
+    return cn_data, metrics_data
+
+
+
+def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory, results_prefix):
+    tantalus_api = dbclients.tantalus.TantalusApi()
 
     cn_data = []
     metrics_data = []
 
     for library_id in library_ids:
-        scgenome.db.qc.cache_qc_results(hmmcopy_tickets[library_id], local_cache_directory)
-        hmmcopy_data = scgenome.loaders.qc.load_cached_qc_data(hmmcopy_tickets[library_id], local_cache_directory)
+        lib_cn_data, lib_metrics_data = retrieve_cn_data(
+            tantalus_api, library_id, sample_ids, local_cache_directory, results_prefix)
 
-        cn_data.append(hmmcopy_data['hmmcopy_reads'])
-        metrics_data.append(hmmcopy_data['hmmcopy_metrics'])
+        cn_data.append(lib_cn_data)
+        metrics_data.append(lib_metrics_data)
 
     cn_data = scgenome.utils.concat_with_categories(cn_data)
     metrics_data = scgenome.utils.concat_with_categories(metrics_data)
-
-    cell_cycle_data = import_cell_cycle_data(tantalus_api, library_ids, hmmcopy_results)
-    cell_cycle_data['cell_id'] = pd.Categorical(cell_cycle_data['cell_id'], categories=metrics_data['cell_id'].cat.categories)
-    metrics_data = metrics_data.merge(cell_cycle_data)
-
-    image_feature_data = import_image_feature_data(tantalus_api, library_ids)
 
     # Read count filtering
     metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > 500000]
@@ -179,15 +196,7 @@ def retrieve_cn_data(library_ids, sample_ids, local_cache_directory, results_pre
     cell_ids = metrics_data['cell_id']
     cn_data = cn_data[cn_data['cell_id'].isin(cell_ids)]
 
-    # TODO: Remove temporary fixup
-    if 'total_mapped_reads_hmmcopy' not in metrics_data:
-         metrics_data['total_mapped_reads_hmmcopy'] = metrics_data['total_mapped_reads']
-    elif metrics_data['total_mapped_reads_hmmcopy'].isnull().any():
-        fix_read_count = metrics_data['total_mapped_reads_hmmcopy'].isnull()
-        metrics_data.loc[fix_read_count, 'total_mapped_reads_hmmcopy'] = (
-            metrics_data.loc[fix_read_count, 'total_mapped_reads'])
-
-    return cn_data, metrics_data, image_feature_data
+    return cn_data, metrics_data
 
 
 def retrieve_pseudobulk_data(
@@ -257,7 +266,7 @@ def retrieve_cn(
         raise Exception('must specify sample_id or sample_ids_filename')
 
     logging.info('retrieving cn data')
-    cn_data, metrics_data, image_feature_data = retrieve_cn_data(
+    cn_data, metrics_data = retrieve_cn_data_multi(
         library_ids,
         sample_ids,
         local_cache_directory,
@@ -266,7 +275,6 @@ def retrieve_cn(
 
     cn_data.to_pickle(results_prefix + 'cn_data.pickle')
     metrics_data.to_pickle(results_prefix + 'metrics_data.pickle')
-    image_feature_data.to_pickle(results_prefix + 'image_feature_data.pickle')
 
 
 @infer_clones_cmd.command()
