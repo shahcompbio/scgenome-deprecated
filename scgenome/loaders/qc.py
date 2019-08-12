@@ -1,8 +1,33 @@
 import click
+import pandas as pd
+
 import scgenome.loaders.utils
 from scgenome.loaders.align import load_align_data
 from scgenome.loaders.hmmcopy import load_hmmcopy_data
 from scgenome.loaders.annotation import load_annotation_data
+
+
+def _calculate_annotation_metrics(results_tables):
+    common_columns = list(set(results_tables['align_metrics'].columns).intersection(
+        results_tables['hmmcopy_metrics'].columns))
+
+    align_idx = results_tables['align_metrics'].set_index(common_columns).index
+    hmmcopy_idx = results_tables['hmmcopy_metrics'].set_index(common_columns).index
+
+    for idx in align_idx.difference(hmmcopy_idx):
+        raise ValueError('found {idx} in align but not hmmcopy')
+
+    for idx in hmmcopy_idx.difference(align_idx):
+        raise ValueError('found {idx} in hmmcopy but not align')
+
+    data = pd.merge(
+        results_tables['align_metrics'],
+        results_tables['hmmcopy_metrics'],
+        on=common_columns,
+        how='left',
+    )
+
+    return data
 
 
 def load_cached_qc_data(
@@ -33,10 +58,13 @@ def load_cached_qc_data(
 
     results_tables.update(hmmcopy_results_tables)
 
-    # Annotation table overrides hmmcopy_metrics
+    # Load annotation tables if they exist otherwise create merge of hmmcopy/align
     if 'annotation' in ticket_results_dirs:
         annotation_results_tables = load_annotation_data(ticket_results_dirs['annotation'])
-        results_tables['hmmcopy_metrics'] = annotation_results_tables['annotation_metrics']
+        results_tables['annotation_metrics'] = annotation_results_tables['annotation_metrics']
+
+    else:
+        results_tables['annotation_metrics'] = _calculate_annotation_metrics(results_tables)
 
     # Optionally select specific samples
     if sample_ids is not None:
