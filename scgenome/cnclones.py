@@ -320,3 +320,81 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
     fig.savefig(plots_prefix + 'cn_state.pdf', bbox_inches='tight')
 
 
+def calculate_mitotic_errors(
+        cn_data,
+        clusters,
+        results_prefix,
+        chromosome_state_diff_threshold=0.75,
+        include_y_chrom=False,
+    ):
+
+    # Calculate raw and integer copy state per cluster
+    clone_cn_data = (
+    cn_data
+        .merge(clusters)
+        .groupby(['chr', 'start', 'end', 'cluster_id'])
+        .agg({'copy': np.mean, 'state': np.median})
+        .reset_index()
+    )
+    clone_cn_data['state'] = clone_cn_data['state'].round().astype(int)
+
+    # Create clone / cell cn table 
+    clone_cell_cn = cn_data.merge(clusters[['cell_id', 'cluster_id']])
+    clone_cell_cn = clone_cell_cn.merge(
+        clone_cn_data[['chr', 'start', 'end', 'cluster_id', 'state']].rename(columns={'state': 'clone_cn'}),
+        on=['chr', 'start', 'end', 'cluster_id'])
+    clone_cell_cn['state_diff'] = clone_cell_cn['state'] - clone_cell_cn['clone_cn']
+    clone_cell_cn['bin_size'] = clone_cell_cn['end'] - clone_cell_cn['start'] + 1
+
+    # Calculate proportion of each chromosome for each cell that has
+    # a different state from the clone (mean_diff)
+    size_state_diff = clone_cell_cn.set_index('state_diff', append=True).groupby(['chr', 'cell_id', 'state_diff'])['bin_size'].sum().rename('state_size').reset_index()
+    size_total = clone_cell_cn.groupby(['chr', 'cell_id'])['bin_size'].sum().astype(float).rename('total_size').reset_index()
+    mean_state_diff = size_state_diff.merge(size_total)
+    mean_state_diff['mean_diff'] = mean_state_diff['state_size'] / mean_state_diff['total_size']
+
+    # Filtering and threshold at 0.75 of a chromosome as a mis-segregation
+    if not include_y_chrom:
+        mean_state_diff = mean_state_diff[mean_state_diff['chr'] != 'Y']
+    mean_state_diff = mean_state_diff[mean_state_diff['state_diff'] != 0]
+    mean_state_diff = mean_state_diff[mean_state_diff['mean_diff'] > chromosome_state_diff_threshold]
+
+    # Count per state diff
+    fig = plt.figure(figsize=(3, 2))
+    plot_data = mean_state_diff.groupby('state_diff').size().rename('count').reset_index()
+    seaborn.barplot(x='state_diff', y='count', data=plot_data)
+    fig.savefig(results_prefix + 'misseg_state_diff_counts.pdf', bbox_inches='tight')
+
+    # Count per state diff
+    fig = plt.figure(figsize=(4, 2))
+    ax = fig.add_subplot(111)
+    plot_data = mean_state_diff.groupby('cell_id').size().rename('chr_count').reset_index()
+    plot_data = plot_data.groupby('chr_count').size().rename('cell_count').reset_index()
+    plot_data['proportion'] = plot_data['cell_count'] / len(clone_cell_cn['cell_id'].unique())
+    plot_data = plot_data.query('chr_count > 0')
+    chr_counts = range(1, plot_data['chr_count'].max() + 1)
+    seaborn.barplot(ax=ax, x='chr_count', y='proportion', data=plot_data, order=chr_counts, color='0.75')
+    ax.set_xlabel('Num. chromosomes')
+    ax.set_ylabel('Prop. cells')
+    seaborn.despine(trim=True)
+    fig.savefig(results_prefix + 'misseg_state_diff_proportions.pdf', bbox_inches='tight')
+
+    # Count per chromosome
+    chromosomes = [str(a) for a in range(1, 23)] + ['X']
+    if include_y_chrom:
+        chromosomes.append('Y')
+    fig = plt.figure(figsize=(7, 2.5))
+    ax = fig.add_subplot(111)
+    plot_data = mean_state_diff.query('state_diff > 0').groupby('chr').size().rename('count').reset_index()
+    seaborn.barplot(x='chr', y='count', data=plot_data, order=chromosomes, color=seaborn.desaturate('red', 0.75))
+    plot_data = mean_state_diff.query('state_diff < 0').groupby('chr').size().rename('count').reset_index()
+    plot_data['count'] = -plot_data['count']
+    seaborn.barplot(x='chr', y='count', data=plot_data, order=chromosomes, color=seaborn.desaturate('blue', 0.75))
+    ax.set_xlabel('Chromosome')
+    ax.set_ylabel('Count')
+    seaborn.despine(trim=True)
+    ax.set_yticklabels([int(abs(a)) for a in ax.get_yticks()])
+    fig.savefig(results_prefix + 'misseg_chr_counts.pdf', bbox_inches='tight')
+
+    return mean_state_diff
+

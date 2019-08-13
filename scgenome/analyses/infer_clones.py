@@ -156,6 +156,9 @@ def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory
     metrics_data = results['hmmcopy_metrics']
     align_metrics_data = results['align_metrics']
 
+    assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
+    assert isinstance(metrics_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
+
     metrics_data = metrics_data.merge(align_metrics_data, how='left')
     assert 'cell_id_x' not in metrics_data
 
@@ -163,9 +166,19 @@ def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory
         cell_cycle_data = load_cell_cycle_data(
             tantalus_api,
             analysis['jira_ticket'])
+        cell_cycle_data['cell_id'] = cell_cycle_data['cell_id'].astype('category')
+
+        scgenome.utils.union_categories([
+            cn_data,
+            metrics_data,
+            align_metrics_data,
+            cell_cycle_data])
 
         metrics_data = metrics_data.merge(cell_cycle_data, how='left')
         assert 'cell_id_x' not in metrics_data
+
+    assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
+    assert isinstance(metrics_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
 
     return cn_data, metrics_data
 
@@ -308,10 +321,17 @@ def cluster_cn(ctx):
         results_prefix + 'finalize_clusters_',
     )
 
+    mitotic_errors = scgenome.cnclones.calculate_mitotic_errors(
+        cn_data,
+        clusters,
+        results_prefix + 'mitotic_errors_',
+    )
+
     clusters.to_pickle(results_prefix + 'clusters.pickle')
     filter_metrics.to_pickle(results_prefix + 'filter_metrics.pickle')
     cell_clone_distances.to_pickle(results_prefix + 'cell_clone_distances.pickle')
     final_clusters.to_pickle(results_prefix + 'final_clusters.pickle')
+    mitotic_errors.to_pickle(results_prefix + 'mitotic_errors.pickle')
 
 
 @infer_clones_cmd.command()
