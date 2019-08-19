@@ -69,7 +69,7 @@ def load_cached_qc_data(
     # Optionally select specific samples
     if sample_ids is not None:
         for table_name, table_data in results_tables.items():
-            table_data = table_data[table_data['sample_id'].isin(sample_ids)]
+            results_tables[table_name] = table_data[table_data['sample_id'].isin(sample_ids)]
 
     # Optionally subsample cells
     if subsample is not None:
