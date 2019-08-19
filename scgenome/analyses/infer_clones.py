@@ -21,6 +21,7 @@ import scgenome.utils
 import scgenome.cncluster
 import scgenome.cnplot
 import scgenome.snvdata
+import scgenome.breakpointdata
 import scgenome.snpdata
 import scgenome.snvphylo
 import scgenome.db.search
@@ -201,7 +202,7 @@ def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory, resul
     metrics_data = scgenome.utils.concat_with_categories(metrics_data)
 
     # Read count filtering
-    metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > 500000]
+    metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > read_count_threshold]
 
     # Filter by experimental condition
     metrics_data = metrics_data[~metrics_data['experimental_condition'].isin(['NTC'])]
@@ -221,6 +222,7 @@ def retrieve_pseudobulk_data(
 
     pseudobulk = scgenome.pseudobulk.PseudobulkData(ticket_id, local_cache_directory)
 
+    logging.info('snv data')
     snv_data, snv_count_data = scgenome.snvdata.load_snv_data(
         pseudobulk,
         museq_filter=museq_score_threshold,
@@ -230,10 +232,38 @@ def retrieve_pseudobulk_data(
         figures_prefix=results_prefix + 'snv_loading_',
     )
 
+    logging.info('allele data')
     allele_data = pseudobulk.load_haplotype_allele_counts()
     allele_data = scgenome.snpdata.calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size)
 
-    breakpoint_data, breakpoint_count_data = pseudobulk.load_breakpoint_data()
+    logging.info('breakpoint data')
+    breakpoint_data, breakpoint_count_data = scgenome.breakpointdata.load_breakpoint_data(pseudobulk)
+
+    logging.info('pre filter breakpoint library portrait')
+    scgenome.breakpointdata.plot_library_portrait(
+        breakpoint_data,
+        results_prefix + 'breakpoints_unfiltered_',
+    )
+
+    logging.info('filter breakpoints')
+    breakpoint_data, breakpoint_count_data = scgenome.breakpointdata.filter_breakpoint_data(
+        breakpoint_data,
+        breakpoint_count_data,
+    )
+
+    logging.info('post filter breakpoint library portrait')
+    scgenome.breakpointdata.plot_library_portrait(
+        breakpoint_data,
+        results_prefix + 'breakpoints_filtered_',
+    )
+
+    logging.info('plot breakpoint clustering')
+    scgenome.breakpointdata.plot_breakpoint_clustering(
+        breakpoint_data,
+        breakpoint_count_data,
+        clusters,
+        results_prefix + 'clone_breakpoints_',
+    )
 
     return snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data
 
@@ -253,10 +283,10 @@ def infer_clones_cmd(ctx, results_prefix, local_cache_directory):
 @click.option('--sample_id')
 @click.option('--library_ids_filename')
 @click.option('--sample_ids_filename')
-def retrieve_cn(
+def retrieve_cn_cmd(
         ctx,
-        library_id=None,
-        library_ids_filename=None,
+        hmmcopy_ticket_id=None,
+        hmmcopy_ticket_ids_filename=None,
         sample_id=None,
         sample_ids_filename=None,
     ):
@@ -264,12 +294,12 @@ def retrieve_cn(
     results_prefix = ctx.obj['results_prefix']
     local_cache_directory = ctx.obj['local_cache_directory']
 
-    if library_id is not None:
-        library_ids = [library_id]
-    elif library_ids_filename is not None:
-        library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
+    if hmmcopy_ticket_id is not None:
+        hmmcopy_ticket_ids = [hmmcopy_ticket_id]
+    elif hmmcopy_ticket_ids_filename is not None:
+        hmmcopy_ticket_ids = [l.strip() for l in open(hmmcopy_ticket_ids_filename).readlines()]
     else:
-        raise Exception('must specify library_id or library_ids_filename')
+        raise Exception('must specify hmmcopy_ticket_id or hmmcopy_ticket_ids_filename')
 
     if sample_id is not None:
         sample_ids = [sample_id]
@@ -278,6 +308,10 @@ def retrieve_cn(
     else:
         raise Exception('must specify sample_id or sample_ids_filename')
 
+    retrieve_cn(hmmcopy_ticket_ids, sample_ids, results_prefix, local_cache_directory)
+
+
+def retrieve_cn(hmmcopy_ticket_ids, sample_ids, results_prefix, local_cache_directory):
     logging.info('retrieving cn data')
     cn_data, metrics_data = retrieve_cn_data_multi(
         library_ids,
@@ -292,10 +326,12 @@ def retrieve_cn(
 
 @infer_clones_cmd.command()
 @click.pass_context
-def cluster_cn(ctx):
-
+def cluster_cn_cmd(ctx):
     results_prefix = ctx.obj['results_prefix']
+    cluster_cn(results_prefix)
 
+
+def cluster_cn(results_prefix, cluster_size_threshold=50):
     cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
     metrics_data = pd.read_pickle(results_prefix + 'metrics_data.pickle')
 
@@ -319,6 +355,7 @@ def cluster_cn(ctx):
         filter_metrics,
         cell_clone_distances,
         results_prefix + 'finalize_clusters_',
+        cluster_size_threshold=cluster_size_threshold,
     )
 
     mitotic_errors = scgenome.cnclones.calculate_mitotic_errors(
@@ -337,15 +374,17 @@ def cluster_cn(ctx):
 @infer_clones_cmd.command()
 @click.pass_context
 @click.argument('pseudobulk_ticket')
-def pseudobulk_analysis(ctx, pseudobulk_ticket):
-
+def pseudobulk_analysis_cmd(ctx, pseudobulk_ticket):
     results_prefix = ctx.obj['results_prefix']
     local_cache_directory = ctx.obj['local_cache_directory']
 
+
+def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory):
     cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
     clusters = pd.read_pickle(results_prefix + 'clusters.pickle')
     final_clusters = pd.read_pickle(results_prefix + 'final_clusters.pickle')
 
+    logging.info('retrieving pseudobulk data')
     snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data = retrieve_pseudobulk_data(
         pseudobulk_ticket,
         final_clusters,
@@ -353,6 +392,7 @@ def pseudobulk_analysis(ctx, pseudobulk_ticket):
         results_prefix + 'retrieve_pseudobulk_data_',
     )
 
+    logging.info('calculate cluster allele cn')
     allele_cn = scgenome.snpdata.calculate_cluster_allele_cn(
         cn_data,
         allele_data,
@@ -360,6 +400,7 @@ def pseudobulk_analysis(ctx, pseudobulk_ticket):
         results_prefix + 'calculate_cluster_allele_cn_',
     )
     
+    logging.info('bulk snv analysis')
     scgenome.snvdata.run_bulk_snv_analysis(
         snv_data,
         snv_count_data,
@@ -367,6 +408,7 @@ def pseudobulk_analysis(ctx, pseudobulk_ticket):
         results_prefix + 'run_bulk_snv_analysis_',
     )
 
+    logging.info('snv phylogenetics')
     snv_ml_tree, snv_tree_annotations = scgenome.snvphylo.run_snv_phylogenetics(
         snv_count_data,
         allele_cn,

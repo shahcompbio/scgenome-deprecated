@@ -67,11 +67,26 @@ def calculate_clusters(cn_data, metrics_data, results_prefix):
     logging.info('clustering copy number')
     clusters = scgenome.cncluster.umap_hdbscan_cluster(cn)
 
+    fig = plt.figure(figsize=(4, 4))
+    scgenome.cncluster.plot_umap_clusters(plt.gca(), clusters)
+    fig.savefig(results_prefix + 'initial_cn_umap.pdf', bbox_inches='tight')
+
+    fig = plt.figure(figsize=(4, 4))
+    seaborn.barplot(x='cluster_id', y='count', data=clusters.groupby('cluster_id').size().rename('count').reset_index())
+    fig.savefig(results_prefix + 'initial_clone_size.pdf', bbox_inches='tight')
+
+    plot_data = (clusters
+        .merge(metrics_data[['cell_id', 'sample_id']].drop_duplicates())
+        .groupby(['cluster_id', 'sample_id']).size().unstack(fill_value=0).T)
+    fig = plt.figure(figsize=(2, 5))
+    seaborn.heatmap(plot_data.T, annot=True, fmt="d", linewidths=.5)
+    fig.savefig(results_prefix + 'initial_clone_sample_size.pdf', bbox_inches='tight')
+
     logging.info('merging clusters')
     cn_data = cn_data.merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
 
     logging.info('plotting clusters to {}*'.format(results_prefix + 'initial'))
-    plot_clones(cn_data, 'cluster_id', results_prefix + 'initial')
+    plot_clones(cn_data, 'cluster_id', results_prefix + 'initial_')
 
     filter_metrics = metrics_data[[
         'cell_id',
@@ -196,10 +211,10 @@ def finalize_clusters(
     #
     
     # Plot final clusters heatmap
-    logging.info('plotting clusters to {}*'.format(results_prefix + 'filter_final'))
+    logging.info('plotting clusters to {}*'.format(results_prefix + 'final_'))
     plot_cn_data = cn_data.merge(
         final_clusters[['cell_id', 'cluster_id']])
-    plot_clones(plot_cn_data, 'cluster_id', results_prefix + 'filter_final')
+    plot_clones(plot_cn_data, 'cluster_id', results_prefix + 'final_')
 
     # Plot s phase proportions
     s_plot_data = (
@@ -318,6 +333,25 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
         fig, plot_data, 'state', cluster_field_name=cluster_col)
     fig.savefig(plots_prefix + 'cn_state.pdf', bbox_inches='tight')
+
+    clone_cn_data = (
+        cn_data
+            .groupby(['chr', 'start', 'end', 'cluster_id'])
+            .agg({'copy': np.mean, 'state': np.median})
+            .reset_index()
+    )
+    clone_cn_data['state'] = clone_cn_data['state'].round().astype(int)
+
+    num_clusters = len(clone_cn_data['cluster_id'].unique())
+    fig = plt.figure(figsize=(20, 4 * num_clusters))
+    idx = 1
+    for cluster_id, plot_data in clone_cn_data.groupby('cluster_id'):
+        ax = fig.add_subplot(num_clusters, 1, idx)
+        scgenome.cnplot.plot_cell_cn_profile(
+            ax, plot_data, 'copy', 'state')
+        ax.set_ylabel(f'Clone {cluster_id} Total CN')
+        idx += 1
+    fig.savefig(plots_prefix + 'total_cn_profiles.pdf', bbox_inches='tight')
 
 
 def calculate_mitotic_errors(
