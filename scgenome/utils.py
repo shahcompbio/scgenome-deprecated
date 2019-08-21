@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import collections
 
+from scgenome.constants import CN_DATA_ID, CELL_ID
 from . import refgenome
 
 
@@ -85,5 +86,17 @@ def concat_with_categories(dfs, **kwargs):
             df[col] = df[col].cat.set_categories(col_categories[col])
 
     return pd.concat(dfs, **kwargs)
+
+
+def cn_data_to_mat_data_ids(cn_data, data_id=CN_DATA_ID, cell_id=CELL_ID):
+    matrix_data = (
+        cn_data.set_index(['chr', 'start', 'cell_id'])
+        [['reads', 'state', 'copy']]
+            .unstack(level=2, fill_value=0.))
+    copy = matrix_data[data_id].values
+    measurement = copy.T
+
+    cell_ids = matrix_data.columns.to_frame().loc[data_id][CELL_ID]
+    return matrix_data, measurement, cell_ids
 
 
