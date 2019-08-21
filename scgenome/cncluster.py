@@ -6,7 +6,17 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from adjustText import adjust_text
+from scgenome.jointcnmodels import calculate_marginal_ll_simple, get_variances, \
+    get_tr_probs
+from scgenome.jointcnmodels import gibbs_sample_cluster_indices
+from itertools import combinations
+from .TNode import TNode
+from math import gamma
+from .constants import ALPHA, MAX_CN
+from .utils import cn_data_to_mat_data_ids
 
+import scipy.stats
+import scipy
 
 def umap_hdbscan_cluster(
         cn,
@@ -147,3 +157,54 @@ def plot_umap_clusters(ax, df):
     ax.set_xlabel('Comp. 1')
     ax.set_ylabel('Comp. 2')
     seaborn.despine(ax=ax, offset=0, trim=True)
+
+
+# TODO set alpha
+# TODO save more info as needed eg. Rs of subtrees
+# TODO maybe cache values
+# TODO next_level, r are redundant
+def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
+                     alpha=ALPHA):
+    matrix_data, measurement, cell_ids = cn_data_to_mat_data_ids(cn_data)
+    n_cells = measurement.shape[0]
+    n_segments = measurement.shape[1]
+    variances = get_variances(cn_data, matrix_data, n_states)
+    tr_probs = get_tr_probs(n_segments, n_states)
+    tr_mat = np.log(tr_probs)
+
+    clusters = [TNode([i], None, None, 1, alpha) for i in range(n_cells)]
+    linkage = pd.DataFrame(
+        data=None,
+        columns=["i", "j", "r_merge", "i_count", "j_count"],
+        index=list(range(n_cells))
+    )
+    li = 0
+    while len(clusters) > 1:
+        r = np.zeros((len(clusters), len(clusters)))
+        next_level = np.zeros((len(clusters), len(clusters)))
+        for i, j in combinations(range(len(clusters)), 2):
+            left_cluster = clusters[i]
+            right_cluster = clusters[j]
+            merge_cluster = TNode(
+                [clusters[i].sample_indeces + clusters[j].sample_indeces],
+                left_cluster, right_cluster, None, None, None, None
+            )
+
+            pi, d = merge_cluster.calculate_pi_d(alpha)
+            ll = merge_cluster.get_ll(measurement, variances, tr_mat)
+            r[i, j] = merge_cluster.get_r()
+            next_level[i, j] = merge_cluster
+
+        max_r_flat_ind = r.argmax()
+        i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)
+
+        linkage.iloc[li] = [i_max, j_max, r.flatten()[max_r_flat_ind],
+            len(clusters[i_max]), len(clusters[j_max])
+        ]
+        clusters[i_max].sample_indeces = next_level[i_max, j_max]
+        del clusters[j_max]
+
+    linkage["merge_count"] = linkage["i_count"] + linkage["j_count"]
+    return linkage, clusters[0]
+
+
