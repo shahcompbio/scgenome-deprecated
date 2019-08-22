@@ -7,14 +7,14 @@ from .constants import ALPHA, NO_CHILDREN
 class TNode:
 
     # TODO assert types
-    def __init__(self, sample_inds, left_child, right_child, pi, d, ll, r):
+    def __init__(self, sample_inds, left_child, right_child, pi, d, ll, log_r):
         self.sample_inds = sample_inds
         self.left_child = left_child
         self.right_child = right_child
         self.pi = pi
         self.d = d
         self.ll = ll
-        self.r = r
+        self.log_r = log_r
 
     def is_leaf(self):
         return (self.left_child is None and
@@ -42,17 +42,24 @@ class TNode:
         )
         return self.ll
 
-    def get_r(self):
-        print("get_r()")
-        print(f"get_r(): self.pi={self.pi}, self.ll={self.ll}, "
-              f"self.left_child.ll={self.left_child.ll}",
-              f"self.right_child.ll={self.right_child.ll}")
-        top = self.pi * self.ll
-        bottom = (self.pi * self.ll +
-            (1 - self.pi) * self.left_child.ll * self.right_child.ll
+    def get_log_r(self, measurement, variances, tr_mat):
+        self.log_r = calculate_marginal_ll_simple(
+            measurement[self.sample_inds, :],
+            variances[self.sample_inds, :],
+            tr_mat
         )
-        self.r = top / bottom
-        return self.r
+        return self.log_r
+    #def get_r(self):
+    #    print("get_r()")
+    #    print(f"get_r(): self.pi={self.pi}, self.ll={self.ll}, "
+    #          f"self.left_child.ll={self.left_child.ll}",
+    #          f"self.right_child.ll={self.right_child.ll}")
+    #    top = self.pi * self.ll
+    #    bottom = (self.pi * self.ll +
+    #        (1 - self.pi) * self.left_child.ll * self.right_child.ll
+    #    )
+    #    self.r = top / bottom
+    #    return self.r
 
     def __str__(self):
         return f"sample_inds : {self.sample_inds}, " \
@@ -61,7 +68,7 @@ class TNode:
             f"pi : {self.pi}, " \
             f"d : {self.d}, " \
             f"ll : {self.ll}, " \
-            f"r : {self.r}"
+            f"log_r : {self.log_r}"
 
     def __eq__(self, other):
         return (
@@ -71,5 +78,5 @@ class TNode:
                 self.pi == other.pi and
                 self.d == other.d and
                 self.ll == other.ll and
-                self.r == other.r
+                self.log_r == other.log_r
         )

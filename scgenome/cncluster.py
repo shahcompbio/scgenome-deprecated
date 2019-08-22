@@ -202,9 +202,9 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
             )
             print("****" + str(merge_cluster))
 
-            pi, d = merge_cluster.get_pi_d(alpha)
-            ll = merge_cluster.get_ll(measurement, variances, tr_mat)
-            r[i, j] = merge_cluster.get_r()
+            #pi, d = merge_cluster.get_pi_d(alpha)
+            #ll = merge_cluster.get_ll(measurement, variances, tr_mat)
+            r[i, j] = merge_cluster.get_log_r(measurement, variances, tr_mat)
             next_level[i][j] = merge_cluster
             print("----" + str(merge_cluster))
 
