@@ -21,7 +21,7 @@ class TNode:
                 self.right_child is None and
                 len(self.sample_indeces) == 1)
 
-    def calculate_pi_d(self, alpha=ALPHA):
+    def get_pi_d(self, alpha=ALPHA):
         if self.left_child is None or self.right_child is None:
             raise ValueError(NO_CHILDREN)
 
@@ -33,18 +33,13 @@ class TNode:
 
         return self.pi, self.d
 
-    def calculate_rk(self):
-        # TODO make abstract class/interface with only this and calculate ll
-        # And this is DPMM implementation
-        pass
-
+    # TODO is weird in the case where there is only 1 sample index
     def get_ll(self, measurement, variances, tr_mat):
         self.ll = calculate_marginal_ll_simple(
             measurement[self.sample_indeces, :],
             variances[self.sample_indeces, :],
             tr_mat
         )
-        # TODO feels weird in case where there is only 1 sample index
         return self.ll
 
     def get_r(self):
@@ -55,22 +50,22 @@ class TNode:
         self.r = top / bottom
         return self.r
 
-#    def calculate_pi_d(self):
-#        n_k = len(self.left_child.sample_indeces) +
-#              len(self.right_child.sample_indeces)
-#
-#        if self.left_child is None and self.right_child is None:
-#            # Node is a leaf
-#            self.d = self.alpha
-#            self.pi = 1
-#        else:
-#            left_pi, left_d = calculate_pi(left_cluster.left_child,
-#                                           left_cluster.right_child, alpha)
-#            right_pi, right_d = calculate_pi(right_cluster.right_child,
-#                                             right_cluster.right_child, alpha)
-#
-#            gnk = gamma(n_k)
-#            d = alpha*gnk + left_d*right_d
-#            pi = alpha*gnk / d
-#
-#        return pi, d
+    def __str__(self):
+        return f"sample_indeces : {self.sample_indeces}, " \
+            f"left_child : {self.left_child}, " \
+            f"right_child : {self.right_child}, " \
+            f"pi : {self.pi}, " \
+            f"d : {self.d}, " \
+            f"ll : {self.ll}, " \
+            f"r : {self.r}"
+
+    def __eq__(self, other):
+        return (
+            self.sample_indeces == other.sample_indeces and
+            self.left_child == other.left_child and
+            self.right_child == other.right_child and
+            self.pi == other.pi and
+            self.d == other.d and
+            self.ll == other.ll and
+            self.r == other.r
+        )
