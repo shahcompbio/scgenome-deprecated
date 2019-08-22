@@ -12,7 +12,7 @@ from scgenome.jointcnmodels import gibbs_sample_cluster_indices
 from itertools import combinations
 from .TNode import TNode
 from math import gamma
-from .constants import ALPHA, MAX_CN
+from .constants import ALPHA, MAX_CN, VALUE_IDS
 from .utils import cn_data_to_mat_data_ids
 
 import scipy.stats
@@ -163,16 +163,19 @@ def plot_umap_clusters(ax, df):
 # TODO save more info as needed eg. Rs of subtrees
 # TODO maybe cache values
 # TODO next_level, r are redundant
+# TODO return more stuff
 def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
-                     alpha=ALPHA):
-    matrix_data, measurement, cell_ids = cn_data_to_mat_data_ids(cn_data)
+                     alpha=ALPHA, value_ids=VALUE_IDS):
+    matrix_data, measurement, cell_ids = (
+        cn_data_to_mat_data_ids(cn_data,
+                                value_ids=value_ids))
     n_cells = measurement.shape[0]
     n_segments = measurement.shape[1]
     variances = get_variances(cn_data, matrix_data, n_states)
     tr_probs = get_tr_probs(n_segments, n_states)
     tr_mat = np.log(tr_probs)
 
-    clusters = [TNode([i], None, None, 1, alpha) for i in range(n_cells)]
+    clusters = [TNode([i], None, None, 1, alpha, None, None) for i in range(n_cells)]
     linkage = pd.DataFrame(
         data=None,
         columns=["i", "j", "r_merge", "i_count", "j_count"],
@@ -190,7 +193,7 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
                 left_cluster, right_cluster, None, None, None, None
             )
 
-            pi, d = merge_cluster.calculate_pi_d(alpha)
+            pi, d = merge_cluster.get_pi_d(alpha)
             ll = merge_cluster.get_ll(measurement, variances, tr_mat)
             r[i, j] = merge_cluster.get_r()
             next_level[i, j] = merge_cluster
