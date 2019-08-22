@@ -15,7 +15,6 @@ def calculate_ll_normal_simple(data, variances):
     Returns:
         log likelihood: (n_cells, n_segments, n_states)
     """
-
     n_cells = data.shape[0]
     n_segments = data.shape[1]
     n_states = variances.shape[1]
@@ -25,7 +24,17 @@ def calculate_ll_normal_simple(data, variances):
 
     # Calculate mean
     mean = states
-    
+
+    # Debug ###########################
+    term1 = -0.5 * np.log(2. * np.pi)
+    term2 = -0.5 * np.log(variances[:, np.newaxis, :])
+    term3_1 = -1. * np.square(data[:, :, np.newaxis] - mean)
+    term3_2 = 2. * variances[:, np.newaxis, :]
+    term3 = term3_1 / term3_2
+    ll_first = term1 + term2 + term3
+    # Debug ###########################
+
+
     # Normal dist log likelihood
     ll = (
         -0.5 * np.log(2. * np.pi)
