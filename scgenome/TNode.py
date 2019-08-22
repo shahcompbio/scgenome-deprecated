@@ -7,7 +7,8 @@ from .constants import ALPHA, NO_CHILDREN
 class TNode:
 
     # TODO assert types
-    def __init__(self, sample_inds, left_child, right_child, pi, d, ll, log_r):
+    def __init__(self, sample_inds, left_child, right_child, pi, d, ll, log_r,
+                 cluster_ind):
         self.sample_inds = sample_inds
         self.left_child = left_child
         self.right_child = right_child
@@ -15,6 +16,7 @@ class TNode:
         self.d = d
         self.ll = ll
         self.log_r = log_r
+        self.cluster_ind = cluster_ind
 
     def is_leaf(self):
         return (self.left_child is None and
@@ -68,7 +70,8 @@ class TNode:
             f"pi : {self.pi}, " \
             f"d : {self.d}, " \
             f"ll : {self.ll}, " \
-            f"log_r : {self.log_r}"
+            f"log_r : {self.log_r}, " \
+            f"cluster_ind : {self.cluster_ind}"
 
     def __eq__(self, other):
         return (
@@ -78,5 +81,7 @@ class TNode:
                 self.pi == other.pi and
                 self.d == other.d and
                 self.ll == other.ll and
-                self.log_r == other.log_r
+                self.log_r == other.log_r and
+                self.cluster_ind == other.cluster_ind
         )
+
