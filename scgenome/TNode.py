@@ -51,17 +51,21 @@ class TNode:
             tr_mat
         )
         return self.log_r
-    #def get_r(self):
-    #    print("get_r()")
-    #    print(f"get_r(): self.pi={self.pi}, self.ll={self.ll}, "
-    #          f"self.left_child.ll={self.left_child.ll}",
-    #          f"self.right_child.ll={self.right_child.ll}")
-    #    top = self.pi * self.ll
-    #    bottom = (self.pi * self.ll +
-    #        (1 - self.pi) * self.left_child.ll * self.right_child.ll
-    #    )
-    #    self.r = top / bottom
-    #    return self.r
+
+    def get_leaves(self, leaves=None):
+        if leaves is None:
+            leaves = []
+        if self.left_child is None and self.right_child is None:
+            leaves.append(self)
+            return leaves
+        elif self.right_child is None:
+            return self.left_child.get_leaves(leaves)
+        elif self.left_child is None:
+            return self.right_child.get_leaves(leaves)
+        else:
+            leaves = leaves + self.left_child.get_leaves()
+            leaves = leaves + self.right_child.get_leaves()
+            return leaves
 
     def __str__(self):
         return f"sample_inds : {self.sample_inds}, " \
