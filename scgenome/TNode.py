@@ -2,13 +2,15 @@ from math import gamma
 
 from scgenome.jointcnmodels import calculate_marginal_ll_simple
 from .constants import ALPHA, NO_CHILDREN
+from scipy.special import logsumexp
+import numpy as np
 
 
 class TNode:
 
     # TODO assert types
     def __init__(self, sample_inds, left_child, right_child, pi, d, ll, log_r,
-                 cluster_ind):
+                 cluster_ind, tree_ll):
         self.sample_inds = sample_inds
         self.left_child = left_child
         self.right_child = right_child
@@ -17,6 +19,7 @@ class TNode:
         self.ll = ll
         self.log_r = log_r
         self.cluster_ind = cluster_ind
+        self.tree_ll = tree_ll
 
     def is_leaf(self):
         return (self.left_child is None and
@@ -35,6 +38,10 @@ class TNode:
 
         return self.pi, self.d
 
+    def get_tree_ll(self):
+        return (self.pi*self.ll -
+                (1-self.pi)*self.left_child.tree_ll*self.tree_ll)
+
     # TODO is weird in the case where there is only 1 sample index
     def get_ll(self, measurement, variances, tr_mat):
         self.ll = calculate_marginal_ll_simple(
@@ -45,12 +52,11 @@ class TNode:
         return self.ll
 
     def get_log_r(self, measurement, variances, tr_mat):
-        self.log_r = calculate_marginal_ll_simple(
-            measurement[self.sample_inds, :],
-            variances[self.sample_inds, :],
-            tr_mat
-        )
-        return self.log_r
+        top = np.log(self.pi) + self.ll
+        bottom = logsumexp([np.log(self.pi) + self.ll,
+            np.log(1 - self.pi) + self.left_child.ll + self.right_child.ll])
+        self.r = top - bottom
+        return self.r
 
     def get_leaves(self, leaves=None):
         if leaves is None:
