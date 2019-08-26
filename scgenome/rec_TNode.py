@@ -2,6 +2,8 @@ from math import gamma
 
 from scgenome.jointcnmodels import calculate_marginal_ll_simple
 from .constants import ALPHA, NO_CHILDREN
+from scipy.special import logsumexp
+import numpy as np
 
 
 class RTNode:
@@ -50,11 +52,10 @@ class RTNode:
         return self.ll
 
     def get_log_r(self, measurement, variances, tr_mat):
-        top = self.pi * self.ll
-        bottom = (self.pi * self.ll +
-            (1 - self.pi) * self.left_child.ll * self.right_child.ll
-        )
-        self.r = top / bottom
+        top = np.log(self.pi) + self.ll
+        bottom = logsumexp([np.log(self.pi) + self.ll,
+            np.log(1 - self.pi) + self.left_child.ll + self.right_child.ll])
+        self.r = top - bottom
         return self.r
 
     def get_leaves(self, leaves=None):
