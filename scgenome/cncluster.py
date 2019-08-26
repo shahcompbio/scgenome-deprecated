@@ -222,7 +222,7 @@ def rec_bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_C
     tr_probs = get_tr_probs(n_segments, n_states)
     tr_mat = np.log(tr_probs)
 
-    clusters = [RTNode([i], None, None, 1, alpha, 1, None, i) for i in range(n_cells)]
+    clusters = [RTNode([i], None, None, 1, alpha, 1, None, i, 1) for i in range(n_cells)]
     linkage = pd.DataFrame(data=None,
                            columns=["i", "j", "r_merge", "i_count", "j_count"],
                            index=list(range(n_cells-1)))
@@ -237,7 +237,7 @@ def rec_bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_C
             right_cluster = clusters[j]
             merge_cluster = RTNode(
                 clusters[i].sample_inds + clusters[j].sample_inds,
-                left_cluster, right_cluster, None, None, None, None, -1
+                left_cluster, right_cluster, None, None, None, None, -1, 1
             )
 
             pi, d = merge_cluster.get_pi_d(alpha)
