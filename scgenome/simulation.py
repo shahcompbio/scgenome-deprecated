@@ -264,7 +264,7 @@ def many_poisson_bicluster(trials_per_set, samples_per_cluster, num_bin,
 
     if num_cores is None:
         tqdm.pandas()
-        sim_df = sim_df.progress_apply(apply_fn, axis=1)
+        sim_df = sim_df.progress_apply(apply_fn, axis=1).reset_index(drop=True)
         return sim_df
     else:
         ProgressBar().register()
