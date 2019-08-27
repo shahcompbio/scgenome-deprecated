@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import collections
+from itertools import product
 
 from scgenome.constants import CN_DATA_ID, CELL_ID, VALUE_IDS, INDEX_IDS, \
     COPY_ID, NBIN_NCHR
@@ -136,3 +137,7 @@ def cn_mat_as_df(cn_mat, chr_names):
     rownames = [str(s) for s in range(num_sample)]
     return pd.DataFrame(data=cn_mat, columns=colnames, index=rownames)
 
+
+def expand_grid(dictionary):
+    return pd.DataFrame([row for row in product(*dictionary.values())],
+                        columns=dictionary.keys())
