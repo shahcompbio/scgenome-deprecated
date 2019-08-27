@@ -1,8 +1,11 @@
 import numpy as np
 import pandas as pd
-from .constants import MAX_CN, INIT_CN, CHR_CLUSTERING, TRANS_NOT_SYMMETRIC, \
-    TRANS_NOT_SUM, TRANS_NOT_SQUARE, NBIN_NCHR
-from .utils import cn_mat_as_df
+
+from scgenome import cncluster
+from .constants import MAX_CN, INIT_CN, CHR_CLUSTERING, \
+    TRANS_NOT_SYMMETRIC, TRANS_NOT_SUM, TRANS_NOT_SQUARE, NBIN_NCHR
+from .utils import cn_mat_as_df, cn_mat_to_cn_data, expand_grid
+
 
 def cn_mat_poisson(num_sample, num_bin, init_rng=np.random.poisson,
                    jump_rng=np.random.poisson, init_lambda=1., jump_lambda=1.,
@@ -33,7 +36,7 @@ def cn_mat_poisson(num_sample, num_bin, init_rng=np.random.poisson,
 
     return cn_mat.astype("int")
 
-# TODO INIT_CN is 2
+# TODO INIT_CN is just 2
 def clustered_cn_mat(num_sample, num_bin, chr_clustering, trans_mats,
                      max_cn=MAX_CN, init_cn=INIT_CN, seeds=None,
                      output_df=False, split=False):
@@ -159,5 +162,135 @@ def cn_mat_as_list(mat, chr_names):
     melted = melted.drop("chr_bin", axis=1)
     melted = melted[["chr", "bin", "cell_id", "copy"]]
     return melted
+
+
+def get_prop_correct(clustering):
+    return max((clustering["exp_cl"] == clustering["obs_cl"]).value_counts() /
+               clustering.shape[0])
+
+
+def poisson_bicluster(samples_per_cluster, num_bin, max_cn, alpha, df=None,
+                      init_lambdas=(None, None),
+                      jump_lambdas=(None, None), seeds=(None, None),
+                      noise_seed=None):
+    cluster1 = cn_mat_poisson(samples_per_cluster, num_bin,
+                              init_lambda=init_lambdas[0],
+                              jump_lambda=jump_lambdas[0], seed=seeds[0],
+                              max_cn=max_cn)
+    cluster2 = cn_mat_poisson(samples_per_cluster, num_bin,
+                              init_lambda=init_lambdas[1],
+                              jump_lambda=jump_lambdas[1], seed=seeds[1],
+                              max_cn=max_cn)
+
+    clst1_cell_ids = [f"cl1_cell{i}" for i in range(samples_per_cluster)]
+    clst2_cell_ids = [f"cl2_cell{i}" for i in range(samples_per_cluster)]
+
+    cn_mat = np.concatenate([cluster1, cluster2])
+    cell_ids = clst1_cell_ids + clst2_cell_ids
+
+    chr_names = ["1", "2"]
+    df_cn_mat = cn_mat_as_df(cn_mat, chr_names)
+    cn_data = cn_mat_to_cn_data(df_cn_mat, cell_id_vals=cell_ids)
+    cn_data["cluster_id"] = (
+        cn_data["cell_id"].str.split("_", expand=True).iloc[:, 0])
+    if noise_seed is not None:
+        np.random.seed(noise_seed)
+    cn_data["copy2"] = cn_data["copy"] + np.absolute(
+        np.random.normal(size=cn_data.shape[0], scale=0.3))
+    cn_data.columns = ["chr", "bin", "cell_id", "state", "start", "end",
+                       "cluster_id", "copy"]
+
+    tlinkage, root, cl_cell_ids = (
+        cncluster.bayesian_cluster(cn_data, n_states=max_cn,
+                                   value_ids=["copy"], alpha=alpha))
+
+    plinkage = tlinkage[["i", "j", "r_merge", "merge_count"]]
+    plinkage["r_merge"] = plinkage["r_merge"].astype("float")
+    plinkage["dist"] = -1 * plinkage["r_merge"]
+    plot_data = (
+        plinkage[["i", "j", "dist", "merge_count"]].to_numpy().astype("float"))
+
+    clustering = pd.DataFrame()
+    clustering["sample_inds"] = list(range(cn_mat.shape[0]))
+    clustering["cell_id"] = cell_ids
+    clustering["exp_cl"] = clustering["cell_id"].str[2]
+
+    left_samples = [x.sample_inds[0] for x in root.left_child.get_leaves()]
+    right_samples = [x.sample_inds[0] for x in root.right_child.get_leaves()]
+
+    def fn(ind):
+        if ind in left_samples:
+            return "1"
+        elif ind in right_samples:
+            return "2"
+
+    clustering["obs_cl"] = clustering["sample_inds"].apply(fn)
+
+    prop_correct = get_prop_correct(clustering)
+
+    if df is not None:
+        df["cn_data"] = cn_data
+        df["plinkage"] = plinkage
+        df["plot_data"] = plot_data
+        df["clustering"] = clustering
+        df["prop_correct"] = prop_correct
+        return df
+    else:
+        return cn_data, plinkage, plot_data, clustering, prop_correct
+
+
+def many_poisson_bicluster(trials_per_set, samples_per_cluster, num_bin,
+                           max_cn, alpha, init_lambdas, jump_lambdas):
+    params = {"samples_per_cluster": samples_per_cluster,
+              "num_bin": num_bin, "max_cn": max_cn, "alpha": alpha,
+              "init_lambdas": init_lambdas, "jump_lambdas": jump_lambdas}
+    sim_df = expand_grid(params)
+    sim_df = pd.concat([sim_df] * trials_per_set)
+
+    def apply_fn(df):
+        samples_per_cluster = df["samples_per_cluster"]
+        num_bin = df["num_bin"]
+        max_cn = df["max_cn"]
+        alpha = df["alpha"]
+        init_lambdas = df["init_lambdas"]
+        jump_lambdas = df["jump_lambdas"]
+        return poisson_bicluster(samples_per_cluster, num_bin, max_cn, alpha,
+                                 df=df, init_lambdas=init_lambdas,
+                                 jump_lambdas=jump_lambdas)
+
+    # TODO tqdm
+    sim_df = sim_df.apply(apply_fn, axis=1)
+    return sim_df
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
