@@ -1,3 +1,4 @@
+import numpy as np
 # Default params
 ALPHA = 0.3
 CN_DATA_ID = "copy"
@@ -7,6 +8,19 @@ INIT_CN = 2
 VALUE_IDS = ["reads", "state", "copy"]
 INDEX_IDS = ['chr', 'start', 'cell_id']
 COPY_ID = "copy"
+SIM_META = {
+    "samples_per_cluster": np.int64,
+    "num_bin": np.int64,
+    "max_cn": np.int64,
+    "alpha": np.float64,
+    "init_lambdas": object,
+    "jump_lambdas": object,
+    "cn_data": object,
+    "plinkage": object,
+    "plot_data": object,
+    "clustering": object,
+    "prop_correct": np.float64
+}
 
 # Error messages
 NO_CHILDREN = "Node has no children to comptue pi, d with"
