@@ -1,9 +1,12 @@
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+import dask.dataframe as dd
+from dask.diagnostics import ProgressBar
 
 from scgenome import cncluster
 from .constants import MAX_CN, INIT_CN, CHR_CLUSTERING, \
-    TRANS_NOT_SYMMETRIC, TRANS_NOT_SUM, TRANS_NOT_SQUARE, NBIN_NCHR
+    TRANS_NOT_SYMMETRIC, TRANS_NOT_SUM, TRANS_NOT_SQUARE, NBIN_NCHR, SIM_META
 from .utils import cn_mat_as_df, cn_mat_to_cn_data, expand_grid
 
 
@@ -204,7 +207,7 @@ def poisson_bicluster(samples_per_cluster, num_bin, max_cn, alpha, df=None,
         cncluster.bayesian_cluster(cn_data, n_states=max_cn,
                                    value_ids=["copy"], alpha=alpha))
 
-    plinkage = tlinkage[["i", "j", "r_merge", "merge_count"]]
+    plinkage = tlinkage.loc[:, ["i", "j", "r_merge", "merge_count"]]
     plinkage["r_merge"] = plinkage["r_merge"].astype("float")
     plinkage["dist"] = -1 * plinkage["r_merge"]
     plot_data = (
@@ -240,7 +243,8 @@ def poisson_bicluster(samples_per_cluster, num_bin, max_cn, alpha, df=None,
 
 
 def many_poisson_bicluster(trials_per_set, samples_per_cluster, num_bin,
-                           max_cn, alpha, init_lambdas, jump_lambdas):
+                           max_cn, alpha, init_lambdas, jump_lambdas,
+                           num_cores=None):
     params = {"samples_per_cluster": samples_per_cluster,
               "num_bin": num_bin, "max_cn": max_cn, "alpha": alpha,
               "init_lambdas": init_lambdas, "jump_lambdas": jump_lambdas}
@@ -258,32 +262,16 @@ def many_poisson_bicluster(trials_per_set, samples_per_cluster, num_bin,
                                  df=df, init_lambdas=init_lambdas,
                                  jump_lambdas=jump_lambdas)
 
-    # TODO tqdm
-    sim_df = sim_df.apply(apply_fn, axis=1)
-    return sim_df
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    if num_cores is None:
+        tqdm.pandas()
+        sim_df = sim_df.progress_apply(apply_fn, axis=1)
+        return sim_df
+    else:
+        ProgressBar().register()
+        sim_df = dd.from_pandas(sim_df, npartitions=num_cores)
+        result = sim_df.map_partitions(lambda df: df.apply(apply_fn, axis=1),
+                                       meta=SIM_META)
+        return result.compute(scheduler="processes").reset_index(drop=True)
 
 
 
