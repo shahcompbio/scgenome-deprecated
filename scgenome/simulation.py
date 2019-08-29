@@ -207,11 +207,7 @@ def poisson_bicluster(samples_per_cluster, num_bin, max_cn, alpha, df=None,
         cncluster.bayesian_cluster(cn_data, n_states=max_cn,
                                    value_ids=["copy"], alpha=alpha))
 
-    plinkage = tlinkage.loc[:, ["i", "j", "r_merge", "merge_count"]]
-    plinkage["r_merge"] = plinkage["r_merge"].astype("float")
-    plinkage["dist"] = -1 * plinkage["r_merge"]
-    plot_data = (
-        plinkage[["i", "j", "dist", "merge_count"]].to_numpy().astype("float"))
+    plinkage, plot_data = get_plot_data(tlinkage)
 
     clustering = pd.DataFrame()
     clustering["sample_inds"] = list(range(cn_mat.shape[0]))
@@ -241,6 +237,14 @@ def poisson_bicluster(samples_per_cluster, num_bin, max_cn, alpha, df=None,
     else:
         return cn_data, plinkage, plot_data, clustering, prop_correct
 
+
+def get_plot_data(linkage):
+    plinkage = linkage.loc[:, ["i", "j", "r_merge", "merge_count"]]
+    plinkage["r_merge"] = plinkage["r_merge"].astype("float")
+    plinkage["dist"] = -1 * plinkage["r_merge"]
+    plot_data = (
+        plinkage[["i", "j", "dist", "merge_count"]].to_numpy().astype("float"))
+    return plinkage, plot_data
 
 def many_poisson_bicluster(trials_per_set, samples_per_cluster, num_bin,
                            max_cn, alpha, init_lambdas, jump_lambdas,

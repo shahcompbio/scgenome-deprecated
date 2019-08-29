@@ -25,16 +25,6 @@ def calculate_ll_normal_simple(data, variances):
     # Calculate mean
     mean = states
 
-    # Debug ###########################
-    term1 = -0.5 * np.log(2. * np.pi)
-    term2 = -0.5 * np.log(variances[:, np.newaxis, :])
-    term3_1 = -1. * np.square(data[:, :, np.newaxis] - mean)
-    term3_2 = 2. * variances[:, np.newaxis, :]
-    term3 = term3_1 / term3_2
-    ll_first = term1 + term2 + term3
-    # Debug ###########################
-
-
     # Normal dist log likelihood
     ll = (
         -0.5 * np.log(2. * np.pi)
@@ -47,6 +37,7 @@ def calculate_ll_normal_simple(data, variances):
 
 
 def calculate_marginal_ll_simple(data, variances, tr_mat):
+    # n_bin x n_states
     framelogprob = calculate_ll_normal_simple(data, variances).sum(axis=0)
 
     alphas = np.zeros(framelogprob.shape)
