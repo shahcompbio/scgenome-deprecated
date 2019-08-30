@@ -21,6 +21,9 @@ SIM_META = {
     "clustering": object,
     "prop_correct": np.float64
 }
+REQUIRED_PARAMS = {"trials_per_set", "samples_per_cluster", "num_bin",
+                   "max_cn", "alpha",
+                   "distribution", "dist_params"}
 
 # Error messages
 NO_CHILDREN = "Node has no children to comptue pi, d with"
