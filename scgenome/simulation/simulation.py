@@ -12,16 +12,18 @@ from scgenome.simulation.poisson import get_poisson_bicluster
 from scgenome.utils import cn_mat_as_df, cn_mat_to_cn_data, expand_grid
 
 
-def do_simulations(params, naive_metric=NAIVE_METRIC, num_cores=None):
+def do_simulations(trials_per_set, params, naive_metric=NAIVE_METRIC,
+                   num_cores=None):
     """"
     :param param_grid: dictionary of {<argument_name>: <arg_values> which is
     used to make parameter grid for simulation
     """
     if not REQUIRED_PARAMS.issubset(params.keys()):
-        raise ValueError(f"param_grid requires these keys: {REQUIRED_PARAMS}")
+        raise ValueError(f"param_grid requires these keys: {REQUIRED_PARAMS}, "
+                         f"only supplied: f{params.keys()}")
 
     sim_df = expand_grid(params)
-    sim_df = pd.concat([sim_df] * params["trials_per_set"])
+    sim_df = pd.concat([sim_df] * trials_per_set)
 
     def apply_fn(df):
         samples_per_cluster = df["samples_per_cluster"]
@@ -29,9 +31,10 @@ def do_simulations(params, naive_metric=NAIVE_METRIC, num_cores=None):
         max_cn = df["max_cn"]
         alpha = df["alpha"]
         distribution = df["distribution"]
-        dist_params = df["distribution_params"]
+        init_lambdas = df["init_lambdas"]
+        jump_lambdas = df["jump_lambdas"]
         simulate_set(samples_per_cluster, num_bin, max_cn, alpha,
-                     distribution, dist_params, df)
+                     distribution, init_lambdas, jump_lambdas, df)
         cn_mat = df["cn_mat"]
         cn_data = df["cn_data"]
         cell_ids = df["cell_ids"]
@@ -51,24 +54,13 @@ def do_simulations(params, naive_metric=NAIVE_METRIC, num_cores=None):
 
 
 def simulate_set(samples_per_cluster, num_bin, max_cn, alpha, distribution,
-                 dist_params, df=None):
-    if distribution == "poisson_rw":
-        init_lambdas = dist_params["init_lambdas"]
-        jump_lambdas = dist_params["init_lambdas"]
-        try:
-            seeds = dist_params["seeds"]
-        except KeyError:
-            seeds = None
-        try:
-            noise_seed = dist_params["noise_seed"]
-        except KeyError:
-            noise_seed = None
+                 init_lambdas, jump_lambdas, df=None):
+    if distribution == "poisson":
         cn_mat = get_poisson_bicluster(samples_per_cluster, num_bin, max_cn,
-                                       df=None, init_lambdas=init_lambdas,
-                                       jump_lambdas=jump_lambdas, seeds=seeds,
-                                       noise_seed=noise_seed)
+                                       init_lambdas=init_lambdas,
+                                       jump_lambdas=jump_lambdas)
     elif distribution == "gaussian":
-        cn_mat = get_gaussian_bicluster(samples_per_cluster, num_bin, max_cn)
+        cn_mat = get_gaussian_bicluster(samples_per_cluster, num_bin)
     else:
         raise ValueError(f"distribution {distribution} invalid")
     _bi_cn_mat_assignment(cn_mat, samples_per_cluster, df)

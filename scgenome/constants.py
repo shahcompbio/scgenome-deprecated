@@ -21,9 +21,9 @@ SIM_META = {
     "clustering": object,
     "prop_correct": np.float64
 }
-REQUIRED_PARAMS = {"trials_per_set", "samples_per_cluster", "num_bin",
+REQUIRED_PARAMS = {"samples_per_cluster", "num_bin",
                    "max_cn", "alpha",
-                   "distribution", "dist_params"}
+                   "distribution", "init_lambdas", "jump_lambdas"}
 NAIVE_METRIC = "cityblock"
 
 # Error messages
