@@ -3,15 +3,16 @@ import pandas as pd
 from tqdm import tqdm
 import dask.dataframe as dd
 from dask.diagnostics import ProgressBar
+from scipy.cluster.hierarchy import linkage
 
 from scgenome import cncluster
-from scgenome.constants import MAX_CN, SIM_META, REQUIRED_PARAMS
+from scgenome.constants import SIM_META, REQUIRED_PARAMS, NAIVE_METRIC
 from scgenome.simulation.gaussian import get_gaussian_bicluster
 from scgenome.simulation.poisson import get_poisson_bicluster
 from scgenome.utils import cn_mat_as_df, cn_mat_to_cn_data, expand_grid
 
 
-def do_simulations(params, num_cores=None):
+def do_simulations(params, naive_metric=NAIVE_METRIC, num_cores=None):
     """"
     :param param_grid: dictionary of {<argument_name>: <arg_values> which is
     used to make parameter grid for simulation
@@ -35,6 +36,7 @@ def do_simulations(params, num_cores=None):
         cn_data = df["cn_data"]
         cell_ids = df["cell_ids"]
         do_bhc(cn_mat, cn_data, max_cn, alpha, cell_ids, df=df)
+        do_naive_hc(cn_mat, metric=naive_metric, df=df)
 
     if num_cores is None:
         tqdm.pandas()
@@ -129,6 +131,15 @@ def do_bhc(cn_mat, cn_data, max_cn, alpha, cell_ids, df=None):
         return df
     else:
         return cn_data, plinkage, plot_data, clustering, prop_correct
+
+
+def do_naive_hc(cn_mat, metric=NAIVE_METRIC, df=None):
+    link_mat = linkage(cn_mat, metric=metric)
+    if df is not None:
+        df["naive_hc"] = link_mat
+        return df
+    else:
+        return link_mat
 
 
 def get_prop_correct(clustering):

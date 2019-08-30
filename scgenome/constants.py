@@ -24,6 +24,7 @@ SIM_META = {
 REQUIRED_PARAMS = {"trials_per_set", "samples_per_cluster", "num_bin",
                    "max_cn", "alpha",
                    "distribution", "dist_params"}
+NAIVE_METRIC = "cityblock"
 
 # Error messages
 NO_CHILDREN = "Node has no children to comptue pi, d with"
