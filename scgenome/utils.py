@@ -141,3 +141,21 @@ def cn_mat_as_df(cn_mat, chr_names):
 def expand_grid(dictionary):
     return pd.DataFrame([row for row in product(*dictionary.values())],
                         columns=dictionary.keys())
+
+def get_leaves(node, leaves=None):
+    if leaves is None:
+        leaves = []
+    if node.get_left() is None and node.get_right() is None:
+        leaves.append(node)
+        return leaves
+    elif node.get_right() is None:
+        return get_leaves(node.get_left())
+    elif node.get_left() is None:
+        return get_leaves(node.get_right())
+    else:
+        leaves = leaves + get_leaves(node.get_left())
+        leaves = leaves + get_leaves(node.get_right())
+        return leaves
+
+def leaf_distance(a, b):
+    """Given two """
