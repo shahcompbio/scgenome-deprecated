@@ -3,6 +3,8 @@ import pandas as pd
 from tqdm import tqdm
 import dask.dataframe as dd
 from dask.diagnostics import ProgressBar
+from scipy.cluster.hierarchy import linkage, to_tree
+from itertools import combinations
 
 from scgenome import cncluster
 from .constants import MAX_CN, INIT_CN, CHR_CLUSTERING, \
@@ -229,10 +231,12 @@ def poisson_bicluster(samples_per_cluster, num_bin, max_cn, alpha, df=None,
 
     if df is not None:
         df["cn_data"] = cn_data
+        df["cn_mat"] = cn_mat
         df["plinkage"] = plinkage
         df["plot_data"] = plot_data
         df["clustering"] = clustering
         df["prop_correct"] = prop_correct
+        df["cell_id"] = cell_ids
         return df
     else:
         return cn_data, plinkage, plot_data, clustering, prop_correct
@@ -278,11 +282,24 @@ def many_poisson_bicluster(trials_per_set, samples_per_cluster, num_bin,
         return result.compute(scheduler="processes").reset_index(drop=True)
 
 
+def do_naive_hc(sim_df, metric="cityblock"):
+    def apply_linkage(cn_mat):
+        return linkage(cn_mat, metric=metric)
+
+    sim_df["naive_linkage"] = sim_df["cn_mat"].apply(apply_linkage)
+    sim_df["naive_root"] = sim_df["naive_linkage"].apply(to_tree)
 
 
+def pairwise_distance(tree):
+    num_leaves = tree.num_nodes(leaves=True, internal=False)
+    out = np.zeros((num_leaves, num_leaves))
+    dist_dict = tree.distance_matrix(leaf_labels=True)
+    for i in range(out.shape[0]):
+        for j in range(out.shape[1]):
+            if i == j:
+                out[i, j] = 0
+            else:
+                out[i, j] = dist_dict[i][j]
 
-
-
-
-
+    return out
 

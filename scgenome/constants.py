@@ -16,10 +16,12 @@ SIM_META = {
     "init_lambdas": object,
     "jump_lambdas": object,
     "cn_data": object,
+    "cn_mat": object,
     "plinkage": object,
     "plot_data": object,
     "clustering": object,
-    "prop_correct": np.float64
+    "prop_correct": np.float64,
+    "cell_id": str
 }
 
 # Error messages
