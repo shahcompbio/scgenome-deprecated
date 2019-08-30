@@ -1,13 +1,8 @@
-import scgenome.simulation as sim
+import scgenome.simulation.simulation as sim
 import numpy as np
-import pandas as pd
-from IPython.display import display
 from scgenome import cncluster
 from scgenome.utils import cn_mat_to_cn_data, cn_mat_as_df
-from scipy.cluster.hierarchy import dendrogram, linkage
-from matplotlib import pyplot as plt
-from unittest import TestCase, main
-from scgenome.TNode import TNode
+from unittest import TestCase
 
 
 class TestCluster(TestCase):

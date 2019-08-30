@@ -1,5 +1,4 @@
-from scgenome.simulation import many_poisson_bicluster, poisson_bicluster
-import numpy as np
+from scgenome.simulation.simulation import many_poisson_bicluster
 
 #OUTPUT_FP = "/Users/massoudmaher/data/pois_ran_walk.json"
 OUTPUT_FP = "/work/shah/maherm/100t_pois_ran_walk.json"

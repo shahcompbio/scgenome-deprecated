@@ -127,7 +127,8 @@ def plot_umap_clusters(ax, df):
         )
 
     text_labels = []
-    for cluster_id, cluster_df in df[df['cluster_id'] >= 0].groupby('cluster_id'):
+    for cluster_id, cluster_df in df[df['cluster_id'] >= 0].groupby(
+            'cluster_id'):
         ax.scatter(
             cluster_df['umap1'].values,
             cluster_df['umap2'].values,
@@ -154,17 +155,39 @@ def plot_umap_clusters(ax, df):
     seaborn.despine(ax=ax, offset=0, trim=True)
 
 
+def _resolve_inputs(cn_data, cn_mat, cell_ids, value_ids=VALUE_IDS):
+    """
+    :param cn_mat: rows are cells, columns are samples
+    """
+    if ((cn_data is None and cn_mat is None) or
+        (cn_data is not None and cn_mat is not None)):
+        raise ValueError("Only one of cn_data, cn_mat should be provided")
+    elif cn_data is not None:
+        matrix_data, measurement, cell_ids = (
+            cn_data_to_mat_data_ids(cn_data, value_ids=value_ids))
+    elif cn_mat is not None:
+        if cell_ids is None:
+            raise ValueError("cn_mat must be provided with cell_ids")
+        matrix_data = cn_data
+        measurement = matrix_data.T
+
+    return matrix_data, measurement, cell_ids
+
+
 # TODO set alpha
 # TODO save more info as needed eg. Rs of subtrees
 # TODO maybe cache values
 # TODO next_level, r are redundant
 # TODO return more stuff
-def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
+def bayesian_cluster(cn_data=None, cn_mat=None, cell_ids=None,
+                     cluster_col="bayes_cluster_id", n_states=MAX_CN,
                      alpha=ALPHA, value_ids=VALUE_IDS):
+
     matrix_data, measurement, cell_ids = (
-        cn_data_to_mat_data_ids(cn_data, value_ids=value_ids))
+        _resolve_inputs(cn_data, cn_mat, cell_ids, value_ids=value_ids))
     n_cells = measurement.shape[0]
     n_segments = measurement.shape[1]
+
     variances = get_variances(cn_data, matrix_data, n_states)
     tr_probs = get_tr_probs(n_segments, n_states)
     tr_mat = np.log(tr_probs)
@@ -173,7 +196,7 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
                 for i in range(n_cells)]
     linkage = pd.DataFrame(data=None,
                            columns=["i", "j", "r_merge", "i_count", "j_count"],
-                           index=list(range(n_cells-1)))
+                           index=list(range(n_cells - 1)))
     li = 0
     while len(clusters) > 1:
         r = np.empty((len(clusters), len(clusters)))
@@ -185,8 +208,7 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
             right_cluster = clusters[j]
             merge_cluster = TNode(
                 clusters[i].sample_inds + clusters[j].sample_inds,
-                left_cluster, right_cluster, None, None, None, None, -1, 1
-            )
+                left_cluster, right_cluster, None, None, None, None, -1, 1)
 
             pi, d = merge_cluster.get_pi_d(alpha)
             ll = merge_cluster.get_ll(measurement, variances, tr_mat)
