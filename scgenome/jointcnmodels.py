@@ -49,7 +49,10 @@ def calculate_marginal_ll_simple(data, variances, tr_mat):
         alphas,
         betas)
 
-    return scipy.special.logsumexp(alphas[-1, :])
+    result = scipy.special.logsumexp(alphas[-1, :])
+    print(f"calculate_marginal_ll_simple: {result}")
+    return result
+    #return scipy.special.logsumexp(alphas[-1, :])
 
 
 def gibbs_sample_cluster_indices(data, variances, tr_mat, assignments, max_clusters, alpha):

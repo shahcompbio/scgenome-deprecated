@@ -169,8 +169,10 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
     tr_probs = get_tr_probs(n_segments, n_states)
     tr_mat = np.log(tr_probs)
 
-    clusters = [TNode([i], None, None, 1, alpha, 1, None, i, 1)
-                for i in range(n_cells)]
+    clusters = [TNode([i], None, None, i, alpha) for i in range(n_cells)]
+    #def __init__(self, sample_inds, left_child, right_child, cluster_ind,
+    #             alpha=ALPHA, pi=None, d=None, ll=None, log_r=None,
+    #             marginal=None):
     linkage = pd.DataFrame(data=None,
                            columns=["i", "j", "r_merge", "i_count", "j_count"],
                            index=list(range(n_cells-1)))
@@ -185,10 +187,10 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
             right_cluster = clusters[j]
             merge_cluster = TNode(
                 clusters[i].sample_inds + clusters[j].sample_inds,
-                left_cluster, right_cluster, None, None, None, None, -1, 1
+                left_cluster, right_cluster, None, alpha,
             )
 
-            pi, d = merge_cluster.get_pi_d(alpha)
+            pi, d = merge_cluster.get_pi_d()
             ll = merge_cluster.get_ll(measurement, variances, tr_mat)
             r[i, j] = merge_cluster.get_log_r(measurement, variances, tr_mat)
             next_level[i][j] = merge_cluster

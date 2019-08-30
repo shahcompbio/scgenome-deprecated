@@ -9,38 +9,45 @@ import numpy as np
 class TNode:
 
     # TODO assert types
-    def __init__(self, sample_inds, left_child, right_child, pi, d, ll, log_r,
-                 cluster_ind, tree_ll):
+    def __init__(self, sample_inds, left_child, right_child, cluster_ind,
+                 alpha=ALPHA, pi=None, d=None, ll=None, log_r=None,
+                 marginal=None):
         self.sample_inds = sample_inds
         self.left_child = left_child
         self.right_child = right_child
-        self.pi = pi
-        self.d = d
-        self.ll = ll
-        self.log_r = log_r
         self.cluster_ind = cluster_ind
-        self.tree_ll = tree_ll
+        self.alpha = alpha
+        self.ll = self.get_ll()
+        self.log_r = log_r
+
+        if pi is None or d is None:
+            self.pi, self.d = self.get_pi_d()
+        else:
+            self.pi = pi
+            self.d = d
+        if marginal is None:
+            self.marginal = self.get_marginal()
+        else:
+            self.marginal = marginal
 
     def is_leaf(self):
         return (self.left_child is None and
                 self.right_child is None and
                 len(self.sample_inds) == 1)
 
-    def get_pi_d(self, alpha=ALPHA):
+    def get_pi_d(self):
         if self.left_child is None or self.right_child is None:
-            raise ValueError(NO_CHILDREN)
+            self.pi = 1
+            self.d = self.alpha
+            return self.pi, self.d
 
         n_k = len(self.left_child.sample_inds) + len(
             self.right_child.sample_inds)
         gnk = gamma(n_k)
-        self.d = alpha * gnk + self.left_child.d * self.right_child.d
-        self.pi = alpha * gnk / self.d
+        self.d = self.alpha * gnk + self.left_child.d * self.right_child.d
+        self.pi = self.alpha * gnk / self.d
 
         return self.pi, self.d
-
-    def get_tree_ll(self):
-        return (self.pi*self.ll -
-                (1-self.pi)*self.left_child.tree_ll*self.tree_ll)
 
     # TODO is weird in the case where there is only 1 sample index
     def get_ll(self, measurement, variances, tr_mat):
@@ -50,6 +57,14 @@ class TNode:
             tr_mat
         )
         return self.ll
+
+    #def get_log_marginal(self):
+    #    if len(self.sample_inds) == 1:
+    #        self.marginal = np.exp(1)
+    #    else:
+    #        self.marginal =
+
+    #    return self.marginal
 
     def get_log_r(self, measurement, variances, tr_mat):
         top = np.log(self.pi) + self.ll
