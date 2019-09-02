@@ -21,7 +21,7 @@ SIM_META = {
     "plot_data": object,
     "clustering": object,
     "prop_correct": np.float64,
-    "cell_id": str
+    "cell_id": object
 }
 
 # Error messages
