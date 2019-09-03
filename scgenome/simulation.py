@@ -243,7 +243,7 @@ def poisson_bicluster(samples_per_cluster, num_bin, max_cn, alpha, df=None,
 
 
 def get_plot_data(linkage):
-    plinkage = linkage.loc[:, ["i", "j", "r_merge", "merge_count"]]
+    plinkage = linkage.loc[:, ["i", "j", "r_merge", "merge_count", "dist_merge"]]
     plinkage["r_merge"] = plinkage["r_merge"].astype("float")
     plinkage["dist"] = -1 * plinkage["r_merge"]
     plot_data = (
