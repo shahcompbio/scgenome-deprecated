@@ -1,5 +1,6 @@
 import umap
 import hdbscan
+from scipy.spatial.distance import pdist
 import seaborn
 import pandas as pd
 import numpy as np
@@ -172,11 +173,13 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
     clusters = [TNode([i], None, None, 1, alpha, 1, None, i, 1)
                 for i in range(n_cells)]
     linkage = pd.DataFrame(data=None,
-                           columns=["i", "j", "r_merge", "i_count", "j_count"],
+                           columns=["i", "j", "r_merge", "dist_merge",
+                                    "i_count", "j_count"],
                            index=list(range(n_cells-1)))
     li = 0
     while len(clusters) > 1:
         r = np.empty((len(clusters), len(clusters)))
+        dist = np.empty((len(clusters), len(clusters)))
         r.fill(np.nan)
         next_level = [[None for i in range(len(clusters))]
                       for j in range(len(clusters))]
@@ -193,6 +196,9 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
             r[i, j] = merge_cluster.get_log_r(measurement, variances, tr_mat)
             next_level[i][j] = merge_cluster
 
+            dist[i, j] = pdist(measurement[merge_cluster.sample_inds, :],
+                               metric="cityblock").min()
+
         max_r_flat_ind = np.nanargmax(r)
         i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)
         selected_cluster = next_level[i_max][j_max]
@@ -201,6 +207,7 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
         left_ind = selected_cluster.left_child.cluster_ind
         right_ind = selected_cluster.right_child.cluster_ind
         linkage.iloc[li] = [left_ind, right_ind, r.flatten()[max_r_flat_ind],
+                            dist[i_max, j_max],
                             len(clusters[i_max].sample_inds),
                             len(clusters[j_max].sample_inds)]
 

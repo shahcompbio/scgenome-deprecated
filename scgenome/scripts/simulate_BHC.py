@@ -4,7 +4,7 @@ from treeswift.Tree import read_tree_linkage
 
 OUTPUT_FP = "/Users/massoudmaher/data/pois_ran_walk.json"
 #OUTPUT_FP = "/work/shah/maherm/100t_pois_ran_walk.json"
-TRIALS_PER_SET = 1
+TRIALS_PER_SET = 5
 SAMPLES_PER_CLUSTER = [8]
 NUM_BIN = [100, 500]
 MAX_CN = [4]
@@ -23,7 +23,7 @@ def plinkage_to_tree(plinkage):
 print("Starting simulations")
 sims = many_poisson_bicluster(TRIALS_PER_SET, SAMPLES_PER_CLUSTER, NUM_BIN,
                               MAX_CN, ALPHA, INIT_LAMBDAS, JUMP_LAMBDAS,
-                              num_cores=8)
+                              num_cores=4)
 do_naive_hc(sims, "cityblock")
 
 sims["naive_tree"] = sims["naive_linkage"].apply(read_tree_linkage)
