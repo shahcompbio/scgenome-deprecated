@@ -3,13 +3,13 @@ from scgenome.simulation import many_poisson_bicluster, do_naive_hc, \
 from treeswift.Tree import read_tree_linkage
 
 #OUTPUT_FP = "/Users/massoudmaher/data/pois_ran_walk.json"
-OUTPUT_FP = "/work/shah/maherm/tpois_ran_walk.json"
-TRIALS_PER_SET = 5
+OUTPUT_FP = "/work/shah/maherm/100t_both_cl_ran_walk.json"
+TRIALS_PER_SET = 200
 SAMPLES_PER_CLUSTER = [8]
 NUM_BIN = [100, 500]
 MAX_CN = [4]
 #ALPHA = [0.01, 0.05, 0.3, 0.6, 0.9]
-ALPHA = [0.01, 0.6, 0.9]
+ALPHA = [0.1]
 INIT_LAMBDAS = [(3, 1)]
 JUMP_LAMBDAS = [(1, 0.1)]
 
