@@ -23,6 +23,8 @@ SIM_META = {
     "prop_correct": np.float64,
     "cell_id": str
 }
+LINKAGE_COLS = ["i", "j", "r_merge", "naive_dist", "log_like",
+                "i_count", "j_count"]
 
 # Error messages
 NO_CHILDREN = "Node has no children to comptue pi, d with"

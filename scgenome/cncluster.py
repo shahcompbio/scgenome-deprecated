@@ -9,8 +9,9 @@ from adjustText import adjust_text
 from scgenome.jointcnmodels import get_variances, get_tr_probs
 from itertools import combinations
 from .TNode import TNode
-from .constants import ALPHA, MAX_CN, VALUE_IDS
+from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS
 from .utils import cn_data_to_mat_data_ids
+from scipy.spatial.distance import pdist
 
 
 def umap_hdbscan_cluster(
@@ -172,14 +173,18 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
     clusters = [TNode([i], None, None, 1, alpha, 1, None, i, 1)
                 for i in range(n_cells)]
     linkage = pd.DataFrame(data=None,
-                           columns=["i", "j", "r_merge", "i_count", "j_count"],
-                           index=list(range(n_cells-1)))
+                           #columns=["i", "j", "r_merge", "i_count", "j_count"],
+                           columns=LINKAGE_COLS,
+                           index=range(n_cells-1))
     li = 0
     while len(clusters) > 1:
         r = np.empty((len(clusters), len(clusters)))
         r.fill(np.nan)
         next_level = [[None for i in range(len(clusters))]
                       for j in range(len(clusters))]
+        naive_dist = np.empty((len(clusters), len(clusters)))
+        log_like = np.empty((len(clusters), len(clusters)))
+
         for i, j in combinations(range(len(clusters)), 2):
             left_cluster = clusters[i]
             right_cluster = clusters[j]
@@ -190,8 +195,11 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
 
             pi, d = merge_cluster.get_pi_d(alpha)
             ll = merge_cluster.get_ll(measurement, variances, tr_mat)
+            tree_ll = merge_cluster.get_tree_ll()
             r[i, j] = merge_cluster.get_log_r(measurement, variances, tr_mat)
             next_level[i][j] = merge_cluster
+
+            naive_dist[i, j] = pdist(measurement[merge_cluster.sample_inds, :]).min()
 
         max_r_flat_ind = np.nanargmax(r)
         i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)
@@ -201,6 +209,7 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
         left_ind = selected_cluster.left_child.cluster_ind
         right_ind = selected_cluster.right_child.cluster_ind
         linkage.iloc[li] = [left_ind, right_ind, r.flatten()[max_r_flat_ind],
+                            naive_dist[i_max, j_max], selected_cluster.ll,
                             len(clusters[i_max].sample_inds),
                             len(clusters[j_max].sample_inds)]
 
