@@ -10,7 +10,7 @@ from adjustText import adjust_text
 from scgenome.jointcnmodels import get_variances, get_tr_probs
 from itertools import combinations
 from .TNode import TNode
-from .constants import ALPHA, MAX_CN, VALUE_IDS
+from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS
 from .utils import cn_data_to_mat_data_ids
 
 
@@ -160,8 +160,14 @@ def plot_umap_clusters(ax, df):
 # TODO maybe cache values
 # TODO next_level, r are redundant
 # TODO return more stuff
-def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
-                     alpha=ALPHA, value_ids=VALUE_IDS):
+#def bayesian_cluster(cn_data=None, cn_mat=None, cell_ids=None,
+#                     n_states=MAX_CN, alpha=ALPHA, value_ids=VALUE_IDS):
+#    # TODO matrix_data needa nother dim in case of cn_mat
+#    matrix_data, measurement, cell_ids = (
+#        _resolve_inputs(cn_data, cn_mat, cell_ids, value_ids))
+def bayesian_cluster(cn_data,
+                     n_states=MAX_CN, alpha=ALPHA, value_ids=VALUE_IDS):
+    # TODO matrix_data needa nother dim in case of cn_mat
     matrix_data, measurement, cell_ids = (
         cn_data_to_mat_data_ids(cn_data, value_ids=value_ids))
     n_cells = measurement.shape[0]
@@ -172,10 +178,8 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
 
     clusters = [TNode([i], None, None, 1, alpha, 1, None, i, 1)
                 for i in range(n_cells)]
-    linkage = pd.DataFrame(data=None,
-                           columns=["i", "j", "r_merge", "dist_merge",
-                                    "i_count", "j_count"],
-                           index=list(range(n_cells-1)))
+    linkage = pd.DataFrame(data=None, columns=LINKAGE_COLS,
+                           index=range(n_cells-1))
     li = 0
     while len(clusters) > 1:
         r = np.empty((len(clusters), len(clusters)))
@@ -193,11 +197,11 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
 
             pi, d = merge_cluster.get_pi_d(alpha)
             ll = merge_cluster.get_ll(measurement, variances, tr_mat)
+            tree_ll = merge_cluster.get_tree_ll()
             r[i, j] = merge_cluster.get_log_r(measurement, variances, tr_mat)
             next_level[i][j] = merge_cluster
 
-            dist[i, j] = pdist(measurement[merge_cluster.sample_inds, :],
-                               metric="cityblock").min()
+            dist[i, j] = pdist(measurement[merge_cluster.sample_inds, :]).min()
 
         max_r_flat_ind = np.nanargmax(r)
         i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)
@@ -207,7 +211,7 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
         left_ind = selected_cluster.left_child.cluster_ind
         right_ind = selected_cluster.right_child.cluster_ind
         linkage.iloc[li] = [left_ind, right_ind, r.flatten()[max_r_flat_ind],
-                            dist[i_max, j_max],
+                            dist[i_max, j_max], selected_cluster.ll,
                             len(clusters[i_max].sample_inds),
                             len(clusters[j_max].sample_inds)]
 
@@ -217,3 +221,22 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
 
     linkage["merge_count"] = linkage["i_count"] + linkage["j_count"]
     return linkage, clusters[0], cell_ids
+
+
+def _resolve_inputs(cn_data, cn_mat, cell_ids, value_ids=VALUE_IDS):
+    """
+    :param cn_mat: rows are cells, columns are samples
+    """
+    if ((cn_data is None and cn_mat is None) or
+        (cn_data is not None and cn_mat is not None)):
+        raise ValueError("Only one of cn_data, cn_mat should be provided")
+    elif cn_data is not None:
+        matrix_data, measurement, cell_ids = (
+            cn_data_to_mat_data_ids(cn_data, value_ids=value_ids))
+    elif cn_mat is not None:
+        if cell_ids is None:
+            raise ValueError("cn_mat must be provided with cell_ids")
+        matrix_data = cn_mat
+        measurement = matrix_data.T
+
+    return matrix_data, measurement, cell_ids

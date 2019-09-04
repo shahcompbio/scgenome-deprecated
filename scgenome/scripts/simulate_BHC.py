@@ -1,12 +1,14 @@
 from scgenome.simulation import many_poisson_bicluster, do_naive_hc, \
     pairwise_distance
 from treeswift.Tree import read_tree_linkage
+import pandas as pd
 
-OUTPUT_FP = "/Users/massoudmaher/data/100t_both_dist_pois_ran_walk.json"
+OUTPUT_FP = "/Users/massoudmaher/data/100t_tree_ll_pois_ran_walk.json"
+#OUTPUT_FP = "/Users/massoudmaher/data/test_pois_ran_walk.json"
 #OUTPUT_FP = "/work/shah/maherm/100t_pois_ran_walk.json"
 TRIALS_PER_SET = 100
 SAMPLES_PER_CLUSTER = [8]
-NUM_BIN = [500]
+NUM_BIN = [300]
 MAX_CN = [4]
 #ALPHA = [0.01, 0.05, 0.3, 0.6, 0.9]
 ALPHA = [0.01]

@@ -151,24 +151,6 @@ def check_sum_valid(a):
     sum1 = np.sum(a, 1) == 1
     return np.all(sum0) and np.all(sum1)
 
-def cn_mat_as_list(mat, chr_names):
-    """
-    Converts a sample x bin CN profile matrix to a pandas DataFrame to be
-    plotted by scgenome.cnplot.plot_cell_cn_profile function in scgenome repo
-    """
-    column_names = ["chr", "start", "end", "copy1", "copy2"]
-    df = cn_mat_as_df(mat, chr_names)
-    melted = pd.melt(df, var_name="chr_bin", value_name="copy")
-    chr_bin = melted["chr_bin"].str.split("_", expand=True)
-    melted["chr"] = chr_bin[0]
-    melted["bin"] = chr_bin[1]
-
-    melted["cell_id"] = np.repeat(list(range(mat.shape[0])), mat.shape[1])
-    melted = melted.drop("chr_bin", axis=1)
-    melted = melted[["chr", "bin", "cell_id", "copy"]]
-    return melted
-
-
 def get_prop_correct(clustering):
     return max((clustering["exp_cl"] == clustering["obs_cl"]).value_counts() /
                clustering.shape[0])
@@ -243,7 +225,9 @@ def poisson_bicluster(samples_per_cluster, num_bin, max_cn, alpha, df=None,
 
 
 def get_plot_data(linkage):
-    plinkage = linkage.loc[:, ["i", "j", "r_merge", "merge_count", "dist_merge"]]
+    # TODO this is too heavily coupled
+    plinkage = linkage.loc[:, ["i", "j", "r_merge", "merge_count",
+                               "dist_merge", "log_likelihood"]]
     plinkage["r_merge"] = plinkage["r_merge"].astype("float")
     plinkage["dist"] = -1 * plinkage["r_merge"]
     plot_data = (

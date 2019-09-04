@@ -104,6 +104,7 @@ def cn_data_to_mat_data_ids(cn_data, data_id=CN_DATA_ID, cell_id=CELL_ID,
 
 def cn_mat_to_cn_data(cn_mat, cell_id_vals=None, cell_id=CELL_ID,
                       value_id=COPY_ID):
+    # TODO this should only be called on results of cn_mat_as_df
     if cell_id_vals is None and cell_id not in cn_mat.columns:
         cell_id_vals = [f"cell{i}" for i in range(cn_mat.shape[0])]
 
@@ -156,6 +157,3 @@ def get_leaves(node, leaves=None):
         leaves = leaves + get_leaves(node.get_left())
         leaves = leaves + get_leaves(node.get_right())
         return leaves
-
-def leaf_distance(a, b):
-    """Given two """

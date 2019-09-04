@@ -92,6 +92,7 @@ def get_variances(cn_data, matrix_data, n_states=MAX_CN):
     variances = cell_state_var.set_index(['state', 'cell_id'])[
         'copy_var'].unstack()
     #variances = variances.reindex(columns=matrix_data['reads'].columns,
+    print(matrix_data.shape)
     variances = variances.reindex(columns=matrix_data['copy'].columns,
                                   index=range(n_states)).fillna(0.05).T
     variances = variances.values

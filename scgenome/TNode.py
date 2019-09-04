@@ -39,10 +39,16 @@ class TNode:
         return self.pi, self.d
 
     def get_tree_ll(self):
-        return (self.pi*self.ll -
-                (1-self.pi)*self.left_child.tree_ll*self.tree_ll)
+        # TODO this should be named update, not get
+        # TODO refactor so these are called in init and theres base cases
+        if len(self.sample_inds) == 1:
+            self.tree_ll = self.ll
+        first = np.log(self.pi) + self.ll
+        second = np.log(1-self.pi) + self.left_child.tree_ll + \
+                 self.right_child.tree_ll
+        self.tree_ll = logsumexp([first, second])
+        return self.tree_ll
 
-    # TODO is weird in the case where there is only 1 sample index
     def get_ll(self, measurement, variances, tr_mat):
         self.ll = calculate_marginal_ll_simple(
             measurement[self.sample_inds, :],
@@ -54,7 +60,8 @@ class TNode:
     def get_log_r(self, measurement, variances, tr_mat):
         top = np.log(self.pi) + self.ll
         bottom = logsumexp([np.log(self.pi) + self.ll,
-            np.log(1 - self.pi) + self.left_child.ll + self.right_child.ll])
+            np.log(1 - self.pi) +
+            self.left_child.tree_ll + self.right_child.tree_ll])
         self.r = top - bottom
         return self.r
 
