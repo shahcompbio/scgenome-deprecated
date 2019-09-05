@@ -82,7 +82,7 @@ prompt-toolkit==1.0.15
 ptyprocess==0.6.0
 pyasn1==0.4.5
 pycparser==2.19
--e git+git@bitbucket.org:dranew/dollo.git@b169b2a8f6ea00c2522881afe0a7dc58a1755504#egg=PyDollo
+-e git+https://bitbucket.org/dranew/dollo.git@b169b2a8f6ea00c2522881afe0a7dc58a1755504#egg=PyDollo
 Pygments==2.2.0
 PyJWT==1.7.1
 pylint==2.3.1
@@ -104,7 +104,7 @@ seaborn==0.9.0
 Send2Trash==1.5.0
 simplegeneric==0.8.1
 singledispatch==3.4.0.3
--e git+git@github.com:shahcompbio/sisyphus.git@711c9ae404abe1e46b5a4b4dd1b9431757a1f029#egg=sisyphus
+-e git+https://github.com/shahcompbio/sisyphus.git@711c9ae404abe1e46b5a4b4dd1b9431757a1f029#egg=sisyphus
 six==1.11.0
 subprocess32==3.5.3
 terminado==0.8.1
@@ -119,6 +119,6 @@ urllib3==1.24.1
 wcwidth==0.1.7
 webencodings==0.5.1
 websocket-client==0.56.0
--e git+git@bitbucket.org:dranew/wgs_analysis.git@b736ac0de7d10a34ce2ffc8f1e3b86c865239258#egg=wgs_analysis
+-e git+https://bitbucket.org/dranew/wgs_analysis.git@b736ac0de7d10a34ce2ffc8f1e3b86c865239258#egg=wgs_analysis
 widgetsnbextension==3.4.2
 wrapt==1.11.1
