@@ -1,4 +1,3 @@
-import numpy as np
 from scgenome import cncluster
 from scgenome.utils import cn_mat_to_cn_data, cn_mat_as_df
 from unittest import TestCase, main

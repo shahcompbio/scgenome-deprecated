@@ -170,10 +170,11 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
     tr_probs = get_tr_probs(n_segments, n_states)
     tr_mat = np.log(tr_probs)
 
-    clusters = [TNode([i], None, None, 1, alpha, 1, None, i, 1)
-                for i in range(n_cells)]
+    # (sample_inds, left_child, right_child, cluster_ind, pi, d, ll)
+    clusters = [TNode([i], None, None, i, 1, alpha, 1) for i in range(n_cells)]
+    [node.update_tree_ll(measurement, variances, tr_mat) for node in clusters]
+
     linkage = pd.DataFrame(data=None,
-                           #columns=["i", "j", "r_merge", "i_count", "j_count"],
                            columns=LINKAGE_COLS,
                            index=range(n_cells-1))
     li = 0
@@ -187,18 +188,20 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
         for i, j in combinations(range(len(clusters)), 2):
             left_cluster = clusters[i]
             right_cluster = clusters[j]
+            # (sample_inds, left_child, right_child, cluster_ind)
             merge_cluster = TNode(
                 clusters[i].sample_inds + clusters[j].sample_inds,
-                left_cluster, right_cluster, None, None, None, None, -1, 1
-            )
+                left_cluster, right_cluster, -1)
+            merge_cluster.update_vars(measurement, variances, tr_mat, alpha)
 
-            pi, d = merge_cluster.get_pi_d(alpha)
-            ll = merge_cluster.get_ll(measurement, variances, tr_mat)
-            tree_ll = merge_cluster.get_tree_ll()
-            r[i, j] = merge_cluster.get_log_r(measurement, variances, tr_mat)
+            #pi, d = merge_cluster.get_pi_d(alpha)
+            #ll = merge_cluster.get_ll(measurement, variances, tr_mat)
+            #tree_ll = merge_cluster.get_tree_ll()
+            r[i, j] = merge_cluster.log_r
             next_level[i][j] = merge_cluster
 
-            naive_dist[i, j] = pdist(measurement[merge_cluster.sample_inds, :]).min()
+            naive_dist[i, j] = (
+                pdist(measurement[merge_cluster.sample_inds, :]).min())
 
         max_r_flat_ind = np.nanargmax(r)
         i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)

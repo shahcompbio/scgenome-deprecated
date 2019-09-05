@@ -4,9 +4,9 @@ from treeswift.Tree import read_tree_linkage
 
 OUTPUT_FP = "/Users/massoudmaher/data/tpois_ran_walk.json"
 #OUTPUT_FP = "/work/shah/maherm/100t_pois_ran_walk.json"
-TRIALS_PER_SET = 2
+TRIALS_PER_SET = 100
 SAMPLES_PER_CLUSTER = [8]
-NUM_BIN = [300]
+NUM_BIN = [500]
 MAX_CN = [4]
 #ALPHA = [0.01, 0.05, 0.3, 0.6, 0.9]
 ALPHA = [0.01]
