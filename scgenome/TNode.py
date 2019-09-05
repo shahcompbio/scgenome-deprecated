@@ -30,8 +30,8 @@ class TNode:
         if self.left_child is None or self.right_child is None:
             raise ValueError(NO_CHILDREN)
 
-        n_k = len(self.left_child.sample_inds) + len(
-            self.right_child.sample_inds)
+        n_k = len(self.left_child.sample_inds) + \
+              len(self.right_child.sample_inds)
         gnk = gamma(n_k)
         self.d = alpha * gnk + self.left_child.d * self.right_child.d
         self.pi = alpha * gnk / self.d
