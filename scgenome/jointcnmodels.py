@@ -1,5 +1,6 @@
 import numpy as np
 from remixt.bpmodel import sum_product
+from remixt.bpmodel import sum_product_2paramtrans
 import scipy
 
 
@@ -35,22 +36,36 @@ def calculate_ll_normal_simple(data, variances):
     return ll
 
 
-def calculate_marginal_ll_simple(data, variances, tr_mat):
+def calculate_marginal_ll_simple(data, variances, transmodel):
     framelogprob = calculate_ll_normal_simple(data, variances).sum(axis=0)
 
     alphas = np.zeros(framelogprob.shape)
     betas = np.zeros(framelogprob.shape)
 
-    sum_product(
-        framelogprob,
-        tr_mat,
-        alphas,
-        betas)
+    if transmodel['kind'] == 'twoparam':
+        sum_product_2paramtrans(
+            framelogprob,
+            alphas,
+            betas,
+            transmodel['e0'],
+            transmodel['e1'],
+        )
+
+    elif transmodel['kind'] == 'full':
+        sum_product(
+            framelogprob,
+            transmodel['tr_mat'],
+            alphas,
+            betas,
+        )
+
+    else:
+        raise ValueError("unknown transition model {transmodel['kind']}")
 
     return scipy.special.logsumexp(alphas[-1, :])
 
 
-def gibbs_sample_cluster_indices(data, variances, tr_mat, assignments, max_clusters, alpha):
+def gibbs_sample_cluster_indices(data, variances, assignments, max_clusters, alpha, transmodel):
     n_cells = data.shape[0]
 
     for cell_idx in range(n_cells):
@@ -60,14 +75,14 @@ def gibbs_sample_cluster_indices(data, variances, tr_mat, assignments, max_clust
             assignments[cell_idx] = cluster_idx
             log_marginal_with = calculate_marginal_ll_simple(
                 data[assignments == cluster_idx, :],
-                variances[assignments == cluster_idx, :],
-                tr_mat)
+                  variances[assignments == cluster_idx, :],
+                transmodel)
 
             assignments[cell_idx] = -1
             log_marginal_without = calculate_marginal_ll_simple(
                 data[assignments == cluster_idx, :],
                 variances[assignments == cluster_idx, :],
-                tr_mat)
+                transmodel)
 
             log_posterior_predictive = log_marginal_with - log_marginal_without
             num_cluster = np.sum(assignments[cell_idx] == cluster_idx)
