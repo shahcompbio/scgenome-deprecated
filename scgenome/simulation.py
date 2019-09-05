@@ -248,6 +248,7 @@ def get_plot_data(plinkage):
     plinkage["dist"] = -1 * plinkage["r_merge"]
     plot_data = (
         plinkage[["i", "j", "dist", "merge_count"]].to_numpy().astype("float"))
+    # TODO only return 1
     return plinkage, plot_data
 
 def many_poisson_bicluster(trials_per_set, samples_per_cluster, num_bin,
