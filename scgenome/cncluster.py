@@ -176,9 +176,6 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
                            #columns=["i", "j", "r_merge", "i_count", "j_count"],
                            columns=LINKAGE_COLS,
                            index=range(n_cells-1))
-    mega_linkage = pd.DataFrame(data=None,
-                                columns=["variable", "i", "j", "value",
-                                         "cluster_size", "i_max", "j_max"])
     li = 0
     while len(clusters) > 1:
         r = np.empty((len(clusters), len(clusters)))
@@ -186,13 +183,6 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
         next_level = [[None for i in range(len(clusters))]
                       for j in range(len(clusters))]
         naive_dist = np.empty((len(clusters), len(clusters)))
-        log_like = np.empty((len(clusters), len(clusters)))
-
-        pw_keys = ["r_merge", "ll", "tree_ll"]
-        all_linkage = pd.concat(
-            [pd.DataFrame(data=np.empty((len(clusters), len(clusters))))
-             for i in range(len(pw_keys))],
-            keys=pw_keys)
 
         for i, j in combinations(range(len(clusters)), 2):
             left_cluster = clusters[i]
@@ -209,9 +199,6 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
             next_level[i][j] = merge_cluster
 
             naive_dist[i, j] = pdist(measurement[merge_cluster.sample_inds, :]).min()
-            all_linkage.xs("r_merge").iloc[i, j] = r[i, j]
-            all_linkage.xs("ll").iloc[i, j] = ll
-            all_linkage.xs("tree_ll").iloc[i, j] = tree_ll
 
         max_r_flat_ind = np.nanargmax(r)
         i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)
@@ -225,16 +212,10 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
                             len(clusters[i_max].sample_inds),
                             len(clusters[j_max].sample_inds)]
 
-        all_linkage = all_linkage.stack().reset_index()
-        all_linkage.columns = ["variable", "i", "j", "value"]
-        all_linkage["cluster_size"] = len(selected_cluster.sample_inds)
-        all_linkage["i_max"] = i_max
-        all_linkage["j_max"] = j_max
-        mega_linkage = mega_linkage.append(all_linkage)
 
         li += 1
         clusters[i_max] = selected_cluster
         del clusters[j_max]
 
     linkage["merge_count"] = linkage["i_count"] + linkage["j_count"]
-    return linkage, clusters[0], cell_ids, mega_linkage
+    return linkage, clusters[0], cell_ids
