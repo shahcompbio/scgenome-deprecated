@@ -2,10 +2,8 @@ import scgenome.simulation as sim
 import numpy as np
 from scgenome import cncluster
 from scgenome.utils import cn_mat_to_cn_data, cn_mat_as_df
-from scipy.cluster.hierarchy import dendrogram, linkage
-from matplotlib import pyplot as plt
 
-NUM_SAMPLE = 4
+NUM_SAMPLE = 20
 NUM_BIN = 6000
 CHR_NAMES = ["1", "2"]
 max_cn = 7

@@ -183,6 +183,7 @@ def bayesian_cluster(cn_data, n_states=MAX_CN, alpha=ALPHA,
                            index=range(n_cells-1))
     li = 0
     # TODO can stop at 2 and merge the last 2 if it saves time
+    cluster_map = set()
     while len(clusters) > 1:
         r = np.empty((len(clusters), len(clusters)))
         r.fill(np.nan)
@@ -193,12 +194,14 @@ def bayesian_cluster(cn_data, n_states=MAX_CN, alpha=ALPHA,
         for i, j in combinations(range(len(clusters)), 2):
             left_cluster = clusters[i]
             right_cluster = clusters[j]
+
             # (sample_inds, left_child, right_child, cluster_ind)
-            merge_cluster = TNode(
-                clusters[i].sample_inds + clusters[j].sample_inds,
-                left_cluster, right_cluster, -1)
-            merge_cluster.update_vars(measurement, variances, transmodel,
-                                      alpha)
+            merge_inds = clusters[i].sample_inds + clusters[j].sample_inds
+            merge_cluster = TNode(merge_inds, left_cluster, right_cluster, -1)
+            if str(merge_inds) not in cluster_map:
+                merge_cluster.update_vars(measurement, variances, transmodel,
+                                          alpha)
+                cluster_map.add(str(merge_inds))
 
             r[i, j] = merge_cluster.log_r
             next_level[i][j] = merge_cluster
@@ -222,6 +225,7 @@ def bayesian_cluster(cn_data, n_states=MAX_CN, alpha=ALPHA,
         li += 1
         clusters[i_max] = selected_cluster
         del clusters[j_max]
+        cluster_map.remove(str(selected_cluster.sample_inds))
 
     linkage["merge_count"] = linkage["i_count"] + linkage["j_count"]
     return linkage, clusters[0], cell_ids
