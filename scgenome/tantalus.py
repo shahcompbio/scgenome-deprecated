@@ -2,7 +2,7 @@ import sys
 import logging
 import dbclients
 import scgenome.utils
-from cnv_cluster.constants import LOGGING_FORMAT, CACHE_DIR
+from scgenome.constants import LOGGING_FORMAT, CACHE_DIR
 import os
 
 from scgenome.loaders.qc import load_cached_qc_data

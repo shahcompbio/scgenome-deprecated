@@ -182,6 +182,7 @@ def bayesian_cluster(cn_data, n_states=MAX_CN, alpha=ALPHA,
                            columns=LINKAGE_COLS,
                            index=range(n_cells-1))
     li = 0
+    # TODO can stop at 2 and merge the last 2 if it saves time
     while len(clusters) > 1:
         r = np.empty((len(clusters), len(clusters)))
         r.fill(np.nan)
