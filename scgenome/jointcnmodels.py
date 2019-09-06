@@ -3,6 +3,8 @@ from remixt.bpmodel import sum_product
 from remixt.bpmodel import sum_product_2paramtrans
 import scipy
 
+from scgenome.constants import MAX_CN
+
 
 def calculate_ll_normal_simple(data, variances):
     """ Calculate likelihood per state per segment
@@ -14,7 +16,6 @@ def calculate_ll_normal_simple(data, variances):
     Returns:
         log likelihood: (n_cells, n_segments, n_states)
     """
-
     n_cells = data.shape[0]
     n_segments = data.shape[1]
     n_states = variances.shape[1]
@@ -24,7 +25,7 @@ def calculate_ll_normal_simple(data, variances):
 
     # Calculate mean
     mean = states
-    
+
     # Normal dist log likelihood
     ll = (
         -0.5 * np.log(2. * np.pi)
@@ -99,3 +100,22 @@ def gibbs_sample_cluster_indices(data, variances, assignments, max_clusters, alp
     return assignments
 
 
+def get_variances(cn_data, matrix_data, n_states=MAX_CN):
+    cell_state_var = cn_data[['cell_id', 'state', 'copy']].dropna().groupby(
+        ['cell_id', 'state'])['copy'].var().rename('copy_var').reset_index()
+    variances = cell_state_var.set_index(['state', 'cell_id'])[
+        'copy_var'].unstack()
+    #variances = variances.reindex(columns=matrix_data['reads'].columns,
+    variances = variances.reindex(columns=matrix_data['copy'].columns,
+                                  index=range(n_states)).fillna(0.05).T
+    variances = variances.values
+    variances[variances < 0.001] = 0.001
+    return variances
+
+
+def get_tr_probs(n_segments, n_states=MAX_CN):
+    tr_probs = np.zeros((n_segments, n_states, n_states))
+    tr_probs[:] += 1.
+    tr_probs[:, range(n_states), range(n_states)] += 100.
+    tr_probs /= tr_probs.sum(axis=2)[:, :, np.newaxis]
+    return tr_probs

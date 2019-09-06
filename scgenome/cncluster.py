@@ -6,6 +6,12 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from adjustText import adjust_text
+from scgenome.jointcnmodels import get_variances, get_tr_probs
+from itertools import combinations
+from .TNode import TNode
+from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS
+from .utils import cn_data_to_mat_data_ids
+from scipy.spatial.distance import pdist
 
 
 def umap_hdbscan_cluster(
@@ -147,3 +153,69 @@ def plot_umap_clusters(ax, df):
     ax.set_xlabel('Comp. 1')
     ax.set_ylabel('Comp. 2')
     seaborn.despine(ax=ax, offset=0, trim=True)
+
+
+# TODO set alpha
+# TODO save more info as needed eg. Rs of subtrees
+# TODO maybe cache values
+# TODO next_level, r are redundant
+# TODO return more stuff
+def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
+                     alpha=ALPHA, value_ids=VALUE_IDS):
+    matrix_data, measurement, cell_ids = (
+        cn_data_to_mat_data_ids(cn_data, value_ids=value_ids))
+    n_cells = measurement.shape[0]
+    n_segments = measurement.shape[1]
+    variances = get_variances(cn_data, matrix_data, n_states)
+    tr_probs = get_tr_probs(n_segments, n_states)
+    tr_mat = np.log(tr_probs)
+
+    # (sample_inds, left_child, right_child, cluster_ind, pi, d, ll)
+    clusters = [TNode([i], None, None, i, 1, alpha, 1) for i in range(n_cells)]
+    [node.update_tree_ll(measurement, variances, tr_mat) for node in clusters]
+
+    linkage = pd.DataFrame(data=None,
+                           columns=LINKAGE_COLS,
+                           index=range(n_cells-1))
+    li = 0
+    while len(clusters) > 1:
+        r = np.empty((len(clusters), len(clusters)))
+        r.fill(np.nan)
+        next_level = [[None for i in range(len(clusters))]
+                      for j in range(len(clusters))]
+        naive_dist = np.empty((len(clusters), len(clusters)))
+
+        for i, j in combinations(range(len(clusters)), 2):
+            left_cluster = clusters[i]
+            right_cluster = clusters[j]
+            # (sample_inds, left_child, right_child, cluster_ind)
+            merge_cluster = TNode(
+                clusters[i].sample_inds + clusters[j].sample_inds,
+                left_cluster, right_cluster, -1)
+            merge_cluster.update_vars(measurement, variances, tr_mat, alpha)
+
+            r[i, j] = merge_cluster.log_r
+            next_level[i][j] = merge_cluster
+
+            naive_dist[i, j] = (
+                pdist(measurement[merge_cluster.sample_inds, :]).min())
+
+        max_r_flat_ind = np.nanargmax(r)
+        i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)
+        selected_cluster = next_level[i_max][j_max]
+
+        selected_cluster.cluster_ind = n_cells + li
+        left_ind = selected_cluster.left_child.cluster_ind
+        right_ind = selected_cluster.right_child.cluster_ind
+        linkage.iloc[li] = [left_ind, right_ind, r.flatten()[max_r_flat_ind],
+                            naive_dist[i_max, j_max], selected_cluster.ll,
+                            len(clusters[i_max].sample_inds),
+                            len(clusters[j_max].sample_inds)]
+
+
+        li += 1
+        clusters[i_max] = selected_cluster
+        del clusters[j_max]
+
+    linkage["merge_count"] = linkage["i_count"] + linkage["j_count"]
+    return linkage, clusters[0], cell_ids
