@@ -21,8 +21,10 @@ SIM_META = {
     "plot_data": object,
     "clustering": object,
     "prop_correct": np.float64,
-    "cell_id": object
+    "cell_id": str
 }
+LINKAGE_COLS = ["i", "j", "r_merge", "naive_dist", "log_like",
+                "i_count", "j_count"]
 
 # Error messages
 NO_CHILDREN = "Node has no children to comptue pi, d with"
