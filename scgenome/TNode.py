@@ -77,49 +77,6 @@ class TNode:
                             self.right_child.tree_ll])
         self.log_r = top - bottom
 
-    #def get_pi_d(self, alpha=ALPHA):
-    #    if self.left_child is None or self.right_child is None:
-    #        raise ValueError(NO_CHILDREN)
-
-    #    n_k = len(self.left_child.sample_inds) + \
-    #          len(self.right_child.sample_inds)
-    #    gnk = gamma(n_k)
-    #    self.d = alpha * gnk + self.left_child.d * self.right_child.d
-    #    self.pi = alpha * gnk / self.d
-
-    #    return self.pi, self.d
-
-    #def get_tree_ll(self, measurement, variances, tr_mat):
-    #    # TODO this should be named update, not get
-    #    # TODO refactor so these are called in init and theres base cases
-    #    if len(self.sample_inds) == 1:
-    #        self.tree_ll = calculate_marginal_ll_simple(
-    #            measurement[self.sample_inds, :],
-    #            variances[self.sample_inds, :],
-    #            tr_mat)
-
-    #    first = np.log(self.pi) + self.ll
-    #    second = np.log(1 - self.pi) + self.left_child.tree_ll + \
-    #             self.right_child.tree_ll
-    #    self.tree_ll = logsumexp([first, second])
-    #    return self.tree_ll
-
-    #def get_ll(self, measurement, variances, tr_mat):
-    #    self.ll = calculate_marginal_ll_simple(
-    #        measurement[self.sample_inds, :],
-    #        variances[self.sample_inds, :],
-    #        tr_mat
-    #    )
-    #    return self.ll
-
-    #def get_log_r(self, measurement, variances, tr_mat):
-    #    top = np.log(self.pi) + self.ll
-    #    bottom = logsumexp([np.log(self.pi) + self.ll,
-    #        np.log(1 - self.pi) +
-    #        self.left_child.tree_ll + self.right_child.tree_ll])
-    #    self.r = top - bottom
-    #    return self.r
-
     def get_leaves(self, leaves=None):
         if leaves is None:
             leaves = []

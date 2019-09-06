@@ -194,9 +194,6 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
                 left_cluster, right_cluster, -1)
             merge_cluster.update_vars(measurement, variances, tr_mat, alpha)
 
-            #pi, d = merge_cluster.get_pi_d(alpha)
-            #ll = merge_cluster.get_ll(measurement, variances, tr_mat)
-            #tree_ll = merge_cluster.get_tree_ll()
             r[i, j] = merge_cluster.log_r
             next_level[i][j] = merge_cluster
 
