@@ -160,19 +160,23 @@ def plot_umap_clusters(ax, df):
 # TODO maybe cache values
 # TODO next_level, r are redundant
 # TODO return more stuff
-def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
-                     alpha=ALPHA, value_ids=VALUE_IDS):
+def bayesian_cluster(cn_data, n_states=MAX_CN, alpha=ALPHA,
+                     prob_cn_change=0.8, value_ids=VALUE_IDS):
     matrix_data, measurement, cell_ids = (
         cn_data_to_mat_data_ids(cn_data, value_ids=value_ids))
     n_cells = measurement.shape[0]
     n_segments = measurement.shape[1]
     variances = get_variances(cn_data, matrix_data, n_states)
-    tr_probs = get_tr_probs(n_segments, n_states)
-    tr_mat = np.log(tr_probs)
+
+    transmodel = {"kind": "twoparam", "e0": prob_cn_change,
+                  "e1": 1-prob_cn_change}
+    #tr_probs = get_tr_probs(n_segments, n_states)
+    #tr_mat = np.log(tr_probs)
 
     # (sample_inds, left_child, right_child, cluster_ind, pi, d, ll)
     clusters = [TNode([i], None, None, i, 1, alpha, 1) for i in range(n_cells)]
-    [node.update_tree_ll(measurement, variances, tr_mat) for node in clusters]
+    [node.update_tree_ll(measurement, variances, transmodel)
+     for node in clusters]
 
     linkage = pd.DataFrame(data=None,
                            columns=LINKAGE_COLS,
@@ -192,7 +196,8 @@ def bayesian_cluster(cn_data, cluster_col="bayes_cluster_id", n_states=MAX_CN,
             merge_cluster = TNode(
                 clusters[i].sample_inds + clusters[j].sample_inds,
                 left_cluster, right_cluster, -1)
-            merge_cluster.update_vars(measurement, variances, tr_mat, alpha)
+            merge_cluster.update_vars(measurement, variances, transmodel,
+                                      alpha)
 
             r[i, j] = merge_cluster.log_r
             next_level[i][j] = merge_cluster

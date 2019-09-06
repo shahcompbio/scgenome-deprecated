@@ -28,10 +28,10 @@ class TNode:
                 self.right_child is None and
                 len(self.sample_inds) == 1)
 
-    def update_vars(self, measurement, variances, tr_mat, alpha=ALPHA):
+    def update_vars(self, measurement, variances, transmodel, alpha=ALPHA):
         self.update_pi_d(alpha)
-        self.update_ll(measurement, variances, tr_mat)
-        self.update_tree_ll(measurement, variances, tr_mat)
+        self.update_ll(measurement, variances, transmodel)
+        self.update_tree_ll(measurement, variances, transmodel)
         self.update_log_r()
 
     def update_pi_d(self, alpha=ALPHA):
@@ -45,29 +45,26 @@ class TNode:
             self.d = alpha * gnk + self.left_child.d * self.right_child.d
             self.pi = alpha * gnk / self.d
 
-    def update_tree_ll(self, measurement, variances, tr_mat):
+    def update_tree_ll(self, measurement, variances, transmodel):
         # TODO this should be named update, not get
         # TODO refactor so these are called in init and theres base cases
         if len(self.sample_inds) == 1:
             self.tree_ll = calculate_marginal_ll_simple(
                 measurement[self.sample_inds, :],
-                variances[self.sample_inds, :],
-                tr_mat)
+                variances[self.sample_inds, :], transmodel)
         else:
             first = np.log(self.pi) + self.ll
             second = (np.log(1 - self.pi) + self.left_child.tree_ll +
                       self.right_child.tree_ll)
             self.tree_ll = logsumexp([first, second])
 
-    def update_ll(self, measurement, variances, tr_mat):
+    def update_ll(self, measurement, variances, transmodel):
         if self.is_leaf():
             self.ll = 1
         else:
             self.ll = calculate_marginal_ll_simple(
                 measurement[self.sample_inds, :],
-                variances[self.sample_inds, :],
-                tr_mat
-            )
+                variances[self.sample_inds, :], transmodel)
 
     def update_log_r(self):
         top = np.log(self.pi) + self.ll
