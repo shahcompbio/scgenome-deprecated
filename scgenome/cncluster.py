@@ -162,6 +162,7 @@ def plot_umap_clusters(ax, df):
 # TODO return more stuff
 def bayesian_cluster(cn_data, n_states=MAX_CN, alpha=ALPHA,
                      prob_cn_change=0.8, value_ids=VALUE_IDS):
+    # TODO return measurement or allow calling of this function on measurement
     matrix_data, measurement, cell_ids = (
         cn_data_to_mat_data_ids(cn_data, value_ids=value_ids))
     n_cells = measurement.shape[0]
@@ -220,6 +221,7 @@ def bayesian_cluster(cn_data, n_states=MAX_CN, alpha=ALPHA,
         right_ind = selected_cluster.right_child.cluster_ind
         linkage.iloc[li] = [left_ind, right_ind, r.flatten()[max_r_flat_ind],
                             naive_dist[i_max, j_max], selected_cluster.ll,
+
                             len(clusters[i_max].sample_inds),
                             len(clusters[j_max].sample_inds)]
 
