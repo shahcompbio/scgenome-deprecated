@@ -155,27 +155,47 @@ def plot_umap_clusters(ax, df):
     seaborn.despine(ax=ax, offset=0, trim=True)
 
 
-# TODO set alpha
-# TODO save more info as needed eg. Rs of subtrees
-# TODO maybe cache values
-# TODO next_level, r are redundant
-# TODO return more stuff
 def bayesian_cluster(cn_data,
                      n_states=MAX_CN, alpha=ALPHA,
                      prob_cn_change=0.8, value_ids=VALUE_IDS,
                      clustering_id=BHC_ID):
+    """
+    Performs bayesian hierarchical clustering on copy-number data (defaults
+    configured for HMMCopy)
+
+    :param cn_data: `DataFrame` with columns: 'chr', 'start', 'end', 'copy',
+    'state', 'cell_id'
+    :param n_states: maximum allowed copy number in model
+    :param alpha: dirichlet parameter, related to how many clusters are made
+    :param prob_cn_change: model parameter, probability that copy number
+    changes from one bin to another
+    :param value_ids: column names in `cn_data` to extract and return in
+    `matrix_data`
+    :param clustering_id: name of column in cn_data we want to cluster on
+
+    :return: tuple of:
+    linkage: `DataFrame` with columns:
+        i: cluster index
+        j: cluster index
+        r_merge: r-value of merging i, j
+        naive_dist: naive distance of merging i, j
+        log_like: log-likelihood of merging i, j
+        i_count: number of samples in i
+        j_count: number of samples in j
+    root: `TNode` representing root of tree
+    cell_ids: cell_ids that correspond to rows of measurement
+    matrix_data: `cn_data` columns `value_ids` in `MultiIndex` matrix form
+    measurement: `clustering_id` values in matrix form
+    """
     # TODO return measurement or allow calling of this function on measurement
     matrix_data, measurement, cell_ids = (
         cn_data_to_mat_data_ids(cn_data, data_id=clustering_id,
                                 value_ids=value_ids))
     n_cells = measurement.shape[0]
-    n_segments = measurement.shape[1]
     variances = get_variances(cn_data, matrix_data, n_states)
 
     transmodel = {"kind": "twoparam", "e0": prob_cn_change,
                   "e1": 1-prob_cn_change}
-    #tr_probs = get_tr_probs(n_segments, n_states)
-    #tr_mat = np.log(tr_probs)
 
     # (sample_inds, left_child, right_child, cluster_ind, pi, d, ll)
     clusters = [TNode([i], None, None, i, 1, alpha, 1) for i in range(n_cells)]
@@ -235,4 +255,4 @@ def bayesian_cluster(cn_data,
         cluster_map.pop(str(selected_cluster.sample_inds))
 
     linkage["merge_count"] = linkage["i_count"] + linkage["j_count"]
-    return linkage, clusters[0], cell_ids
+    return linkage, clusters[0], cell_ids, matrix_data, measurement

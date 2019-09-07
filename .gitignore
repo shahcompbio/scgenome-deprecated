@@ -6,3 +6,4 @@ venv
 scg
 .idea
 scgenome/scratchspace.py
+*.swp
