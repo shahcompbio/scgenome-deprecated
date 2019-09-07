@@ -9,7 +9,7 @@ from adjustText import adjust_text
 from scgenome.jointcnmodels import get_variances, get_tr_probs
 from itertools import combinations
 from .TNode import TNode
-from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS
+from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS, BHC_ID
 from .utils import cn_data_to_mat_data_ids
 from scipy.spatial.distance import pdist
 
@@ -160,11 +160,14 @@ def plot_umap_clusters(ax, df):
 # TODO maybe cache values
 # TODO next_level, r are redundant
 # TODO return more stuff
-def bayesian_cluster(cn_data, n_states=MAX_CN, alpha=ALPHA,
-                     prob_cn_change=0.8, value_ids=VALUE_IDS):
+def bayesian_cluster(cn_data,
+                     n_states=MAX_CN, alpha=ALPHA,
+                     prob_cn_change=0.8, value_ids=VALUE_IDS,
+                     clustering_id=BHC_ID):
     # TODO return measurement or allow calling of this function on measurement
     matrix_data, measurement, cell_ids = (
-        cn_data_to_mat_data_ids(cn_data, value_ids=value_ids))
+        cn_data_to_mat_data_ids(cn_data, data_id=clustering_id,
+                                value_ids=value_ids))
     n_cells = measurement.shape[0]
     n_segments = measurement.shape[1]
     variances = get_variances(cn_data, matrix_data, n_states)
