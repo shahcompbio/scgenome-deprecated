@@ -4,7 +4,7 @@ import collections
 from itertools import product
 
 from scgenome.constants import CN_DATA_ID, CELL_ID, VALUE_IDS, INDEX_IDS, \
-    COPY_ID, NBIN_NCHR
+    COPY_ID, NBIN_NCHR, BHC_ID
 from . import refgenome
 
 
@@ -90,7 +90,7 @@ def concat_with_categories(dfs, **kwargs):
     return pd.concat(dfs, **kwargs)
 
 
-def cn_data_to_mat_data_ids(cn_data, data_id=CN_DATA_ID, cell_id=CELL_ID,
+def cn_data_to_mat_data_ids(cn_data, data_id=BHC_ID, cell_id=CELL_ID,
                             index_ids=INDEX_IDS, value_ids=VALUE_IDS):
     matrix_data = (
         cn_data.set_index(index_ids)[value_ids]
