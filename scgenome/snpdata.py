@@ -242,7 +242,7 @@ def calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size):
     # Merge clusters and 
     scgenome.utils.union_categories(
         [allele_data, clusters],
-        cols=['cell_id'])
+        cat_cols=['cell_id'])
     allele_data = allele_data.merge(clusters[['cell_id', 'cluster_id']])
     allele_data = allele_data.groupby(
         index_cols + ['cluster_id'],
