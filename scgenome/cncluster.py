@@ -262,7 +262,7 @@ def prune_cluster(fclustering, cell_ids, cn_data,
                   cluster_field_name="bhc_cluster_id", inplace=False):
     if not inplace:
         cn_data = cn_data.copy()
-    cell_id_to_clst = {cell_ids[cl_id]: cl_id for cl_id in fclustering}
-    cn_data[cluster_field_name] = cell_id_to_clst[cn_data["cell_id"]]
-    if not inplace:
-        return cn_data
+    cell_id_to_clst = {cell_ids[i]: fclustering[i]
+                       for i in range(len(fclustering))}
+    cn_data[cluster_field_name] = cn_data["cell_id"].map(cell_id_to_clst)
+    return cn_data
