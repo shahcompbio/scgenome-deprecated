@@ -109,7 +109,10 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
     cluster_ids = plot_data.columns.get_level_values(1).values
     color_mat = cncluster.get_cluster_colors(cluster_ids)
 
-    ax = fig.add_axes([0.0,0.0,0.05,1.])
+    if linkage is None:
+        ax = fig.add_axes([0.0, 0.0, 0.05, 1.])
+    else:
+        ax = fig.add_axes([1.03, 0, 0.05, 1.])
     ax.imshow(np.array(color_mat)[::-1, np.newaxis], aspect='auto', origin='lower')
     ax.grid(False)
     ax.set_xticks([])
