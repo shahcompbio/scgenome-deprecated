@@ -44,11 +44,15 @@ def plot_cbar(ax):
     ax.set_yticklabels(np.arange(len(color_reference))[::-1])
 
 
-def _secondary_clustering(data):
-    D = dst.squareform(dst.pdist(data.T, 'cityblock'))
-    Y = sch.linkage(D, method='complete')
-    Z = sch.dendrogram(Y, color_threshold=-1, no_plot=True)
-    idx = np.array(Z['leaves'])
+def _secondary_clustering(data, linkage=None):
+    if linkage is None:
+        D = dst.squareform(dst.pdist(data.T, 'cityblock'))
+        Y = sch.linkage(D, method='complete')
+        Z = sch.dendrogram(Y, color_threshold=-1, no_plot=True)
+        idx = np.array(Z['leaves'])
+    else:
+        Z = sch.dendrogram(linkage, color_threshold=-1, no_plot=True)
+        idx = np.array(linkage)
     ordering = np.zeros(idx.shape[0], dtype=int)
     ordering[idx] = np.arange(idx.shape[0])
     return ordering
@@ -60,7 +64,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
     plot_data = cn_data.merge(utils.chrom_idxs)
     plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
 
-    ordering = _secondary_clustering(plot_data.values)
+    ordering = _secondary_clustering(plot_data.values, linkage)
     ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
     plot_data = plot_data.T.set_index(ordering, append=True).T
 
