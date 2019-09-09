@@ -6,22 +6,6 @@ def find_filenames(filenames, suffix):
     return [f for f in filenames if f.endswith(suffix)]
 
 
-def find_manifest_filenames(
-        ticket_id,
-        local_cache_directory,
-    ):
-    ticket_directory = os.path.join(local_cache_directory, ticket_id)
-
-    for dirpath, dirnames, filenames in os.walk(ticket_directory):
-        for filename in filenames:
-            if not filename == 'metadata.yaml':
-                continue
-
-            manifest_filename = os.path.join(dirpath, filename)
-
-            yield manifest_filename
-
-
 def _find_manifest_filenames(
         ticket_id,
         local_cache_directory,
@@ -66,3 +50,9 @@ def find_results_directories(
         results_directories[results_type] = os.path.dirname(manifest_filename)
 
     return results_directories
+
+
+def get_version(results_dir):
+    manifest_filename = os.path.join(results_dir, 'metadata.yaml')
+    manifest = yaml.load(open(manifest_filename))
+    return manifest['meta']['version']
