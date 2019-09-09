@@ -16,12 +16,9 @@ bp_index_cols = [
 ]
 
 
-def load_breakpoint_data(pseudobulk):
+def annotate_breakpoint_data(breakpoint_data, breakpoint_count_data):
     """ Load breakpoints and add annotations.
     """
-
-    breakpoint_data = pseudobulk.load_breakpoint_data()
-    breakpoint_count_data = pseudobulk.load_breakpoint_count_data()
 
     # Calculate cell counts
     cell_counts = (
