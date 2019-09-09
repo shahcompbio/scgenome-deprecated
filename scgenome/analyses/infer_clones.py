@@ -26,9 +26,11 @@ import scgenome.snpdata
 import scgenome.snvphylo
 import scgenome.db.search
 import scgenome.cnclones
-import scgenome.pseudobulk
 import scgenome.db.qc
 import scgenome.loaders.qc
+import scgenome.loaders.snv
+import scgenome.loaders.allele
+import scgenome.loaders.breakpoint
 
 import wgs_analysis.snvs.mutsig
 import wgs_analysis.plots.snv
@@ -44,6 +46,9 @@ import datamanagement.transfer_files
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
+
+# Threshold on total cell read counts
+read_count_threshold = 500000
 
 # SNV Calling thresholds
 museq_score_threshold = None
@@ -184,7 +189,6 @@ def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory
     return cn_data, metrics_data
 
 
-
 def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory, results_prefix):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
@@ -220,24 +224,47 @@ def retrieve_pseudobulk_data(
     """ Retrieve SNV, breakpoint and allele data
     """
 
-    pseudobulk = scgenome.pseudobulk.PseudobulkData(ticket_id, local_cache_directory)
-
     logging.info('snv data')
-    snv_data, snv_count_data = scgenome.snvdata.load_snv_data(
-        pseudobulk,
+    snv_results = scgenome.loaders.snv.load_cached_snv_data(
+        ticket_id,
+        local_cache_directory,
         museq_filter=museq_score_threshold,
         strelka_filter=strelka_score_threshold,
+    )
+    snv_data = snv_results['snv_data']
+    snv_count_data = snv_results['snv_count_data']
+
+    snv_data, snv_count_data = scgenome.snvdata.filter_snv_data(
+        snv_data,
+        snv_count_data,
         num_cells_threshold=snvs_num_cells_threshold,
         sum_alt_threshold=snvs_sum_alt_threshold,
         figures_prefix=results_prefix + 'snv_loading_',
     )
 
     logging.info('allele data')
-    allele_data = pseudobulk.load_haplotype_allele_counts()
-    allele_data = scgenome.snpdata.calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size)
+    allele_results = scgenome.loaders.allele.load_cached_haplotype_allele_data(
+        ticket_id,
+        local_cache_directory,
+    )
+    allele_data = allele_results['allele_counts']
+    allele_data = scgenome.snpdata.calculate_cluster_allele_counts(
+        allele_data,
+        clusters,
+        cn_bin_size,
+    )
 
     logging.info('breakpoint data')
-    breakpoint_data, breakpoint_count_data = scgenome.breakpointdata.load_breakpoint_data(pseudobulk)
+    breakpoint_results = scgenome.loaders.breakpoint.load_cached_breakpoint_data(
+        ticket_id,
+        local_cache_directory,
+    )
+    breakpoint_data = breakpoint_results['breakpoint_data']
+    breakpoint_count_data = breakpoint_results['breakpoint_count_data']
+    breakpoint_data, breakpoint_count_data = scgenome.breakpointdata.annotate_breakpoint_data(
+        breakpoint_data,
+        breakpoint_count_data,
+    )
 
     logging.info('pre filter breakpoint library portrait')
     scgenome.breakpointdata.plot_library_portrait(
@@ -285,8 +312,8 @@ def infer_clones_cmd(ctx, results_prefix, local_cache_directory):
 @click.option('--sample_ids_filename')
 def retrieve_cn_cmd(
         ctx,
-        hmmcopy_ticket_id=None,
-        hmmcopy_ticket_ids_filename=None,
+        library_id=None,
+        library_ids_filename=None,
         sample_id=None,
         sample_ids_filename=None,
     ):
@@ -294,12 +321,12 @@ def retrieve_cn_cmd(
     results_prefix = ctx.obj['results_prefix']
     local_cache_directory = ctx.obj['local_cache_directory']
 
-    if hmmcopy_ticket_id is not None:
-        hmmcopy_ticket_ids = [hmmcopy_ticket_id]
-    elif hmmcopy_ticket_ids_filename is not None:
-        hmmcopy_ticket_ids = [l.strip() for l in open(hmmcopy_ticket_ids_filename).readlines()]
+    if library_id is not None:
+        library_ids = [library_id]
+    elif library_ids_filename is not None:
+        library_ids = [l.strip() for l in open(library_ids_filename).readlines()]
     else:
-        raise Exception('must specify hmmcopy_ticket_id or hmmcopy_ticket_ids_filename')
+        raise Exception('must specify library_id or library_ids_filename')
 
     if sample_id is not None:
         sample_ids = [sample_id]
@@ -308,10 +335,10 @@ def retrieve_cn_cmd(
     else:
         raise Exception('must specify sample_id or sample_ids_filename')
 
-    retrieve_cn(hmmcopy_ticket_ids, sample_ids, results_prefix, local_cache_directory)
+    retrieve_cn(library_ids, sample_ids, results_prefix, local_cache_directory)
 
 
-def retrieve_cn(hmmcopy_ticket_ids, sample_ids, results_prefix, local_cache_directory):
+def retrieve_cn(library_ids, sample_ids, results_prefix, local_cache_directory):
     logging.info('retrieving cn data')
     cn_data, metrics_data = retrieve_cn_data_multi(
         library_ids,
@@ -377,6 +404,7 @@ def cluster_cn(results_prefix, cluster_size_threshold=50):
 def pseudobulk_analysis_cmd(ctx, pseudobulk_ticket):
     results_prefix = ctx.obj['results_prefix']
     local_cache_directory = ctx.obj['local_cache_directory']
+    pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory)
 
 
 def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory):

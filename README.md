@@ -153,11 +153,13 @@ align_metrics_data = scgenome.utils.concat_with_categories(align_metrics_data)
 
 ### Pseudobulk Data
 
-The following example code snippet will provide access to pseudobulk SNV data for the OV cell line data:
+The following example code snippet will provide access to pseudobulk SNV, allele and breakpoint data for the OV cell line data:
 
 ```
 import scgenome.snvdata
-import scgenome.pseudobulk
+import scgenome.loaders.snv
+import scgenome.loaders.allele
+import scgenome.loaders.breakpoint
 
 ticket_id = 'SC-1939'
 
@@ -170,15 +172,24 @@ strelka_score_threshold = None
 snvs_num_cells_threshold = 2
 snvs_sum_alt_threshold = 2
 
-pseudobulk = scgenome.pseudobulk.PseudobulkData(ticket_id, local_cache_directory)
-
-snv_data, snv_count_data = scgenome.snvdata.load_snv_data(
-    pseudobulk,
+snv_results = scgenome.loaders.snv.load_cached_snv_data(
+    ticket_id,
+    local_cache_directory,
     museq_filter=museq_score_threshold,
     strelka_filter=strelka_score_threshold,
-    num_cells_threshold=snvs_num_cells_threshold,
-    sum_alt_threshold=snvs_sum_alt_threshold,
-    figures_prefix=results_prefix + 'snv_loading_',
+)
+
+allele_results = scgenome.loaders.allele.load_cached_haplotype_allele_data(
+    ticket_id,
+    local_cache_directory,
+)
+
+breakpoint_results = scgenome.loaders.breakpoint.load_cached_breakpoint_data(
+    ticket_id,
+    local_cache_directory,
 )
 
 ```
+
+For additional filtering and annotation see `scgenome.analyses.infer_clones.retrieve_pseudobulk_data`.
+

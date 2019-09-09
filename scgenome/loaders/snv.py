@@ -218,9 +218,6 @@ def load_snv_data(
         results_dir,
         museq_filter=None,
         strelka_filter=None,
-        num_cells_threshold=None,
-        sum_alt_threshold=None,
-        figures_prefix=None,
     ):
     """ Load filtered SNV annotation and count data
     
@@ -228,9 +225,6 @@ def load_snv_data(
         results_dir (str): pseudbulk data to load from
         museq_score_threshold (float, optional): mutationseq score threshold. Defaults to None.
         strelka_score_threshold (float, optional): strelka score threshold. Defaults to None.
-        num_cells_threshold (int, optional): minimum number of cells threshold. Defaults to None.
-        sum_alt_threshold (int, optional): minimum total alt count threshold. Defaults to None.
-        figures_prefix (str, optional): filename prefix for figures. Defaults to None.
     
     Returns:
         pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
@@ -248,54 +242,6 @@ def load_snv_data(
     snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
     snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
 
-    assert not snv_count_data['alt_counts'].isnull().any()
-
-    # Calculate cell counts
-    cell_counts = (
-        snv_count_data
-        .query('alt_counts > 0')
-        .drop_duplicates(['chrom', 'coord', 'ref', 'alt', 'cell_id'])
-        .groupby(['chrom', 'coord', 'ref', 'alt']).size().rename('num_cells')
-        .reset_index())
-
-    if figures_prefix is not None:
-        fig = plt.figure(figsize=(4, 4))
-        cell_counts['num_cells'].hist(bins=50)
-        fig.savefig(figures_prefix + 'snv_cell_counts.pdf', bbox_inches='tight')
-
-    snv_data = snv_data.merge(cell_counts, how='left')
-    assert not snv_data['num_cells'].isnull().any()
-
-    # Calculate total alt counts for each SNV
-    sum_alt_counts = (
-        snv_count_data
-        .groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts']
-        .sum().rename('sum_alt_counts')
-        .reset_index())
-
-    if figures_prefix is not None:
-        fig = plt.figure(figsize=(4, 4))
-        sum_alt_counts['sum_alt_counts'].hist(bins=50)
-        fig.savefig(figures_prefix + 'snv_alt_counts.pdf', bbox_inches='tight')
-
-    # Filter SNVs by num cells in which they are detected
-    if num_cells_threshold is not None:
-        filtered_cell_counts = cell_counts.query(
-            'num_cells >= {}'.format(num_cells_threshold))
-        logging.info('Filtering {} of {} SNVs by num_cells >= {}'.format(
-            len(filtered_cell_counts.index), len(cell_counts.index), num_cells_threshold))
-        snv_data = snv_data.merge(filtered_cell_counts[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
-
-    # Filter SNVs by total alt counts
-    if sum_alt_threshold is not None:
-        filtered_sum_alt_counts = sum_alt_counts.query(
-            'sum_alt_counts >= {}'.format(sum_alt_threshold))
-        logging.info('Filtering {} of {} SNVs by sum_alt_counts >= {}'.format(
-            len(filtered_sum_alt_counts.index), len(sum_alt_counts.index), sum_alt_threshold))
-        snv_data = snv_data.merge(filtered_sum_alt_counts[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
-
-    snv_count_data = snv_count_data.merge(snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
-
     return {
         'snv_data': snv_data,
         'snv_count_data': snv_count_data,
@@ -305,6 +251,7 @@ def load_snv_data(
 def load_cached_snv_data(
         ticket_id,
         local_cache_directory,
+        **kwargs
     ):
     """ Load snv tables from the cache
     
@@ -324,5 +271,5 @@ def load_cached_snv_data(
 
     return load_snv_data(
         ticket_results_dirs['pseudobulk'],
-    )
+        **kwargs)
 
