@@ -7,6 +7,7 @@ import dbclients.tantalus
 import datamanagement.transfer_files
 
 from scgenome.loaders.snv import load_cached_snv_data
+from scgenome.loaders.breakpoint import load_cached_breakpoint_data
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
@@ -15,7 +16,7 @@ LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 @click.option('--local_cache_directory')
 @click.option('--local_storage_name')
 @click.option('--single_ticket_id')
-def test_load_cached_snv_data(local_cache_directory, local_storage_name, single_ticket_id):
+def test_load_cached_pseudobulk_data(local_cache_directory, local_storage_name, single_ticket_id):
     if local_cache_directory is not None and local_storage_name is not None:
         raise ValueError('local_cache_directory and local_storage_name are mutually exclusive')
 
@@ -68,7 +69,17 @@ def test_load_cached_snv_data(local_cache_directory, local_storage_name, single_
             print(table_data.shape)
             print(table_data.head())
 
+        results_tables = load_cached_breakpoint_data(
+            ticket_id,
+            local_results_directory,
+        )
+
+        for table_name, table_data in results_tables.items():
+            print(table_name)
+            print(table_data.shape)
+            print(table_data.head())
+
 
 if __name__ == '__main__':
     logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
-    test_load_cached_snv_data()
+    test_load_cached_pseudobulk_data()
