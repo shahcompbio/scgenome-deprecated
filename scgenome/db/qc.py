@@ -45,7 +45,7 @@ def cache_qc_results(
                 suffix_filter=csv_suffix,
             )
 
-            if len(filepaths) != 1:
+            if csv_suffix is not None and len(filepaths) != 1:
                 raise Exception(f'found {len(filepaths)} filepaths for {csv_suffix}, results {results["id"]}')
 
         results_ids.add(results['id'])
