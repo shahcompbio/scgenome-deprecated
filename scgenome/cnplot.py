@@ -44,15 +44,22 @@ def plot_cbar(ax):
     ax.set_yticklabels(np.arange(len(color_reference))[::-1])
 
 
-def _secondary_clustering(data, linkage=None):
-    if linkage is None:
-        D = dst.squareform(dst.pdist(data.T, 'cityblock'))
-        Y = sch.linkage(D, method='complete')
-        Z = sch.dendrogram(Y, color_threshold=-1, no_plot=True)
-        idx = np.array(Z['leaves'])
-    else:
-        Z = sch.dendrogram(linkage, color_threshold=-1, no_plot=True)
-        idx = np.array(linkage)
+#def _secondary_clustering(data, linkage=None):
+#    if linkage is None:
+#        D = dst.squareform(dst.pdist(data.T, 'cityblock'))
+#        Y = sch.linkage(D, method='complete')
+#        Z = sch.dendrogram(Y, color_threshold=-1, no_plot=True)
+#    else:
+#        Z = sch.dendrogram(linkage, color_threshold=-1, no_plot=True)
+#    idx = np.array(Z['leaves'])
+#    ordering = np.zeros(idx.shape[0], dtype=int)
+#    ordering[idx] = np.arange(idx.shape[0])
+#    return ordering
+def _secondary_clustering(data):
+    D = dst.squareform(dst.pdist(data.T, 'cityblock'))
+    Y = sch.linkage(D, method='complete')
+    Z = sch.dendrogram(Y, color_threshold=-1, no_plot=True)
+    idx = np.array(Z['leaves'])
     ordering = np.zeros(idx.shape[0], dtype=int)
     ordering[idx] = np.arange(idx.shape[0])
     return ordering
@@ -60,15 +67,32 @@ def _secondary_clustering(data, linkage=None):
 
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
                                   cluster_field_name='cluster_id',
-                                  raw=False, max_cn=13, linkage=None):
+                                  raw=False, max_cn=13, linkage=None,
+                                  fig=None):
     plot_data = cn_data.merge(utils.chrom_idxs)
     plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
 
-    ordering = _secondary_clustering(plot_data.values, linkage)
-    ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
-    plot_data = plot_data.T.set_index(ordering, append=True).T
+    if linkage is None:
+        ordering = _secondary_clustering(plot_data.values)
+        ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
+        plot_data = plot_data.T.set_index(ordering, append=True).T
+        plot_data = plot_data.sort_index(axis=1, level=[1, 2]) # TODO THIS MAY BE WRONG
+    else:
+        if fig is None:
+            raise ValueError("Must supply linkage with fig")
+        # add axes, plot it, fix ordering and plot_data
+        dend_ax = fig.add_axes([0.0, 0, 0.1, 1.])
+        Z = sch.dendrogram(linkage, color_threshold=-1, orientation='left')
+        idx = Z['leaves'][::-1]
+        dend_ax.set_xticks([])
+        dend_ax.set_yticks([])
+        dend_ax.spines['left'].set_visible(False)
+        dend_ax.spines['bottom'].set_visible(False)
+        dend_ax.spines['top'].set_visible(False)
+        dend_ax.spines['right'].set_visible(False)
+        plot_data = plot_data.iloc[:, idx]
 
-    plot_data = plot_data.sort_index(axis=1, level=[1, 2])
+    #plot_data = plot_data.sort_index(axis=1, level=[1, 2]) # TODO THIS MAY BE WRONG
     if max_cn is not None:
         plot_data[plot_data > max_cn] = max_cn
 
@@ -104,7 +128,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
     ax = fig.add_axes([0.1,0.0,0.9,1.])
     plot_data = plot_clustered_cell_cn_matrix(
         ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name,
-        raw=raw, max_cn=max_cn, linkage=linkage)
+        raw=raw, max_cn=max_cn, linkage=linkage, fig=fig)
 
     cluster_ids = plot_data.columns.get_level_values(1).values
     color_mat = cncluster.get_cluster_colors(cluster_ids)
