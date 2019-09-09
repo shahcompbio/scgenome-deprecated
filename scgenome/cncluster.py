@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import seaborn as sns
 from adjustText import adjust_text
 from scgenome.jointcnmodels import get_variances, get_tr_probs
 from itertools import combinations
@@ -256,9 +255,6 @@ def bayesian_cluster(cn_data,
         cluster_map.pop(str(selected_cluster.sample_inds))
 
     linkage["merge_count"] = linkage["i_count"] + linkage["j_count"]
-    return linkage, clusters[0], cell_ids, matrix_data, measurement
+    return linkage, clusters[0], cell_ids, matrix_data, measurement, variances
 
 
-def plot_bhc(measurement, linkage, cell_labels):
-    return sns.clustermap(measurement, col_cluster=False, row_linkage=linkage,
-                          yticklabels=cell_labels, cmap="YlGnBu")

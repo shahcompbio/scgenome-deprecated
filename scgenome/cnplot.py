@@ -3,6 +3,7 @@ import matplotlib
 import seaborn
 import pandas as pd
 import numpy as np
+import seaborn as sns
 import matplotlib.pyplot as plt
 import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as dst
@@ -53,7 +54,9 @@ def _secondary_clustering(data):
     return ordering
 
 
-def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', raw=False, max_cn=13):
+def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
+                                  cluster_field_name='cluster_id',
+                                  raw=False, max_cn=13, linkage=None):
     plot_data = cn_data.merge(utils.chrom_idxs)
     plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
 
@@ -90,9 +93,14 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     return plot_data
 
 
-def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_field_name='cluster_id', raw=False, max_cn=13):
+def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
+                                         cluster_field_name='cluster_id',
+                                         raw=False, max_cn=13,
+                                         linkage=None, origin_field_name=None):
     ax = fig.add_axes([0.1,0.0,0.9,1.])
-    plot_data = plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name, raw=raw, max_cn=max_cn)
+    plot_data = plot_clustered_cell_cn_matrix(
+        ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name,
+        raw=raw, max_cn=max_cn, linkage=linkage)
 
     cluster_ids = plot_data.columns.get_level_values(1).values
     color_mat = cncluster.get_cluster_colors(cluster_ids)
@@ -177,3 +185,6 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='clus
     return plot_data.columns.values
 
 
+def plot_bhc(measurement, linkage, cell_labels):
+    return sns.clustermap(measurement, col_cluster=False, row_linkage=linkage,
+                          yticklabels=cell_labels, cmap="YlGnBu")

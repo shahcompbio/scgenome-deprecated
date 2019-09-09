@@ -61,7 +61,7 @@ def calculate_marginal_ll_simple(data, variances, transmodel):
         )
 
     else:
-        raise ValueError("unknown transition model {transmodel['kind']}")
+        raise ValueError(f"unknown transition model {transmodel['kind']}")
 
     return scipy.special.logsumexp(alphas[-1, :])
 

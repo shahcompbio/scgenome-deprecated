@@ -16,14 +16,13 @@ class TestCluster(TestCase):
         cn_data.columns = ["chr", "bin", "cell_id", "state", "start", "end",
                            "cluster_id", "copy"]
 
-        linkage, root, cl_cell_ids = (
+        linkage, root, cl_cell_ids, matrix_data, measurement, variances = (
             cncluster.bayesian_cluster(cn_data, n_states=11,
                                        value_ids=["copy", "state"]))
 
         print(linkage)
         print(root)
         print(cl_cell_ids)
-
 
 
 if __name__ == "__main__":
