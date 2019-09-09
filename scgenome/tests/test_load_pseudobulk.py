@@ -8,9 +8,69 @@ import datamanagement.transfer_files
 
 from scgenome.loaders.snv import load_cached_snv_data
 from scgenome.loaders.breakpoint import load_cached_breakpoint_data
+from scgenome.loaders.allele import load_cached_haplotype_allele_data
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
+
+dtypes_check = {
+    'snv_data': {
+        'chrom': 'category',
+        'coord': 'int64',
+        'ref': 'category',
+        'alt': 'category',
+        'alt_counts_sum': 'int64',
+        'ref_counts_sum': 'int64',
+        'mappability': 'float64',
+        'is_cosmic': 'object',
+        'gene_name': 'category',
+        'effect': 'category',
+        'effect_impact': 'category',
+        'amino_acid_change': 'category',
+        'tri_nucleotide_context': 'category',
+        'strelka_score': 'float64',
+        'museq_score': 'float64',
+        'num_cells': 'int64',
+    },
+    'snv_count_data': {
+        'chrom': 'category',
+        'coord': 'int64',
+        'ref': 'category',
+        'alt': 'category',
+        'ref_counts': 'int64',
+        'alt_counts': 'int64',
+        'cell_id': 'category',
+        'total_counts': 'int64',
+        'sample_id': 'category',
+    },
+    'breakpoint_data': {
+        'prediction_id': 'int64',
+        'chromosome_1': 'object',
+        'strand_1': 'object',
+        'position_1': 'int64',
+        'chromosome_2': 'object',
+        'strand_2': 'object',
+        'position_2': 'int64',
+        'library_id': 'object', 
+        'sample_id': 'object',
+    },
+    'breakpoint_count_data': {
+        'prediction_id': 'int64',
+        'cell_id': 'object',
+        'read_count': 'int64',
+        'library_id': 'object',
+        'sample_id': 'object',
+    },
+    'allele_counts': {
+        'allele_id': 'int64',
+        'cell_id': 'category',
+        'chromosome': 'category',
+        'end': 'int64',
+        'hap_label': 'int64',
+        'readcount': 'int64',
+        'start': 'int64',
+    },
+}
 
 @click.command()
 @click.option('--local_cache_directory')
@@ -59,25 +119,28 @@ def test_load_cached_pseudobulk_data(local_cache_directory, local_storage_name, 
         elif local_storage_name is not None:
             local_results_directory = tantalus_api.get('storage', name=local_storage_name)['storage_directory']
 
-        results_tables = load_cached_snv_data(
+        snv_results_tables = load_cached_snv_data(
             ticket_id,
             local_results_directory,
         )
 
-        for table_name, table_data in results_tables.items():
-            print(table_name)
-            print(table_data.shape)
-            print(table_data.head())
-
-        results_tables = load_cached_breakpoint_data(
+        breakpoint_results_tables = load_cached_breakpoint_data(
             ticket_id,
             local_results_directory,
         )
 
-        for table_name, table_data in results_tables.items():
-            print(table_name)
-            print(table_data.shape)
-            print(table_data.head())
+        haplotype_results_tables = load_cached_haplotype_allele_data(
+            ticket_id,
+            local_results_directory,
+        )
+
+        for results_tables in (snv_results_tables, breakpoint_results_tables, haplotype_results_tables):
+            for table_name, table_data in results_tables.items():
+                logging.info(f'table {table_name} has size {len(table_data)}')
+                for column_name, dtype_name in dtypes_check[table_name].items():
+                    column_dtype = str(results_tables[table_name][column_name].dtype)
+                    if not column_dtype == dtype_name:
+                        raise Exception(f'{column_name} has dtype {column_dtype} not {dtype_name}')
 
 
 if __name__ == '__main__':
