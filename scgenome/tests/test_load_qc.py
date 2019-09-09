@@ -39,6 +39,7 @@ def test_load_cached_qc_data(local_cache_directory, single_ticket_id):
         cache_qc_results(
             ticket_id,
             local_cache_directory,
+            results_storage_name='singlecellresults',
         )
 
         results_tables = load_cached_qc_data(
