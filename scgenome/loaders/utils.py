@@ -2,6 +2,10 @@ import os
 import yaml
 
 
+def find_filenames(filenames, suffix):
+    return [f for f in filenames if f.endswith(suffix)]
+
+
 def find_manifest_filenames(
         ticket_id,
         local_cache_directory,

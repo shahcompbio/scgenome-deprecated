@@ -4,6 +4,7 @@ import os
 import pandas as pd
 
 import scgenome.utils
+import scgenome.loaders.utils
 
 
 standard_hmmcopy_reads_cols = [
@@ -86,10 +87,6 @@ _table_fixes = {
 }
 
 
-def _find_filenames(filenames, suffix):
-    return [f for f in filenames if f.endswith(suffix)]
-
-
 def load_hmmcopy_data(
         hmmcopy_results_dir,
         additional_reads_cols=None,
@@ -122,7 +119,7 @@ def load_hmmcopy_data(
     results_tables = {}
 
     for table_name, suffix in table_suffixes[version]:
-        filenames = _find_filenames(manifest['filenames'], suffix)
+        filenames = scgenome.loaders.utils.find_filenames(manifest['filenames'], suffix)
 
         if len(filenames) != 1:
             raise ValueError(f'found filenames {filenames} for suffix {suffix}')
