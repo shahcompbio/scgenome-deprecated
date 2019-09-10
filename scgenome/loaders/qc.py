@@ -15,10 +15,10 @@ def _calculate_annotation_metrics(results_tables):
     hmmcopy_idx = results_tables['hmmcopy_metrics'].set_index(common_columns).index
 
     for idx in align_idx.difference(hmmcopy_idx):
-        raise ValueError('found {idx} in align but not hmmcopy')
+        raise ValueError(f'found {idx} in align but not hmmcopy')
 
     for idx in hmmcopy_idx.difference(align_idx):
-        raise ValueError('found {idx} in hmmcopy but not align')
+        raise ValueError(f'found {idx} in hmmcopy but not align')
 
     data = pd.merge(
         results_tables['align_metrics'],
@@ -51,7 +51,6 @@ def load_cached_qc_data(
         ticket_id, local_cache_directory)
 
     results_tables = load_align_data(ticket_results_dirs['align'])
-
     hmmcopy_results_tables = load_hmmcopy_data(
         ticket_results_dirs['hmmcopy'],
         additional_reads_cols=additional_hmmcopy_reads_cols)
