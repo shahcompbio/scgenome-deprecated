@@ -143,6 +143,9 @@ def load_hmmcopy_data(
 
         results_tables[table_name] = data
 
+    # FIXUP: older hmmcopy results have total_mapped_reads instead of total_mapped_reads_hmmcopy
+    results_tables['hmmcopy_metrics'] = results_tables['hmmcopy_metrics'].rename(columns={'total_mapped_reads': 'total_mapped_reads_hmmcopy'})
+
     scgenome.utils.union_categories(results_tables.values())
 
     _table_fixes[version](results_tables)
