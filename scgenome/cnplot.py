@@ -56,6 +56,7 @@ def _secondary_clustering(data, linkage=None):
     ordering[idx] = np.arange(idx.shape[0])
     return ordering
 
+
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
                                   cluster_field_name='cluster_id',
                                   raw=False, max_cn=13, linkage=None,

@@ -56,4 +56,4 @@ def qc_cn(metrics_data, cn_data):
             .unstack(level='cell_id').fillna(0)
     )
 
-    return cn
+    return cn, cn_data

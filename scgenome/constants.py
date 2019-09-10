@@ -28,6 +28,7 @@ LINKAGE_COLS = ["i", "j", "r_merge", "naive_dist", "log_like",
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 CACHE_DIR = "Scratch/tantalus_data"
 BHC_ID = "state"
+ORIGIN_ID = "origin_id"
 
 # Error messages
 NO_CHILDREN = "Node has no children to comptue pi, d with"
@@ -37,4 +38,5 @@ TRANS_NOT_SQUARE = "Transition matrix must be square"
 NBIN_NCHR = "Number of bins must be divisible by number of chromosomes"
 CHR_CLUSTERING = "Number of chromosome clusters exceeds number" \
                  " of transition matrices"
+PROPS_LENGTH = 'proportions must be same length as sample_ids, hmmcopy_tickets'
 
