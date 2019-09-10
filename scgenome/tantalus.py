@@ -41,6 +41,18 @@ def get_data(hmmcopy_tickets, sample_ids, cached=False,
         hmmcopy_data = load_cached_qc_data(jira_ticket, local_cache_directory,
                                            sample_ids=sample_ids)
 
+        if 'is_s_phase' not in hmmcopy_data['hmmcopy_metrics']:
+            cell_cycle_data = load_cell_cycle_data(tantalus_api, jira_ticket)
+            cell_cycle_data['cell_id'] = (
+                cell_cycle_data['cell_id'].astype('category'))
+
+            scgenome.utils.union_categories(
+                [hmmcopy_data['hmmcopy_metrics'], cell_cycle_data])
+
+            hmmcopy_data['hmmcopy_metrics'] = hmmcopy_data[
+                'hmmcopy_metrics'].merge(cell_cycle_data, how='left')
+            assert 'cell_id_x' not in hmmcopy_data['hmmcopy_metrics']
+
         cn_data.append(hmmcopy_data['hmmcopy_reads'])
         segs_data.append(hmmcopy_data['hmmcopy_segs'])
         metrics_data.append(hmmcopy_data['hmmcopy_metrics'])
@@ -51,23 +63,10 @@ def get_data(hmmcopy_tickets, sample_ids, cached=False,
     metrics_data = scgenome.utils.concat_with_categories(metrics_data)
     align_metrics_data = scgenome.utils.concat_with_categories(align_metrics_data)
 
-    if 'is_s_phase' not in metrics_data:
-        cell_cycle_data = load_cell_cycle_data(
-            tantalus_api,
-            analysis['jira_ticket'])
-        cell_cycle_data['cell_id'] = cell_cycle_data['cell_id'].astype('category')
-
-        scgenome.utils.union_categories([
-            cn_data,
-            metrics_data,
-            align_metrics_data,
-            cell_cycle_data])
-
-        metrics_data = metrics_data.merge(cell_cycle_data, how='left')
-        assert 'cell_id_x' not in metrics_data
 
     # TODO return dictionary instead so we know which value were unpacking
     return cn_data, segs_data, metrics_data, align_metrics_data
+
 
 def spike_in(num_cells, hmmcopy_tickets, sample_ids, cached=False,
              local_cache_directory=get_local_cache_dir(), proportions=None,
@@ -89,26 +88,29 @@ def spike_in(num_cells, hmmcopy_tickets, sample_ids, cached=False,
     else:
         if seed is not None:
             np.random.seed(seed)
-        proportions = np.random.normal(size=len(sample_ids))
+        proportions = np.abs(np.random.normal(size=len(sample_ids)))
         proportions = proportions / proportions.sum()
 
-    cell_counts = num_cells * proportions
+    cell_counts = (num_cells * proportions).astype("int")
 
-    datasets = []
+    flat_samples = [e for sublist in sample_ids for e in sublist]
+    print("flat_samples")
+    print(flat_samples)
+    data = get_data(hmmcopy_tickets, flat_samples, cached,
+                    local_cache_directory)
+    cn, cn_data = qc_cn(data[2], data[0])
+
     sub_datasets = []
     for i in range(len(hmmcopy_tickets)):
-        data = get_data(hmmcopy_tickets[i], sample_ids[i], cached,
-                        local_cache_directory)
-        cn, cn_data = qc_cn(data[2], data[0])
-        cn_data[origin_field_name] = i
+        jira_cn_data = cn_data[cn_data["sample_id"].isin(sample_ids[i])]
+        jira_cn_data[origin_field_name] = hmmcopy_tickets[i]
+        sub_cn_data = subsample_cn_data(jira_cn_data, cell_counts[i],
+                                        id_field_name, seed)
 
-        sub_cn_data = subsample_cn_data(cn_data, cell_counts[i], id_field_name,
-                                        seed)
-        datasets.append(cn_data)
         sub_datasets.append(sub_cn_data)
 
-    mixed = pd.concatenat(sub_datasets)
-    return {"mixed_cn_data": mixed, "full_datasets": datasets,
+    mixed = pd.concat(sub_datasets)
+    return {"mixed_cn_data": mixed, "all_cn_data": cn_data,
             "proportions": proportions, "cell_counts": cell_counts}
 
 
@@ -117,7 +119,7 @@ def subsample_cn_data(cn_data, num_cells, id_field_name=CELL_ID,
     if seed is not None:
         np.random.seed(seed)
 
-    keep_ids = cn_data[id_field_name].unique().sample(num_cells,
-                                                      random_state=seed)
+    keep_ids = pd.Series(
+        cn_data[id_field_name].unique()).sample(num_cells, random_state=seed)
 
-    return cn_data[cn_data[id_field_name] in keep_ids]
+    return cn_data[cn_data[id_field_name].isin(keep_ids)]
