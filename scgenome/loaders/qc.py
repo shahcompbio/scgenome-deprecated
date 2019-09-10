@@ -82,21 +82,3 @@ def load_cached_qc_data(
 
     return results_tables
 
-
-@click.command()
-@click.argument('ticket_id')
-@click.argument('local_cache_directory')
-def test_load_cached_qc_data(ticket_id, local_cache_directory):
-    load_cached_qc_data(
-        ticket_id,
-        local_cache_directory,
-    )
-
-    for table_name, table_data in results_tables.items():
-        print(table_name)
-        print(table_data.shape)
-        print(table_data.head())
-
-
-if __name__ == '__main__':
-    test_load_cached_qc_data()
