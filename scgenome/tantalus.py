@@ -103,13 +103,4 @@ def spike_in(num_cells, hmmcopy_tickets, sample_ids, cached=False,
     return result
 
 
-def subsample_cn_data(cn_data, num_cells, id_field_name=CELL_ID,
-                      seed=None):
-    if seed is not None:
-        np.random.seed(seed)
-
-    keep_ids = pd.Series(
-        cn_data[id_field_name].unique()).sample(num_cells, random_state=seed)
-
-    return cn_data[cn_data[id_field_name].isin(keep_ids)]
 

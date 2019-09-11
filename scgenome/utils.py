@@ -5,7 +5,6 @@ from itertools import product
 
 from scgenome.constants import CN_DATA_ID, CELL_ID, VALUE_IDS, INDEX_IDS, \
     COPY_ID, NBIN_NCHR, BHC_ID, ORIGIN_ID
-from scgenome.tantalus import subsample_cn_data
 from . import refgenome
 
 
@@ -162,7 +161,7 @@ def get_cn_data_submixture(cn_data, num_cells, hmmcopy_tickets, sample_ids,
         proportions = np.abs(np.random.normal(size=len(sample_ids)))
         proportions = proportions / proportions.sum()
 
-    cell_counts = (num_cells * proportions).astype("int")
+    cell_counts = (num_cells * np.array(proportions)).astype("int")
 
     sub_datasets = []
     for i in range(len(hmmcopy_tickets)):
@@ -176,3 +175,14 @@ def get_cn_data_submixture(cn_data, num_cells, hmmcopy_tickets, sample_ids,
     mixed = pd.concat(sub_datasets)
     return {"mixed_cn_data": mixed, "proportions": proportions,
             "cell_counts": cell_counts}
+
+
+def subsample_cn_data(cn_data, num_cells, id_field_name=CELL_ID,
+                      seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+
+    keep_ids = pd.Series(
+        cn_data[id_field_name].unique()).sample(num_cells, random_state=seed)
+
+    return cn_data[cn_data[id_field_name].isin(keep_ids)]
