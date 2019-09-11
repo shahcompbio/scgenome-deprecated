@@ -139,7 +139,6 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
 
     if origin_field_name is not None:
         sample_ids = plot_data.columns.get_level_values(2).values
-        print(f"sample_ids {sample_ids}")
         sample_color_mat = cncluster.get_cluster_colors(sample_ids)
         ax = fig.add_axes([1.07, 0, 0.05, 1.])
         ax.imshow(np.array(sample_color_mat)[::-1, np.newaxis], aspect='auto',
