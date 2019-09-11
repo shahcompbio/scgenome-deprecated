@@ -88,13 +88,13 @@ _table_fixes = {
 
 
 def load_hmmcopy_data(
-        hmmcopy_results_dir,
+        results_dir,
         additional_reads_cols=None,
     ):
     """ Load copy number tables
     
     Args:
-        hmmcopy_results_dir (str): path to hmmcopy results.
+        results_dir (str): results directory to load from.
 
     KwArgs:
         additional_reads_cols (list of str, optional): Additional columns to obtain from the reads table. Defaults to None.
@@ -102,6 +102,14 @@ def load_hmmcopy_data(
     Returns:
         dict: pandas.DataFrame tables keyed by table name
     """
+
+    analysis_dirs = scgenome.loaders.utils.find_results_directories(
+        results_dir)
+
+    if 'hmmcopy' not in analysis_dirs:
+        raise ValueError(f'no hmmcopy found for directory {results_dir}')
+
+    hmmcopy_results_dir = analysis_dirs['hmmcopy']
 
     hmmcopy_reads_cols = standard_hmmcopy_reads_cols.copy()
     if additional_reads_cols is not None:

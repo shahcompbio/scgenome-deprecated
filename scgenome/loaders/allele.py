@@ -11,14 +11,23 @@ def load_haplotype_allele_data(results_dir):
     """ Load the haplotype allele count data from the pseudobulk results paths
     
     Args:
-        results_dir (str): pseudbulk data to load from
+        results_dir (str): results directory to load from.
     
     Returns:
         dict of pandas.DataFrame: Haplotype allele data
     """
+
+    analysis_dirs = scgenome.loaders.utils.find_results_directories(
+        results_dir)
+
+    if 'pseudobulk' not in analysis_dirs:
+        raise ValueError(f'no pseudobulk found for directory {results_dir}')
+
+    pseudobulk_dir = analysis_dirs['pseudobulk']
+
     allele_counts = []
 
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(results_dir, 'allele_counts.csv'):
+    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, 'allele_counts.csv'):
         logging.info('Loading haplotype allele counts from {}'.format(filepath))
 
         # HACK: temp fix until the pipeline outputs csv headers
@@ -54,29 +63,4 @@ def load_haplotype_allele_data(results_dir):
     return {
         'allele_counts': allele_counts,
     }
-
-
-def load_cached_haplotype_allele_data(
-        ticket_id,
-        local_cache_directory,
-    ):
-    """ Load haplotype tables from the cache
-    
-    Args:
-        ticket_id (str): jira ticket for the analyis producing the results.
-        local_cache_directory (str): local cache directory to search for results.
-    
-    Returns:
-        dict: pandas.DataFrame tables keyed by table name
-    """
-
-    ticket_results_dirs = scgenome.loaders.utils.find_results_directories(
-        ticket_id, local_cache_directory)
-
-    if 'pseudobulk' not in ticket_results_dirs:
-        raise ValueError(f'no pseudobulk found for ticket {ticket_id}')
-
-    return load_haplotype_allele_data(
-        ticket_results_dirs['pseudobulk'],
-    )
 

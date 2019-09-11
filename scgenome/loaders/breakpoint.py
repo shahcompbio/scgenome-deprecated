@@ -9,12 +9,12 @@ import scgenome.loaders.utils
 
 
 def load_breakpoint_annotation_data(
-        results_dir,
+        pseudobulk_dir,
     ):
     """ Load breakpoint data from a pseudobulk run.
 
     Args:
-        results_dir (str): results directory
+        pseudobulk_dir (str): results directory
     """
     bpcols = "prediction_id\tchromosome_1\tstrand_1\tposition_1\tchromosome_2\tstrand_2\t\
     position_2\thomology\tnum_split\tinserted\tmate_score\ttemplate_length_1\tlog_cdf\t\
@@ -24,13 +24,13 @@ def load_breakpoint_annotation_data(
     dist_filtered\tbalanced\trearrangement_type".replace(' ', '').split('\t')
 
     suffix = 'destruct.csv.gz'
-    if scgenome.loaders.utils.get_version(results_dir) == 'v0.2.11':
+    if scgenome.loaders.utils.get_version(pseudobulk_dir) == 'v0.2.11':
         suffix = 'destruct.tsv'
         bpcols = None
 
     breakpoint_data = []
 
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(results_dir, suffix):
+    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, suffix):
         data = pd.read_csv(
             filepath, sep='\t', names=bpcols,
             dtype={
@@ -50,23 +50,23 @@ def load_breakpoint_annotation_data(
 
 
 def load_breakpoint_count_data(
-        results_dir
+        pseudobulk_dir
     ):
     """ Load breakpoint count data from a pseudobulk run.
 
     Args:
-        results_dir (str): results directory
+        pseudobulk_dir (str): results directory
     """
     suffix = 'cell_counts_destruct.csv.gz'
     cols = ['cluster_id', 'cell_id', 'read_count']
 
-    if scgenome.loaders.utils.get_version(results_dir) == 'v0.2.11':
+    if scgenome.loaders.utils.get_version(pseudobulk_dir) == 'v0.2.11':
         suffix = 'cell_counts_destruct.csv'
         cols = None
 
     breakpoint_count_data = []
 
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(results_dir, suffix):
+    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, suffix):
         data = pd.read_csv(filepath, names=cols)
         data['library_id'] = library_id
         data['sample_id'] = sample_id
@@ -85,41 +85,23 @@ def load_breakpoint_data(results_dir):
     """ Load breakpoint count data from a pseudobulk run.
 
     Args:
-        results_dir (str): results directory
+        results_dir (str): results directory to load from.
     """
-    breakpoint_data = load_breakpoint_annotation_data(results_dir)
-    breakpoint_count_data = load_breakpoint_count_data(results_dir)
+
+    analysis_dirs = scgenome.loaders.utils.find_results_directories(
+        results_dir)
+
+    if 'pseudobulk' not in analysis_dirs:
+        raise ValueError(f'no pseudobulk found for directory {results_dir}')
+
+    pseudobulk_dir = analysis_dirs['pseudobulk']
+
+    breakpoint_data = load_breakpoint_annotation_data(pseudobulk_dir)
+    breakpoint_count_data = load_breakpoint_count_data(pseudobulk_dir)
 
     return {
         'breakpoint_data': breakpoint_data,
         'breakpoint_count_data': breakpoint_count_data,
     }
 
-
-def load_cached_breakpoint_data(
-        ticket_id,
-        local_cache_directory,
-    ):
-    """ Load breakpoint tables from the cache
-    
-    Args:
-        ticket_id (str): jira ticket for the analyis producing the results.
-        local_cache_directory (str): local cache directory to search for results.
-    
-    KwArgs:
-        additional_reads_cols (list of str, optional): Additional columns to obtain from the reads table. Defaults to None.
-    
-    Returns:
-        dict: pandas.DataFrame tables keyed by table name
-    """
-
-    ticket_results_dirs = scgenome.loaders.utils.find_results_directories(
-        ticket_id, local_cache_directory)
-
-    if 'pseudobulk' not in ticket_results_dirs:
-        raise ValueError(f'no pseudobulk found for ticket {ticket_id}')
-
-    return load_breakpoint_data(
-        ticket_results_dirs['pseudobulk'],
-    )
 

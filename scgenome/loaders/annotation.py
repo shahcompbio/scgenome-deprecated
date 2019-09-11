@@ -38,16 +38,24 @@ _table_fixes = {
 
 
 def load_annotation_data(
-        annotation_results_dir,
+        results_dir,
     ):
     """ Load copy number tables
     
     Args:
-        annotation_results_dir (str): path to hmmcopy results.
+        results_dir (str): results directory to load from.
     
     Returns:
         dict: pandas.DataFrame tables keyed by table name
     """
+
+    analysis_dirs = scgenome.loaders.utils.find_results_directories(
+        results_dir)
+
+    if 'annotation' not in analysis_dirs:
+        raise ValueError(f'no annotation found for directory {results_dir}')
+
+    annotation_results_dir = analysis_dirs['annotation']
 
     manifest_filename = os.path.join(annotation_results_dir, 'metadata.yaml')
     manifest = yaml.load(open(manifest_filename))
