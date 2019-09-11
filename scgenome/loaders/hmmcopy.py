@@ -153,32 +153,3 @@ def load_hmmcopy_data(
     return results_tables
 
 
-def load_cached_hmmcopy_data(
-        ticket_id,
-        local_cache_directory,
-        additional_reads_cols=None,
-    ):
-    """ Load copy number tables from the cache
-    
-    Args:
-        ticket_id (str): jira ticket for the analyis producing the results.
-        local_cache_directory (str): local cache directory to search for results.
-    
-    KwArgs:
-        additional_reads_cols (list of str, optional): Additional columns to obtain from the reads table. Defaults to None.
-    
-    Returns:
-        dict: pandas.DataFrame tables keyed by table name
-    """
-
-    ticket_results_dirs = scgenome.loaders.utils.find_results_directories(
-        ticket_id, local_cache_directory)
-
-    if 'hmmcopy' not in ticket_results_dirs:
-        raise ValueError(f'no hmmcopy found for ticket {ticket_id}')
-
-    return load_hmmcopy_data(
-        ticket_results_dirs['hmmcopy'],
-        additional_reads_cols=additional_reads_cols,
-    )
-

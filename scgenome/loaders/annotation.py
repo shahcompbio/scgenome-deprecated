@@ -87,27 +87,3 @@ def load_annotation_data(
 
     return results_tables
 
-
-def load_cached_annotation_data(
-        ticket_id,
-        local_cache_directory,
-    ):
-    """ Load annotation tables from the cache
-    
-    Args:
-        ticket_id (str): jira ticket for the analyis producing the results.
-        local_cache_directory (str): local cache directory to search for results.
-    
-    Returns:
-        dict: pandas.DataFrame tables keyed by table name
-    """
-
-    ticket_results_dirs = scgenome.loaders.utils.find_results_directories(
-        ticket_id, local_cache_directory)
-
-    if 'annotation' not in ticket_results_dirs:
-        raise ValueError(f'no annotation found for ticket {ticket_id}')
-
-    return load_annotation_data(
-        ticket_results_dirs['annotation'],
-    )
