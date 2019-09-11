@@ -172,21 +172,20 @@ strelka_score_threshold = None
 snvs_num_cells_threshold = 2
 snvs_sum_alt_threshold = 2
 
-snv_results = scgenome.loaders.snv.load_cached_snv_data(
-    ticket_id,
-    local_cache_directory,
+ticket_directory = os.path.join(local_cache_directory, ticket_id)
+
+snv_results = scgenome.loaders.snv.load_snv_data(
+    ticket_directory,
     museq_filter=museq_score_threshold,
     strelka_filter=strelka_score_threshold,
 )
 
-allele_results = scgenome.loaders.allele.load_cached_haplotype_allele_data(
-    ticket_id,
-    local_cache_directory,
+allele_results = scgenome.loaders.allele.load_haplotype_allele_data(
+    ticket_directory,
 )
 
-breakpoint_results = scgenome.loaders.breakpoint.load_cached_breakpoint_data(
-    ticket_id,
-    local_cache_directory,
+breakpoint_results = scgenome.loaders.breakpoint.load_breakpoint_data(
+    ticket_directory,
 )
 
 ```
