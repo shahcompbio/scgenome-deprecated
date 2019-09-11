@@ -76,8 +76,6 @@ def spike_in(num_cells, hmmcopy_tickets, sample_ids, cached=False,
    :param hmmcopy_tickets: list of hmmcopy tickets
    :param sample_ids: list of lists of sample ids. first element corresponds
    to first element in `hmmcopy_tickets` etc.
-   :param cached:
-   :param local_cache_directory:
    :return:
    """
     if len(hmmcopy_tickets) != len(sample_ids):
@@ -94,24 +92,15 @@ def spike_in(num_cells, hmmcopy_tickets, sample_ids, cached=False,
     cell_counts = (num_cells * proportions).astype("int")
 
     flat_samples = [e for sublist in sample_ids for e in sublist]
-    print("flat_samples")
-    print(flat_samples)
     data = get_data(hmmcopy_tickets, flat_samples, cached,
                     local_cache_directory)
     cn, cn_data = qc_cn(data[2], data[0])
 
-    sub_datasets = []
-    for i in range(len(hmmcopy_tickets)):
-        jira_cn_data = cn_data[cn_data["sample_id"].isin(sample_ids[i])]
-        jira_cn_data[origin_field_name] = hmmcopy_tickets[i]
-        sub_cn_data = subsample_cn_data(jira_cn_data, cell_counts[i],
-                                        id_field_name, seed)
-
-        sub_datasets.append(sub_cn_data)
-
-    mixed = pd.concat(sub_datasets)
-    return {"mixed_cn_data": mixed, "all_cn_data": cn_data,
-            "proportions": proportions, "cell_counts": cell_counts}
+    result = scgenome.utils.get_cn_data_submixture(
+        cn_data, num_cells, hmmcopy_tickets, sample_ids, proportions,
+        origin_field_name, id_field_name, seed)
+    result["all_cn_data"] = cn_data
+    return result
 
 
 def subsample_cn_data(cn_data, num_cells, id_field_name=CELL_ID,
@@ -123,3 +112,4 @@ def subsample_cn_data(cn_data, num_cells, id_field_name=CELL_ID,
         cn_data[id_field_name].unique()).sample(num_cells, random_state=seed)
 
     return cn_data[cn_data[id_field_name].isin(keep_ids)]
+

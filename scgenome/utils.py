@@ -4,7 +4,8 @@ import collections
 from itertools import product
 
 from scgenome.constants import CN_DATA_ID, CELL_ID, VALUE_IDS, INDEX_IDS, \
-    COPY_ID, NBIN_NCHR, BHC_ID
+    COPY_ID, NBIN_NCHR, BHC_ID, ORIGIN_ID
+from scgenome.tantalus import subsample_cn_data
 from . import refgenome
 
 
@@ -143,3 +144,35 @@ def expand_grid(dictionary):
     return pd.DataFrame([row for row in product(*dictionary.values())],
                         columns=dictionary.keys())
 
+
+def get_cn_data_submixture(cn_data, num_cells, hmmcopy_tickets, sample_ids,
+                           proportions=None, origin_field_name=ORIGIN_ID,
+                           id_field_name=CELL_ID,
+                           seed=None):
+    """
+
+   :param hmmcopy_tickets: list of hmmcopy tickets
+   :param sample_ids: list of lists of sample ids. first element corresponds
+   to first element in `hmmcopy_tickets` etc.
+   :return:
+   """
+    if proportions is None:
+        if seed is not None:
+            np.random.seed(seed)
+        proportions = np.abs(np.random.normal(size=len(sample_ids)))
+        proportions = proportions / proportions.sum()
+
+    cell_counts = (num_cells * proportions).astype("int")
+
+    sub_datasets = []
+    for i in range(len(hmmcopy_tickets)):
+        jira_cn_data = cn_data[cn_data["sample_id"].isin(sample_ids[i])]
+        jira_cn_data[origin_field_name] = hmmcopy_tickets[i]
+        sub_cn_data = subsample_cn_data(jira_cn_data, cell_counts[i],
+                                        id_field_name, seed)
+
+        sub_datasets.append(sub_cn_data)
+
+    mixed = pd.concat(sub_datasets)
+    return {"mixed_cn_data": mixed, "proportions": proportions,
+            "cell_counts": cell_counts}
