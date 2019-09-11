@@ -50,7 +50,8 @@ def _secondary_clustering(data, linkage=None):
         Y = sch.linkage(D, method='complete')
         Z = sch.dendrogram(Y, color_threshold=-1, no_plot=True)
     else:
-        Z = sch.dendrogram(linkage, color_threshold=-1, no_plot=True)
+        Z = sch.dendrogram(linkage, color_threshold=-1, no_plot=True,
+                           orientation="left")
     idx = np.array(Z['leaves'])
     ordering = np.zeros(idx.shape[0], dtype=int)
     ordering[idx] = np.arange(idx.shape[0])
@@ -70,7 +71,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
     plot_data = (plot_data.set_index(columns)[cn_field_name]
                     .unstack(level=levels).fillna(0))
 
-    ordering = _secondary_clustering(plot_data.values)
+    ordering = _secondary_clustering(plot_data.values, linkage)
     ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
     plot_data = plot_data.T.set_index(ordering, append=True).T
     if linkage is not None:

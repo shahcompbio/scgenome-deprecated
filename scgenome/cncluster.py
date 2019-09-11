@@ -196,7 +196,7 @@ def bayesian_cluster(cn_data,
     variances = get_variances(cn_data, matrix_data, n_states)
 
     transmodel = {"kind": "twoparam", "e0": prob_cn_change,
-                  "e1": 1-prob_cn_change}
+                  "e1": 1 - prob_cn_change}
 
     # (sample_inds, left_child, right_child, cluster_ind, pi, d, ll)
     clusters = [TNode([i], None, None, i, 1, alpha, 1) for i in range(n_cells)]
@@ -207,8 +207,7 @@ def bayesian_cluster(cn_data,
         link_cols = DEBUG_LINKAGE_COLS
     else:
         link_cols = LINKAGE_COLS
-    linkage = pd.DataFrame(data=None,
-                           columns=link_cols,
+    linkage = pd.DataFrame(data=None, columns=link_cols,
                            index=range(n_cells-1))
     li = 0
     # TODO can stop at 2 and merge the last 2 if it saves time
