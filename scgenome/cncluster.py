@@ -9,7 +9,8 @@ from adjustText import adjust_text
 from scgenome.jointcnmodels import get_variances, get_tr_probs
 from itertools import combinations
 from .TNode import TNode
-from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS, BHC_ID
+from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS, BHC_ID, \
+    DEBUG_LINKAGE_COLS
 from .utils import cn_data_to_mat_data_ids
 from scipy.spatial.distance import pdist
 
@@ -158,7 +159,7 @@ def plot_umap_clusters(ax, df):
 def bayesian_cluster(cn_data,
                      n_states=MAX_CN, alpha=ALPHA,
                      prob_cn_change=0.8, value_ids=VALUE_IDS,
-                     clustering_id=BHC_ID):
+                     clustering_id=BHC_ID, debug=False):
     """
     Performs bayesian hierarchical clustering on copy-number data (defaults
     configured for HMMCopy)
@@ -202,8 +203,12 @@ def bayesian_cluster(cn_data,
     [node.update_tree_ll(measurement, variances, transmodel)
      for node in clusters]
 
+    if debug:
+        link_cols = DEBUG_LINKAGE_COLS
+    else:
+        link_cols = LINKAGE_COLS
     linkage = pd.DataFrame(data=None,
-                           columns=LINKAGE_COLS,
+                           columns=link_cols,
                            index=range(n_cells-1))
     li = 0
     # TODO can stop at 2 and merge the last 2 if it saves time
@@ -242,12 +247,14 @@ def bayesian_cluster(cn_data,
         selected_cluster.cluster_ind = n_cells + li
         left_ind = selected_cluster.left_child.cluster_ind
         right_ind = selected_cluster.right_child.cluster_ind
-        linkage.iloc[li] = [left_ind, right_ind, r.flatten()[max_r_flat_ind],
-                            naive_dist[i_max, j_max], selected_cluster.ll,
 
-                            len(clusters[i_max].sample_inds),
-                            len(clusters[j_max].sample_inds)]
-
+        link_row = [left_ind, right_ind, r.flatten()[max_r_flat_ind],
+                    naive_dist[i_max, j_max], selected_cluster.ll,
+                    len(clusters[i_max].sample_inds),
+                    len(clusters[j_max].sample_inds)]
+        if debug:
+            link_row += debug_additions(selected_cluster)
+        linkage.iloc[li] = link_row
 
         li += 1
         clusters[i_max] = selected_cluster
@@ -257,6 +264,22 @@ def bayesian_cluster(cn_data,
     linkage["merge_count"] = linkage["i_count"] + linkage["j_count"]
     return linkage, clusters[0], cell_ids, matrix_data, measurement, variances
 
+
+def debug_additions(selected_cluster):
+    l = [selected_cluster.pi,
+         selected_cluster.d,
+         selected_cluster.cluster_ind,
+         selected_cluster.left_child.d,
+         selected_cluster.right_child.d,
+         selected_cluster.left_child.ll,
+         selected_cluster.right_child.ll,
+         selected_cluster.left_child.pi,
+         selected_cluster.right_child.pi,
+         selected_cluster.tree_ll,
+         selected_cluster.left_child.tree_ll,
+         selected_cluster.right_child.tree_ll,
+    ]
+    return l
 
 def prune_cluster(fclustering, cell_ids, cn_data,
                   cluster_field_name="bhc_cluster_id", inplace=False):

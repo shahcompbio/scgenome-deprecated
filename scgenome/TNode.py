@@ -34,16 +34,29 @@ class TNode:
         self.update_tree_ll(measurement, variances, transmodel)
         self.update_log_r()
 
+    #def update_pi_d(self, alpha=ALPHA):
+    #    if self.is_leaf():
+    #        self.pi = 1
+    #        self.d = alpha
+    #    else:
+    #        n_k = (len(self.left_child.sample_inds) +
+    #               len(self.right_child.sample_inds))
+    #        gnk = gamma(n_k)
+    #        self.d = alpha * gnk + self.left_child.d * self.right_child.d
+    #        self.pi = alpha * gnk / self.d
     def update_pi_d(self, alpha=ALPHA):
+        log_alpha = np.log(alpha)
         if self.is_leaf():
-            self.pi = 1
-            self.d = alpha
+            self.pi = np.log(1)
+            self.d = log_alpha
         else:
             n_k = (len(self.left_child.sample_inds) +
                    len(self.right_child.sample_inds))
-            gnk = gamma(n_k)
-            self.d = alpha * gnk + self.left_child.d * self.right_child.d
-            self.pi = alpha * gnk / self.d
+
+            log_gnk = np.log(gamma(n_k))
+            self.d = logsumexp([log_alpha + log_gnk,
+                                self.left_child.d + self.right_child.d])
+            self.pi = log_alpha + log_gnk - self.d
 
     def update_tree_ll(self, measurement, variances, transmodel):
         # TODO this should be named update, not get
@@ -53,8 +66,10 @@ class TNode:
                 measurement[self.sample_inds, :],
                 variances[self.sample_inds, :], transmodel)
         else:
-            first = np.log(self.pi) + self.ll
-            second = (np.log(1 - self.pi) + self.left_child.tree_ll +
+            #first = np.log(self.pi) + self.ll
+            first = self.pi + self.ll
+            #second = (np.log(1 - self.pi) + self.left_child.tree_ll +
+            second = (np.log(1) - self.pi + self.left_child.tree_ll +
                       self.right_child.tree_ll)
             self.tree_ll = logsumexp([first, second])
 
@@ -67,11 +82,13 @@ class TNode:
                 variances[self.sample_inds, :], transmodel)
 
     def update_log_r(self):
-        top = np.log(self.pi) + self.ll
-        bottom = logsumexp([np.log(self.pi) + self.ll,
-                            np.log(1 - self.pi) +
-                            self.left_child.tree_ll +
-                            self.right_child.tree_ll])
+        #top = np.log(self.pi) + self.ll
+        top = self.pi + self.ll
+        #bottom = logsumexp([np.log(self.pi) + self.ll,
+        #                    np.log(1 - self.pi) +
+        #                    self.left_child.tree_ll +
+        #                    self.right_child.tree_ll])
+        bottom = self.tree_ll
         self.log_r = top - bottom
 
     def get_leaves(self, leaves=None):
