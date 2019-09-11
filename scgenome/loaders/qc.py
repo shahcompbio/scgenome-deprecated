@@ -30,9 +30,8 @@ def _calculate_annotation_metrics(results_tables):
     return data
 
 
-def load_cached_qc_data(
-        ticket_id,
-        local_cache_directory,
+def load_qc_data(
+        results_dir,
         sample_ids=None,
         subsample=None,
         additional_hmmcopy_reads_cols=None,
@@ -40,15 +39,14 @@ def load_cached_qc_data(
     """ Load qc data (align, hmmcopy, annotation)
     
     Args:
-        ticket_id (str): jira ticket for the analyis producing the results.
-        local_cache_directory (str): path to hmmcopy results.
+        results_dir (str): results directory to load from.
         sample_ids (list of str, optional): Set of sample ids to filter for. Defaults to None.
         subsample (float, optional): Proportion of the cells to downsample to. Defaults to None.
         additional_hmmcopy_reads_cols (list of str, optional): Additional columns to obtain from the reads table. Defaults to None.
     """
 
     ticket_results_dirs = scgenome.loaders.utils.find_results_directories(
-        ticket_id, local_cache_directory)
+        results_dir)
 
     results_tables = load_align_data(ticket_results_dirs['align'])
     hmmcopy_results_tables = load_hmmcopy_data(

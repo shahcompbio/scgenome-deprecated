@@ -24,11 +24,11 @@ categorical_columns = [
 ]
 
 
-def load_snv_count_data(results_dir, positions):
+def load_snv_count_data(pseudobulk_dir, positions):
     """ Load per cell SNV count data
     
     Args:
-        results_dir (str): pseudobulk results directory
+        pseudobulk_dir (str): pseudobulk results directory
         positions (pandas.DataFrame): restrict to the specified positions
     
     Returns:
@@ -36,7 +36,7 @@ def load_snv_count_data(results_dir, positions):
     """
     snv_count_data = []
 
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(results_dir, 'snv_union_counts.csv.gz'):
+    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, 'snv_union_counts.csv.gz'):
         logging.info('Loading snv counts from {}'.format(filepath))
 
         data = pd.read_csv(
@@ -67,18 +67,18 @@ def load_snv_count_data(results_dir, positions):
 
 
 
-def load_snv_annotation_table(results_dir, table_name):
+def load_snv_annotation_table(pseudobulk_dir, table_name):
     """ Load SNV annotation data
     
     Args:
-        results_dir (str): pseudobulk results directory
+        pseudobulk_dir (str): pseudobulk results directory
         table_name (str): name of annotation table to load.
     
     Returns:
         pandas.DataFrame: SNVs annotation data per sample / library
     """
     snv_data = []
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(results_dir, f'snv_{table_name}.csv.gz'):
+    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, f'snv_{table_name}.csv.gz'):
         logging.info(f'Loading snv {table_name} annotations from {filepath}')
 
         data = pd.read_csv(
@@ -138,7 +138,7 @@ def get_highest_snpeff_effect(snpeff_data):
     return snpeff_data
 
 
-def load_snv_annotation_results(results_dir, museq_filter=None, strelka_filter=None):
+def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filter=None):
     """ Collate snv results into a single table.
     """
 
@@ -149,30 +149,30 @@ def load_snv_annotation_results(results_dir, museq_filter=None, strelka_filter=N
         strelka_filter = default_strelka_filter
 
     logging.info('starting load')
-    mappability = load_snv_annotation_table(results_dir, 'mappability')
+    mappability = load_snv_annotation_table(pseudobulk_dir, 'mappability')
     mappability = mappability[mappability['mappability'] > 0.99]
     mappability['chrom'] = mappability['chrom'].astype(str)
 
-    strelka_results = load_snv_annotation_table(results_dir, 'strelka').rename(columns={'score': 'strelka_score'})
+    strelka_results = load_snv_annotation_table(pseudobulk_dir, 'strelka').rename(columns={'score': 'strelka_score'})
     for col in ('chrom', 'ref', 'alt'):
         strelka_results[col] = strelka_results[col].astype(str)
 
-    museq_results = load_snv_annotation_table(results_dir, 'museq').rename(columns={'score': 'museq_score'})
+    museq_results = load_snv_annotation_table(pseudobulk_dir, 'museq').rename(columns={'score': 'museq_score'})
     for col in ('chrom', 'ref', 'alt'):
         museq_results[col] = museq_results[col].astype(str)
 
-    cosmic = load_snv_annotation_table(results_dir, 'cosmic_status')
+    cosmic = load_snv_annotation_table(pseudobulk_dir, 'cosmic_status')
     logging.info('cosmic table with shape {}'.format(cosmic.shape))
     cosmic['is_cosmic'] = True
     cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
 
-    snpeff = load_snv_annotation_table(results_dir, 'snpeff')
+    snpeff = load_snv_annotation_table(pseudobulk_dir, 'snpeff')
     snpeff = get_highest_snpeff_effect(snpeff)
     logging.info('snpeff table with shape {}'.format(snpeff.shape))
 
-    tnc = load_snv_annotation_table(results_dir, 'trinuc')
+    tnc = load_snv_annotation_table(pseudobulk_dir, 'trinuc')
 
-    data = load_snv_annotation_table(results_dir, 'allele_counts')
+    data = load_snv_annotation_table(pseudobulk_dir, 'allele_counts')
 
     logging.info('summing snv counts')
     data = (
@@ -222,15 +222,23 @@ def load_snv_data(
     """ Load filtered SNV annotation and count data
     
     Args:
-        results_dir (str): pseudbulk data to load from
+        results_dir (str): results directory to load from.
         museq_score_threshold (float, optional): mutationseq score threshold. Defaults to None.
         strelka_score_threshold (float, optional): strelka score threshold. Defaults to None.
     
     Returns:
         pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
     """
+    analysis_dirs = scgenome.loaders.utils.find_results_directories(
+        results_dir)
+
+    if 'pseudobulk' not in analysis_dirs:
+        raise ValueError(f'no pseudobulk found for directory {results_dir}')
+
+    pseudobulk_dir = analysis_dirs['pseudobulk']
+
     snv_data = load_snv_annotation_results(
-        results_dir,
+        pseudobulk_dir,
         museq_filter=museq_filter,
         strelka_filter=strelka_filter)
 
@@ -238,7 +246,7 @@ def load_snv_data(
 
     positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
 
-    snv_count_data = load_snv_count_data(results_dir, positions)
+    snv_count_data = load_snv_count_data(pseudobulk_dir, positions)
     snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
     snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
 
@@ -246,30 +254,4 @@ def load_snv_data(
         'snv_data': snv_data,
         'snv_count_data': snv_count_data,
     }
-
-
-def load_cached_snv_data(
-        ticket_id,
-        local_cache_directory,
-        **kwargs
-    ):
-    """ Load snv tables from the cache
-    
-    Args:
-        ticket_id (str): jira ticket for the analyis producing the results.
-        local_cache_directory (str): local cache directory to search for results.
-    
-    Returns:
-        dict: pandas.DataFrame tables keyed by table name
-    """
-
-    ticket_results_dirs = scgenome.loaders.utils.find_results_directories(
-        ticket_id, local_cache_directory)
-
-    if 'pseudobulk' not in ticket_results_dirs:
-        raise ValueError(f'no pseudobulk found for ticket {ticket_id}')
-
-    return load_snv_data(
-        ticket_results_dirs['pseudobulk'],
-        **kwargs)
 

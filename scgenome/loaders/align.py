@@ -72,16 +72,24 @@ _table_fixes = {
 
 
 def load_align_data(
-        align_results_dir,
+        results_dir,
     ):
     """ Load copy number tables
     
     Args:
-        align_results_dir (str): path to hmmcopy results.
+        results_dir (str): results directory to load from.
     
     Returns:
         dict: pandas.DataFrame tables keyed by table name
     """
+
+    analysis_dirs = scgenome.loaders.utils.find_results_directories(
+        results_dir)
+
+    if 'align' not in analysis_dirs:
+        raise ValueError(f'no align found for directory {results_dir}')
+
+    align_results_dir = analysis_dirs['align']
 
     manifest_filename = os.path.join(align_results_dir, 'metadata.yaml')
     manifest = yaml.load(open(manifest_filename))

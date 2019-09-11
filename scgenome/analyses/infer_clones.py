@@ -154,9 +154,9 @@ def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory
         analysis['jira_ticket'],
         local_cache_directory)
 
-    results = scgenome.loaders.qc.load_cached_qc_data(
-        analysis['jira_ticket'],
-        local_cache_directory)
+    ticket_directory = os.path.join(local_cache_directory, analysis['jira_ticket'])
+
+    results = scgenome.loaders.qc.load_qc_data(ticket_directory)
 
     cn_data = results['hmmcopy_reads']
     metrics_data = results['hmmcopy_metrics']
@@ -223,11 +223,11 @@ def retrieve_pseudobulk_data(
     ):
     """ Retrieve SNV, breakpoint and allele data
     """
+    ticket_directory = os.path.join(local_cache_directory, ticket_id)
 
     logging.info('snv data')
-    snv_results = scgenome.loaders.snv.load_cached_snv_data(
-        ticket_id,
-        local_cache_directory,
+    snv_results = scgenome.loaders.snv.load_snv_data(
+        ticket_directory,
         museq_filter=museq_score_threshold,
         strelka_filter=strelka_score_threshold,
     )
@@ -243,9 +243,8 @@ def retrieve_pseudobulk_data(
     )
 
     logging.info('allele data')
-    allele_results = scgenome.loaders.allele.load_cached_haplotype_allele_data(
-        ticket_id,
-        local_cache_directory,
+    allele_results = scgenome.loaders.allele.load_haplotype_allele_data(
+        ticket_directory,
     )
     allele_data = allele_results['allele_counts']
     allele_data = scgenome.snpdata.calculate_cluster_allele_counts(
@@ -255,9 +254,8 @@ def retrieve_pseudobulk_data(
     )
 
     logging.info('breakpoint data')
-    breakpoint_results = scgenome.loaders.breakpoint.load_cached_breakpoint_data(
-        ticket_id,
-        local_cache_directory,
+    breakpoint_results = scgenome.loaders.breakpoint.load_breakpoint_data(
+        ticket_directory,
     )
     breakpoint_data = breakpoint_results['breakpoint_data']
     breakpoint_count_data = breakpoint_results['breakpoint_count_data']
