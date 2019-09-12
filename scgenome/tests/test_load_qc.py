@@ -35,7 +35,7 @@ dtypes_check = {
     'hmmcopy_segs': {
         'chr': 'category',
         'start': 'int64',
-        'end': 'float64',
+        'end': 'int64',
         'state': 'int64',
         'median': 'float64',
         'multiplier': 'int64',
@@ -63,6 +63,7 @@ dtypes_check = {
         'order': 'float64',
         'experimental_condition': 'object',
         'quality': 'float64',
+        'is_s_phase': 'boolean',
     },
     'gc_metrics': {
     },

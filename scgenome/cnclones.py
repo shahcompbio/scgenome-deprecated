@@ -217,6 +217,7 @@ def finalize_clusters(
     plot_clones(plot_cn_data, 'cluster_id', results_prefix + 'final_')
 
     # Plot s phase proportions
+    metrics_data['is_s_phase'] = metrics_data['is_s_phase'].astype(bool)
     s_plot_data = (
         metrics_data
         .merge(final_clusters[['cell_id', 'cluster_id']].drop_duplicates())
