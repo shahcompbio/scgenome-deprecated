@@ -26,15 +26,15 @@ The `infer_clones.py` script can be used to run the full clonal analysis on a li
 
 #### Usage
 
-The `infer_clones.py` script runs in 3 stages: `retrieve_cn`, `cluster_cn`, and `pseudobulk_analysis.py`, to be run in that order.
+The `infer_clones.py` script runs in 3 stages: `retrieve-cn`, `cluster-cn`, and `pseudobulk-analysis`, to be run in that order.
 
 The CLI requires you to select the stage, and also specify the results prefix and the local storage directory for caching files.  Results of the analysis will be stored in files named with the results prefix and tantalus data will be cached in the local storage directory.
 
-The `retrieve_cn` stage requests metadata from tantalus and caches the data locally.  This stage requires one or more library ids and sample ids.  Copy number tables will be stored with the results prefix.
+The `rretrieve-cn` stage requests metadata from tantalus and caches the data locally.  This stage requires one or more library ids and sample ids.  Copy number tables will be stored with the results prefix.
 
-The `cluster_cn` stage runs the current copy number clustering, produces tables including the cluster labels, and distance from each cell to each cluster.  Additional plots will be output to files with the results prefix.
+The `cluster-cn` stage runs the current copy number clustering, produces tables including the cluster labels, and distance from each cell to each cluster.  Additional plots will be output to files with the results prefix.
 
-The `pseudobulk_analysis.py` stage runs the current pseudobulk analyses on a given raw pseudobulk run.  This includes:
+The `pseudobulk-analysis` stage runs the current pseudobulk analyses on a given raw pseudobulk run.  This includes:
 - an analysis of the data as bulk with plots that include mutation signatures and genome wide SNV frequencies
 - SNV phylogenetic analysis of clone specific SNVs
 - Inference of allele specific copy number

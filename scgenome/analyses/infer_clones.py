@@ -302,7 +302,7 @@ def infer_clones_cmd(ctx, results_prefix, local_cache_directory):
     ctx.obj['local_cache_directory'] = local_cache_directory
 
 
-@infer_clones_cmd.command()
+@infer_clones_cmd.command('retriever-cn')
 @click.pass_context
 @click.option('--library_id')
 @click.option('--sample_id')
@@ -349,7 +349,7 @@ def retrieve_cn(library_ids, sample_ids, results_prefix, local_cache_directory):
     metrics_data.to_pickle(results_prefix + 'metrics_data.pickle')
 
 
-@infer_clones_cmd.command()
+@infer_clones_cmd.command('cluster-cn')
 @click.pass_context
 def cluster_cn_cmd(ctx):
     results_prefix = ctx.obj['results_prefix']
@@ -396,7 +396,7 @@ def cluster_cn(results_prefix, cluster_size_threshold=50):
     mitotic_errors.to_pickle(results_prefix + 'mitotic_errors.pickle')
 
 
-@infer_clones_cmd.command()
+@infer_clones_cmd.command('pseudobulk-analysis')
 @click.pass_context
 @click.argument('pseudobulk_ticket')
 def pseudobulk_analysis_cmd(ctx, pseudobulk_ticket):
