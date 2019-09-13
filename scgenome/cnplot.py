@@ -49,13 +49,15 @@ def _secondary_clustering(data, linkage=None):
         D = dst.squareform(dst.pdist(data.T, 'cityblock'))
         Y = sch.linkage(D, method='complete')
         Z = sch.dendrogram(Y, color_threshold=-1, no_plot=True)
+        idx = np.array(Z['leaves'])
+        ordering = np.zeros(idx.shape[0], dtype=int)
+        ordering[idx] = np.arange(idx.shape[0])
+        return ordering
     else:
         Z = sch.dendrogram(linkage, color_threshold=-1, no_plot=True,
                            orientation="left")
-    idx = np.array(Z['leaves'])
-    ordering = np.zeros(idx.shape[0], dtype=int)
-    ordering[idx] = np.arange(idx.shape[0])
-    return ordering
+        idx = np.flip(np.array(Z['leaves']))
+        return idx
 
 
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
@@ -70,6 +72,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
         levels.append(origin_field_name)
     plot_data = (plot_data.set_index(columns)[cn_field_name]
                     .unstack(level=levels).fillna(0))
+    #plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
 
     ordering = _secondary_clustering(plot_data.values, linkage)
     ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
@@ -87,9 +90,14 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
         dend_ax.spines['top'].set_visible(False)
         dend_ax.spines['right'].set_visible(False)
 
-    plot_data = plot_data.sort_index(axis=1, level=[1, 2])
+    if linkage is None:
+        plot_data = plot_data.sort_index(axis=1, level=[1, 2])
+    else:
+        plot_data = plot_data.sort_index(axis=1, level=[3])
+
     if max_cn is not None:
         plot_data[plot_data > max_cn] = max_cn
+
 
     mat_chrom_idxs = plot_data.index.get_level_values(0).values
     chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [plot_data.shape[0] - 1])
@@ -105,6 +113,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
     if not raw:
         cmap = get_cn_cmap(plot_data.values)
 
+    # Generates heatmap
     im = ax.imshow(plot_data.T, aspect='auto', cmap=cmap)
 
     ax.set(xticks=chrom_mids)
@@ -133,7 +142,8 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
         ax = fig.add_axes([0.0, 0.0, 0.05, 1.])
     else:
         ax = fig.add_axes([1.03, 0, 0.05, 1.])
-    ax.imshow(np.array(color_mat)[::-1, np.newaxis], aspect='auto', origin='lower')
+    ax.imshow(np.array(color_mat)[::-1, np.newaxis], aspect='auto',
+              origin='lower')
     ax.grid(False)
     ax.set_xticks([])
     ax.set_yticks([])

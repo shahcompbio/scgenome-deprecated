@@ -265,20 +265,22 @@ def bayesian_cluster(cn_data,
 
 
 def debug_additions(selected_cluster):
-    l = [selected_cluster.pi,
-         selected_cluster.d,
-         selected_cluster.cluster_ind,
-         selected_cluster.left_child.d,
-         selected_cluster.right_child.d,
-         selected_cluster.left_child.ll,
-         selected_cluster.right_child.ll,
-         selected_cluster.left_child.pi,
-         selected_cluster.right_child.pi,
-         selected_cluster.tree_ll,
-         selected_cluster.left_child.tree_ll,
-         selected_cluster.right_child.tree_ll,
+    l = [
+        selected_cluster.pi,
+        selected_cluster.d,
+        selected_cluster.cluster_ind,
+        selected_cluster.left_child.d,
+        selected_cluster.right_child.d,
+        selected_cluster.left_child.ll,
+        selected_cluster.right_child.ll,
+        selected_cluster.left_child.pi,
+        selected_cluster.right_child.pi,
+        selected_cluster.tree_ll,
+        selected_cluster.left_child.tree_ll,
+        selected_cluster.right_child.tree_ll,
     ]
     return l
+
 
 def prune_cluster(fclustering, cell_ids, cn_data,
                   cluster_field_name="bhc_cluster_id", inplace=False):
