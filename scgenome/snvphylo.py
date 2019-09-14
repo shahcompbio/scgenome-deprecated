@@ -163,7 +163,8 @@ def log_likelihood_present(c_m, c_t, e_s, n_v, n_t):
     conditional_log_likelihoods = []
 
     for c_v in np.arange(1., c_m + 1., 1.):
-        r = c_v / c_t
+        allele_ratio = c_v / c_t
+        r = (1 - e_s) * allele_ratio + e_s * (1 - allele_ratio)
         conditional_log_likelihoods.append(log_binomial_pdf(n_v, n_t, r))
 
     return scipy.misc.logsumexp(conditional_log_likelihoods)
