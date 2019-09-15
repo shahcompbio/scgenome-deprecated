@@ -170,22 +170,28 @@ def log_likelihood_present(c_m, c_t, e_s, n_v, n_t):
     return scipy.misc.logsumexp(conditional_log_likelihoods)
 
 
-def compute_dollo_ml_tree(snv_log_likelihoods):
+def compute_dollo_ml_tree(snv_log_likelihoods, leaf_name_groups=None):
     """ Compute the ML tree under the dollo model of SNV evolution
     """
-    trees = dollo.tasks.create_trees(snv_log_likelihoods, sample_col='cluster_id')
+    trees = dollo.tasks.create_trees(
+        snv_log_likelihoods,
+        sample_col='cluster_id',
+        leaf_name_groups=leaf_name_groups,
+    )
 
     results_table = dollo.tasks.compute_tree_log_likelihoods_mp(
         snv_log_likelihoods, trees,
         sample_col='cluster_id', variant_col='variant_id')
 
     ml_tree_id = results_table.set_index('tree_id')['log_likelihood'].idxmax()
+    tree = trees[ml_tree_id]
+    loss_prob = results_table.set_index('tree_id').loc[ml_tree_id, 'loss_prob']
 
     tree_annotations = dollo.run.annotate_posteriors(
-        snv_log_likelihoods, trees[ml_tree_id],
+        snv_log_likelihoods, tree, loss_prob=loss_prob,
         sample_col='cluster_id', variant_col='variant_id')
 
-    return trees[ml_tree_id], tree_annotations
+    return tree, tree_annotations
 
 
 def plot_dollo_ml_tree(tree, nodes):
