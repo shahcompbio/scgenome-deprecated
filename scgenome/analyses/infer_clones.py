@@ -53,8 +53,6 @@ read_count_threshold = 500000
 # SNV Calling thresholds
 museq_score_threshold = None
 strelka_score_threshold = None
-snvs_num_cells_threshold = 2
-snvs_sum_alt_threshold = 2
 
 # Cluster pruning thresholds
 is_original_cluster_mean_threshold = 0.5
@@ -220,6 +218,7 @@ def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory, resul
 def retrieve_pseudobulk_data(
         ticket_id, clusters, local_cache_directory, results_prefix,
         museq_score_threshold=None, strelka_score_threshold=None,
+        snvs_num_cells_threshold=2, snvs_sum_alt_threshold=2,
     ):
     """ Retrieve SNV, breakpoint and allele data
     """
