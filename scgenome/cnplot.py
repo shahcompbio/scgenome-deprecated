@@ -120,18 +120,37 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13
         cmap=get_cn_cmap(plot_data[cn_field_name].values),
     )
 
-    ax.set_xlim((-0.5, refgenome.info.chromosome_end.max()))
-    ax.set_xlabel('chromosome')
-    ax.set_xticks([0] + list(refgenome.info.chromosome_end.values))
-    ax.set_xticklabels([])
+    if chromosome is not None:
+        chromosome_length = refgenome.info.chromosome_info.set_index('chr').loc[chromosome, 'chromosome_length']
+        chromosome_start = refgenome.info.chromosome_info.set_index('chr').loc[chromosome, 'chromosome_start']
+        chromosome_end = refgenome.info.chromosome_info.set_index('chr').loc[chromosome, 'chromosome_end']
+        xticks = np.arange(0, chromosome_length, 1e7)
+        xticklabels = ['{0:d}M'.format(int(x / 1e6)) for x in xticks]
+        xminorticks = np.arange(0, chromosome_length, 1e6)
+        ax.set_xlabel(f'chromosome {chromosome}')
+        ax.set_xticks(xticks + chromosome_start)
+        ax.set_xticklabels(xticklabels)
+        ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(xminorticks + chromosome_start))
+        ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+        ax.set_xlim((chromosome_start, chromosome_end))
+
+    else:
+        ax.set_xlim((-0.5, refgenome.info.chromosome_end.max()))
+        ax.set_xlabel('chromosome')
+        ax.set_xticks([0] + list(refgenome.info.chromosome_end.values))
+        ax.set_xticklabels([])
+        ax.xaxis.tick_bottom()
+        ax.yaxis.tick_left()
+        ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_mid))
+        ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.chromosomes))
+
     ax.set_ylim((-0.5, max_cn))
     ax.set_yticks(np.arange(0, max_cn, 2))
-    ax.xaxis.tick_bottom()
-    ax.yaxis.tick_left()
-    ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_mid))
-    ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.chromosomes))
-
-    seaborn.despine(ax=ax, offset=10, trim=True)
+    
+    if chromosome is not None:
+        seaborn.despine(ax=ax, offset=10, trim=False)
+    else:
+        seaborn.despine(ax=ax, offset=10, trim=True)
 
     return chromosome_info
 
