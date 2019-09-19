@@ -139,7 +139,7 @@ def import_image_feature_data(
     return image_feature_data
 
 
-def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory, results_prefix):
+def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory):
     """ Retrieve comprehensive metrics data for a library
     """
 
@@ -187,7 +187,7 @@ def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory
     return cn_data, metrics_data
 
 
-def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory, results_prefix):
+def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     cn_data = []
@@ -195,7 +195,7 @@ def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory, resul
 
     for library_id in library_ids:
         lib_cn_data, lib_metrics_data = retrieve_cn_data(
-            tantalus_api, library_id, sample_ids, local_cache_directory, results_prefix)
+            tantalus_api, library_id, sample_ids, local_cache_directory)
 
         cn_data.append(lib_cn_data)
         metrics_data.append(lib_metrics_data)
@@ -341,7 +341,6 @@ def retrieve_cn(library_ids, sample_ids, results_prefix, local_cache_directory):
         library_ids,
         sample_ids,
         local_cache_directory,
-        results_prefix + 'retrieve_cn_',
     )
 
     cn_data.to_pickle(results_prefix + 'cn_data.pickle')
