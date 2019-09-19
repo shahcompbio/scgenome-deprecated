@@ -44,7 +44,7 @@ def plot_cbar(ax):
     ax.set_yticklabels(np.arange(len(color_reference))[::-1])
 
 
-def _secondary_clustering(data, linkage=None):
+def _secondary_clustering(data, linkage=None, flip=False):
     if linkage is None:
         D = dst.squareform(dst.pdist(data.T, 'cityblock'))
         Y = sch.linkage(D, method='complete')
@@ -56,14 +56,18 @@ def _secondary_clustering(data, linkage=None):
     else:
         Z = sch.dendrogram(linkage, color_threshold=-1, no_plot=True,
                            orientation="left")
-        idx = np.flip(np.array(Z['leaves']))
+        idx = np.array(Z['leaves'])
+        if flip:
+            idx = np.flip(idx)
+        print(f"idx: {idx}")
         return idx
 
 
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
                                   cluster_field_name='cluster_id',
                                   raw=False, max_cn=13, linkage=None,
-                                  fig=None, origin_field_name=None):
+                                  fig=None, origin_field_name=None,
+                                  flip=False):
     plot_data = cn_data.merge(utils.chrom_idxs)
     columns = ['chr_index', 'start', 'cell_id', cluster_field_name]
     levels = ['cell_id', cluster_field_name]
@@ -74,7 +78,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
                     .unstack(level=levels).fillna(0))
     #plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
 
-    ordering = _secondary_clustering(plot_data.values, linkage)
+    ordering = _secondary_clustering(plot_data.values, linkage, flip)
     ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
     plot_data = plot_data.T.set_index(ordering, append=True).T
     if linkage is not None:
@@ -128,12 +132,13 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
 def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
                                          cluster_field_name='cluster_id',
                                          raw=False, max_cn=13,
-                                         linkage=None, origin_field_name=None):
+                                         linkage=None, origin_field_name=None,
+                                         flip=False):
     ax = fig.add_axes([0.1, 0.0, 0.9, 1.])
     plot_data = plot_clustered_cell_cn_matrix(
         ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name,
         raw=raw, max_cn=max_cn, linkage=linkage, fig=fig,
-        origin_field_name=origin_field_name)
+        origin_field_name=origin_field_name, flip=flip)
 
     cluster_ids = plot_data.columns.get_level_values(1).values
     color_mat = cncluster.get_cluster_colors(cluster_ids)

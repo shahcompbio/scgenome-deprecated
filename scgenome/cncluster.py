@@ -159,7 +159,7 @@ def plot_umap_clusters(ax, df):
 def bayesian_cluster(cn_data,
                      n_states=MAX_CN, alpha=ALPHA,
                      prob_cn_change=0.8, value_ids=VALUE_IDS,
-                     clustering_id=BHC_ID, debug=False):
+                     clustering_id=BHC_ID, debug=False, print_r=False):
     """
     Performs bayesian hierarchical clustering on copy-number data (defaults
     configured for HMMCopy)
@@ -198,9 +198,11 @@ def bayesian_cluster(cn_data,
     transmodel = {"kind": "twoparam", "e0": prob_cn_change,
                   "e1": 1 - prob_cn_change}
 
-    # (sample_inds, left_child, right_child, cluster_ind, pi, d, ll)
-    clusters = [TNode([i], None, None, i, 1, alpha, 1) for i in range(n_cells)]
-    [node.update_tree_ll(measurement, variances, transmodel)
+    clusters = [TNode([i], None, None, i,
+                      0, alpha) for i in range(n_cells)]
+    #def __init__(self, sample_inds, left_child, right_child, cluster_ind,
+    #             pi=None, d=None, ll=None, tree_ll=None, log_r=None):
+    [node.update_vars(measurement, variances, transmodel, alpha)
      for node in clusters]
 
     if debug:
@@ -242,6 +244,13 @@ def bayesian_cluster(cn_data,
         max_r_flat_ind = np.nanargmax(r)
         i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)
         selected_cluster = next_level[i_max][j_max]
+        if print_r:
+            print(f"r at li: {li}\n{pd.DataFrame(r)}")
+            print(f"i_max, j_max: {i_max}, {j_max}")
+            if 69 in selected_cluster.sample_inds:
+                print("---------------")
+            print(f"left_cluster, {selected_cluster.left_child}")
+            print(f"right_cluster, {selected_cluster.right_child}")
 
         selected_cluster.cluster_ind = n_cells + li
         left_ind = selected_cluster.left_child.cluster_ind
