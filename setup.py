@@ -15,4 +15,6 @@ setup(name='scgenome',
             'filter_copynumber = scgenome.scripts.filter_copynumber:main',
             'generate_copynumber_clone_tree_hac = scgenome.generate_copynumber_clone_tree_hac:main'
         ]
-      })
+      },
+      package_data={'':['data/GRCh37-lite.fa.fai']},
+    )
