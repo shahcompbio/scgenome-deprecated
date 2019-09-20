@@ -1,11 +1,12 @@
-import logging
-import yaml
 import os
+from collections import defaultdict
+
 import pandas as pd
-
-import scgenome.utils
 import scgenome.loaders.utils
-
+import scgenome.loaders.utils
+import scgenome.utils
+import scgenome.utils
+import yaml
 
 standard_hmmcopy_reads_cols = [
     'chr',
@@ -18,7 +19,6 @@ standard_hmmcopy_reads_cols = [
     'state',
 ]
 
-
 _categorical_cols = [
     'cell_id',
     'chr',
@@ -26,13 +26,11 @@ _categorical_cols = [
     'library_id',
 ]
 
-
 _table_suffixes_v0_0_0 = {
     ('hmmcopy_reads', '_multiplier0_reads.csv.gz'),
     ('hmmcopy_segs', '_multiplier0_segments.csv.gz'),
     ('hmmcopy_metrics', '_multiplier0_metrics.csv.gz'),
 }
-
 
 _table_suffixes_v0_2_25 = {
     ('hmmcopy_reads', '_reads.csv.gz'),
@@ -40,8 +38,7 @@ _table_suffixes_v0_2_25 = {
     ('hmmcopy_metrics', '_metrics.csv.gz'),
 }
 
-
-table_suffixes = {
+table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
     'v0.0.0': _table_suffixes_v0_0_0,
     'v0.1.5': _table_suffixes_v0_0_0,
     'v0.2.2': _table_suffixes_v0_0_0,
@@ -57,18 +54,18 @@ table_suffixes = {
     'v0.2.25': _table_suffixes_v0_2_25,
     'v0.3.0': _table_suffixes_v0_2_25,
     'v0.3.1': _table_suffixes_v0_2_25,
-}
+})
 
 
 def _table_fixes_v0_0_0(results_tables):
-    pass # TODO
+    pass  # TODO
 
 
 def _table_fixes_v0_2_25(results_tables):
-    pass # TODO
+    pass  # TODO
 
 
-_table_fixes = {
+_table_fixes = defaultdict(lambda: _table_fixes_v0_2_25, {
     'v0.0.0': _table_fixes_v0_0_0,
     'v0.1.5': _table_fixes_v0_0_0,
     'v0.2.2': _table_fixes_v0_0_0,
@@ -84,13 +81,13 @@ _table_fixes = {
     'v0.2.25': _table_fixes_v0_2_25,
     'v0.3.0': _table_fixes_v0_2_25,
     'v0.3.1': _table_fixes_v0_2_25,
-}
+})
 
 
 def load_hmmcopy_data(
         results_dir,
         additional_reads_cols=None,
-    ):
+):
     """ Load copy number tables
     
     Args:
@@ -152,12 +149,11 @@ def load_hmmcopy_data(
         results_tables[table_name] = data
 
     # FIXUP: older hmmcopy results have total_mapped_reads instead of total_mapped_reads_hmmcopy
-    results_tables['hmmcopy_metrics'] = results_tables['hmmcopy_metrics'].rename(columns={'total_mapped_reads': 'total_mapped_reads_hmmcopy'})
+    results_tables['hmmcopy_metrics'] = results_tables['hmmcopy_metrics'].rename(
+        columns={'total_mapped_reads': 'total_mapped_reads_hmmcopy'})
 
     scgenome.utils.union_categories(results_tables.values())
 
     _table_fixes[version](results_tables)
 
     return results_tables
-
-

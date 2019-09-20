@@ -1,11 +1,12 @@
-import logging
-import yaml
 import os
+from collections import defaultdict
+
 import pandas as pd
-
-import scgenome.utils
 import scgenome.loaders.utils
-
+import scgenome.loaders.utils
+import scgenome.utils
+import scgenome.utils
+import yaml
 
 _categorical_cols = [
     'cell_id',
@@ -13,33 +14,33 @@ _categorical_cols = [
     'library_id',
 ]
 
-
 _table_suffixes_v0_2_25 = [
     ('annotation_metrics', '_metrics.csv.gz'),
 ]
 
-
-table_suffixes = {
+table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
     'v0.2.25': _table_suffixes_v0_2_25,
     'v0.3.0': _table_suffixes_v0_2_25,
     'v0.3.1': _table_suffixes_v0_2_25,
 }
+                             )
 
 
 def _table_fixes_v0_2_25(results_tables):
-    pass # TODO
+    pass  # TODO
 
 
-_table_fixes = {
+_table_fixes = defaultdict(lambda: _table_fixes_v0_2_25, {
     'v0.2.25': _table_fixes_v0_2_25,
     'v0.3.0': _table_fixes_v0_2_25,
     'v0.3.1': _table_fixes_v0_2_25,
 }
+                           )
 
 
 def load_annotation_data(
         results_dir,
-    ):
+):
     """ Load copy number tables
     
     Args:
@@ -94,4 +95,3 @@ def load_annotation_data(
     _table_fixes[version](results_tables)
 
     return results_tables
-
