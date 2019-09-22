@@ -14,7 +14,7 @@ class getFileHandle(object):
         self.mode = mode
 
     def __enter__(self):
-        if self.get_file_format(self.filename) in ["csv", 'plain-text']:
+        if self.get_file_format(self.filename) in ["csv", 'plain-text', "yaml"]:
             self.handle = open(self.filename, self.mode)
         elif self.get_file_format(self.filename) == "gzip":
             self.handle = gzip.open(self.filename, self.mode)
@@ -37,9 +37,11 @@ class getFileHandle(object):
             return "gzip"
         elif ext == ".h5" or ext == ".hdf5":
             return "h5"
+        elif ext == ".yaml":
+            return "yaml"
         else:
             logging.getLogger("single_cell.helpers").warn(
-                "Couldn't detect output format. extension {}".format(ext)
+                "Couldn't detect output format for {}. extension {}".format(filepath, ext)
             )
             return "plain-text"
 
@@ -139,7 +141,7 @@ class CsvInput(object):
             raise CsvInputError("HDF is not supported")
         else:
             logging.getLogger("single_cell.utils.csv").warn(
-                "Couldn't detect output format. extension {}".format(ext)
+                "Couldn't detect output format for {}. extension {}".format(filepath, ext)
             )
             return None
 
@@ -257,7 +259,7 @@ class CsvOutput(object):
             raise CsvInputError("HDF is not supported")
         else:
             logging.getLogger("single_cell.utils.csv").warn(
-                "Couldn't detect output format. extension {}".format(ext)
+                "Couldn't detect output format for {}. extension {}".format(filepath, ext)
             )
             return None
 
