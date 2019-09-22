@@ -6,6 +6,7 @@ import numpy as np
 
 import scgenome.utils
 import scgenome.loaders.utils
+import scgenome.csvutils
 
 
 def load_breakpoint_annotation_data(
@@ -16,27 +17,13 @@ def load_breakpoint_annotation_data(
     Args:
         pseudobulk_dir (str): results directory
     """
-    bpcols = "prediction_id\tchromosome_1\tstrand_1\tposition_1\tchromosome_2\tstrand_2\t\
-    position_2\thomology\tnum_split\tinserted\tmate_score\ttemplate_length_1\tlog_cdf\t\
-    template_length_2\tlog_likelihood\ttemplate_length_min\tnum_reads\tnum_unique_reads\t\
-    type\tnum_inserted\tsequence\tgene_id_1\tgene_name_1\tgene_location_1\tgene_id_2\t\
-    gene_name_2\tgene_location_2\tdgv_ids\tis_germline\tis_dgv\tnum_patients\tis_filtered\t\
-    dist_filtered\tbalanced\trearrangement_type".replace(' ', '').split('\t')
-
     suffix = 'destruct.csv.gz'
-    if scgenome.loaders.utils.get_version(pseudobulk_dir) == 'v0.2.11':
-        suffix = 'destruct.tsv'
-        bpcols = None
 
     breakpoint_data = []
 
     for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, suffix):
-        data = pd.read_csv(
-            filepath, sep='\t', names=bpcols,
-            dtype={
-                'chromosome_1': 'str',
-                'chromosome_2': 'str',
-            })
+        csv_input = scgenome.csvutils.CsvInput(filepath)
+        data = csv_input.read_csv()
         data['library_id'] = library_id
         data['sample_id'] = sample_id
         breakpoint_data.append(data)
@@ -58,16 +45,12 @@ def load_breakpoint_count_data(
         pseudobulk_dir (str): results directory
     """
     suffix = 'cell_counts_destruct.csv.gz'
-    cols = ['cluster_id', 'cell_id', 'read_count']
-
-    if scgenome.loaders.utils.get_version(pseudobulk_dir) == 'v0.2.11':
-        suffix = 'cell_counts_destruct.csv'
-        cols = None
 
     breakpoint_count_data = []
 
     for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, suffix):
-        data = pd.read_csv(filepath, names=cols)
+        csv_input = scgenome.csvutils.CsvInput(filepath)
+        data = csv_input.read_csv()
         data['library_id'] = library_id
         data['sample_id'] = sample_id
         breakpoint_count_data.append(data)
