@@ -3,92 +3,90 @@ from scgenome.utils import cn_mat_to_cn_data, cn_mat_as_df
 from unittest import TestCase, main
 from .constants_test import *
 import pandas as pd
+from scipy.special import logsumexp
 
 
 class TestCluster(TestCase):
 
-    def test_bayesian_cluster(self):
-        df_cn_mat = cn_mat_as_df(E1_CN_MAT, E1_CHR_NAMES)
-        cn_data = cn_mat_to_cn_data(df_cn_mat, cell_id_vals=E1_CELL_IDS)
-        cn_data["cluster_id"] = (
-            cn_data["cell_id"].str.split("_", expand=True).iloc[:, 0])
-        np.random.seed(2)
-        cn_data["copy2"] = cn_data["copy"] + abs(np.random.normal(scale=0.3, size=cn_data.shape[0]))
-        cn_data.columns = ["chr", "bin", "cell_id", "state", "start", "end",
-                           "cluster_id", "copy"]
+    def setUp(self):
+        print(E2_VAR)
+        print("E2_VAR\n")
+        print(E2_COPY)
+        print("E2_COPY\n")
 
-        linkage, root, cl_cell_ids, matrix_data, measurement, variances = (
-            cncluster.bayesian_cluster(cn_data, n_states=11, debug=True,
-                                       value_ids=["copy", "state"]))
+        e2_pw_ll = np.zeros((E2_COPY.shape[0], E2_COPY.shape[0]))
+        for i in range(E2_COPY.shape[0]):
+            for j in range(E2_COPY.shape[0]):
+                data = E2_COPY[[i] + [j], :]
+                var = E2_VAR[[i] + [j], :]
+                ll = jointcnmodels.calculate_marginal_ll_simple(
+                    data, var, E2_TRANS
+                )
+                e2_pw_ll[i, j] = ll
+        print(e2_pw_ll)
+        print("e2_pw_ll\n\n")
 
-        with pd.option_context('display.max_rows', None,
-                               'display.max_columns', None):
-            print(linkage)
-        print(root)
-        print(cl_cell_ids)
-        print("expected----------")
-        prob_same = 0.8
-        transmodel = {"kind": "twoparam", "e0": prob_same,
-                      "e1": 1 - prob_same}
+        e2_d1 = 2.302585092994046
+        e2_pi1 = 0
+        e2_d2 = 4.700480365792417
+        e2_pi2 = -2.3978952727983707
+
         ll = [
             jointcnmodels.calculate_marginal_ll_simple(
-                E1_CN_MAT[[i], :],
-                variances[[i], :],
-                transmodel
+                E2_COPY[[i], :],
+                E2_VAR[[i], :],
+                E2_TRANS
             )
 
             for i in range(E1_CN_MAT.shape[0])
         ]
-        print(f"ll {ll}")
-        print(f"variances\n{variances}")
-        print(f"cn_data:\n{cn_data}")
+        print(ll)
+        print("single ll\n")
 
-    def test_bayesian_cluster3(self):
+        e2_pw_tree_ll = np.zeros((E2_COPY.shape[0], E2_COPY.shape[0]))
+        for i in range(E2_COPY.shape[0]):
+            for j in range(E2_COPY.shape[0]):
+                e2_pw_tree_ll[i,j] = logsumexp(
+                    [e2_pi2 + e2_pw_ll[i, j],
+                     np.log(1-np.exp(e2_pi2)) + ll[i] + ll[j]]
+                )
+        print(e2_pw_tree_ll)
+        print("e2_pw_tree_ll\n\n")
+
+        e2_r1 = e2_pi2 + e2_pw_ll - e2_pw_tree_ll
+        print(e2_r1)
+        print("e2_r1\n\n")
+
+
+    def test_bayesian_cluster(self):
         df_cn_mat = cn_mat_as_df(E2_CN_MAT, E2_CHR_NAMES)
         cn_data = cn_mat_to_cn_data(df_cn_mat, cell_id_vals=E2_CELL_IDS)
         cn_data["cluster_id"] = (
             cn_data["cell_id"].str.split("_", expand=True).iloc[:, 0])
-        np.random.seed(2)
-        cn_data["copy2"] = cn_data["copy"] + abs(np.random.normal(scale=0.3, size=cn_data.shape[0]))
+        np.random.seed(E2_SEED)
+        cn_data["copy2"] = (cn_data["copy"] +
+            abs(np.random.normal(scale=0.3, size=cn_data.shape[0]))
+        )
         cn_data.columns = ["chr", "bin", "cell_id", "state", "start", "end",
                            "cluster_id", "copy"]
         cn_data["reads"] = 1
 
-        alpha=10
         linkage, root, cl_cell_ids, matrix_data, measurement, variances = (
             cncluster.bayesian_cluster(cn_data, n_states=11, debug=True,
                                        value_ids=["copy", "state"],
-                                       alpha=alpha))
+                                       clustering_id="copy",
+                                       alpha=E2_ALPHA,
+                                       prob_cn_change=E2_TRANS["e0"])
+        )
+
+        np.testing.assert_almost_equal(variances, E2_VAR)
 
         with pd.option_context('display.max_rows', None,
                                'display.max_columns', None):
+            print(cn_data)
+            print("cn_data\n")
             print(linkage)
-        print(root)
-        print(cl_cell_ids)
-        print("expected----------")
-        prob_same = 0.8
-        transmodel = {"kind": "twoparam", "e0": prob_same,
-                      "e1": 1 - prob_same}
-        ll = [
-            jointcnmodels.calculate_marginal_ll_simple(
-                E2_CN_MAT[[i], :],
-                variances[[i], :],
-                transmodel
-            )
-
-            for i in range(E1_CN_MAT.shape[0])
-        ]
-        np.testing.assert_almost_equal(variances, E2_VAR)
-        print(f"ll {ll}")
-        print(f"variances\n{variances}")
-        print(f"cn_data:\n{cn_data}")
-        print("*********************************-")
-        ll_01 = jointcnmodels.calculate_marginal_ll_simple(E2_CN_MAT[[0,1], :], variances[[0,1], :], transmodel)
-        pi_01 =  1 / (1+alpha**2)
-        tll_01 = 1
-        print(f"ll_01: {jointcnmodels.calculate_marginal_ll_simple(E2_CN_MAT[[0,1], :], variances[[0,1], :], transmodel)}")
-        print(f"ll_01: {jointcnmodels.calculate_marginal_ll_simple(E2_CN_MAT[[0,1], :], variances[[0,1], :], transmodel)}")
-
+            print("linkage\n")
 
 
 if __name__ == "__main__":
