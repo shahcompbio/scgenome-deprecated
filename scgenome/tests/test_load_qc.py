@@ -35,7 +35,7 @@ dtypes_check = {
     'hmmcopy_segs': {
         'chr': 'category',
         'start': 'int64',
-        'end': 'int64',
+        'end': 'float64',
         'state': 'int64',
         'median': 'float64',
         'multiplier': 'int64',
@@ -76,7 +76,7 @@ def test_qc_data(results_tables):
         for column_name, dtype_name in dtypes_check[table_name].items():
             column_dtype = str(results_tables[table_name][column_name].dtype)
             if not column_dtype == dtype_name:
-                raise Exception(f'{column_name} has dtype {column_dtype} not {dtype_name}')
+                raise Exception(f'{column_name} in {table_name} has dtype {column_dtype} not {dtype_name}')
 
 
 def test_load_local_qc_data(results_dir):
