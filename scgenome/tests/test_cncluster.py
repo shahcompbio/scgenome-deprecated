@@ -5,6 +5,7 @@ from .constants_test import *
 import pandas as pd
 from scipy.special import logsumexp
 
+
 class TestCluster(TestCase):
 
     def setUp(self):
@@ -45,7 +46,7 @@ class TestCluster(TestCase):
         e2_pw_tree_ll = np.zeros((E2_COPY.shape[0], E2_COPY.shape[0]))
         for i in range(E2_COPY.shape[0]):
             for j in range(E2_COPY.shape[0]):
-                e2_pw_tree_ll[i,j] = logsumexp(
+                e2_pw_tree_ll[i, j] = logsumexp(
                     [e2_pi2 + e2_pw_ll[i, j],
                      np.log(1-np.exp(e2_pi2)) + ll[i] + ll[j]]
                 )

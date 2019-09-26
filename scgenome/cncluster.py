@@ -194,13 +194,7 @@ def bayesian_cluster(cn_data,
         cn_data_to_mat_data_ids(cn_data, data_id=clustering_id,
                                 value_ids=value_ids))
     variances = get_variances(cn_data, matrix_data, n_states)
-    #matrix_data = utils.plot_get_mat(cn_data, cluster_field_name=None,
-    #                                 origin_field_name=None,
-    #                                 cn_field_name=clustering_id)
-    #measurement = matrix_data.values.T
-    #variances = jointcnmodels.single_get_variances(cn_data, matrix_data,
-    #                                               n_states)
-    #cell_ids = pd.Series(matrix_data.columns.get_level_values(0))
+    no_nan_meas = np.nan_to_num(measurement)
     n_cells = measurement.shape[0]
 
     transmodel = {"kind": "twoparam", "e0": prob_cn_change,
@@ -247,7 +241,7 @@ def bayesian_cluster(cn_data,
             next_level[i][j] = merge_cluster
 
             naive_dist[i, j] = (
-                pdist(measurement[merge_cluster.sample_inds, :]).min())
+                pdist(no_nan_meas[merge_cluster.sample_inds, :]).min())
 
         max_r_flat_ind = np.nanargmax(r)
         i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)
@@ -255,8 +249,6 @@ def bayesian_cluster(cn_data,
         if print_r:
             print(f"r at li: {li}\n{pd.DataFrame(r)}")
             print(f"i_max, j_max: {i_max}, {j_max}")
-            if 69 in selected_cluster.sample_inds:
-                print("---------------")
             print(f"left_cluster, {selected_cluster.left_child}")
             print(f"right_cluster, {selected_cluster.right_child}")
 
