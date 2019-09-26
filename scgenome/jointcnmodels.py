@@ -112,6 +112,19 @@ def get_variances(cn_data, matrix_data, n_states=MAX_CN):
     return variances
 
 
+def single_get_variances(cn_data, matrix_data, n_states=MAX_CN):
+        cell_state_var = cn_data[['cell_id', 'state', 'copy']].dropna().groupby(
+            ['cell_id', 'state'])['copy'].var().rename('copy_var').reset_index()
+        variances = cell_state_var.set_index(['state', 'cell_id'])[
+            'copy_var'].unstack()
+        variances = variances.reindex(
+            columns=matrix_data.columns.get_level_values(0),
+            index=range(n_states)).fillna(0.05).T
+        variances = variances.values
+        variances[variances < 0.001] = 0.001
+        return variances
+
+
 def get_tr_probs(n_segments, n_states=MAX_CN):
     tr_probs = np.zeros((n_segments, n_states, n_states))
     tr_probs[:] += 1.

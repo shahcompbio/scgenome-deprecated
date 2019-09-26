@@ -102,6 +102,40 @@ def cn_data_to_mat_data_ids(cn_data, data_id=BHC_ID, cell_id=CELL_ID,
     return matrix_data, measurement, cell_ids
 
 
+def cn_data_to_mat1(cn_data, cluster_field_name="bhc_cluster_id",
+                    origin_field_name=None):
+    matrix_data = cn_data.merge(chrom_idxs)
+    columns = ['chr_index', 'start', 'cell_id', cluster_field_name]
+    levels = ['cell_id', cluster_field_name]
+    if origin_field_name is not None:
+        columns.append(origin_field_name)
+        levels.append(origin_field_name)
+    matrix_data = (matrix_data.set_index(columns)["state"]
+                        .unstack(level=levels).fillna(0))
+
+    copy = matrix_data.values
+    measurement = copy.T
+
+    cell_ids = matrix_data.columns.to_frame().loc["state"]["cell_id"]
+    return matrix_data, measurement, cell_ids
+
+
+def plot_get_mat(cn_data, cluster_field_name="bhc_cluster_id", origin_field_name=None,
+                 cn_field_name="state"):
+    plot_data = cn_data.merge(chrom_idxs)
+    columns = ['chr_index', 'start', 'cell_id']
+    levels = ['cell_id']
+    if cluster_field_name is not None:
+        columns.append(cluster_field_name)
+        levels.append(cluster_field_name)
+    if origin_field_name is not None:
+        columns.append(origin_field_name)
+        levels.append(origin_field_name)
+    plot_data = (plot_data.set_index(columns)[cn_field_name]
+                 .unstack(level=levels).fillna(0))
+    return plot_data
+
+
 def cn_mat_to_cn_data(cn_mat, cell_id_vals=None, cell_id=CELL_ID,
                       value_id=COPY_ID):
     if cell_id_vals is None and cell_id not in cn_mat.columns:

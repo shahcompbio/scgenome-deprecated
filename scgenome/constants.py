@@ -26,10 +26,18 @@ SIM_META = {
 LINKAGE_COLS = ["i", "j", "r_merge", "naive_dist", "log_like",
                 "i_count", "j_count"]
 DEBUG_LINKAGE_COLS = ["i", "j", "r_merge", "naive_dist", "log_like",
-                      "i_count", "j_count", "pi", "d", "result_ind",
-                      "d_left", "d_right", "ll_left", "ll_right",
-                      "pi_left", "pi_right", "tree_ll", "tree_ll_left",
-                      "tree_ll_right"]
+                      "i_count", "j_count",
+                      "pi",
+                      "d",
+                      "result_ind",
+                      "sample_inds",
+                      "l_sample_inds", "r_sample_inds",
+                      "d_left", "d_right",
+                      "ll_left", "ll_right",
+                      "pi_left", "pi_right",
+                      "tree_ll",
+                      "tree_ll_left", "tree_ll_right"
+]
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 CACHE_DIR = "Scratch/tantalus_data"
 BHC_ID = "state"

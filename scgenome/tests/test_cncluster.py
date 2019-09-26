@@ -57,7 +57,6 @@ class TestCluster(TestCase):
         print(e2_r1)
         print("e2_r1\n\n")
 
-
     def test_bayesian_cluster(self):
         df_cn_mat = cn_mat_as_df(E2_CN_MAT, E2_CHR_NAMES)
         cn_data = cn_mat_to_cn_data(df_cn_mat, cell_id_vals=E2_CELL_IDS)
@@ -87,6 +86,8 @@ class TestCluster(TestCase):
             print("cn_data\n")
             print(linkage)
             print("linkage\n")
+            print(variances)
+            print("variances\n")
 
 
 if __name__ == "__main__":

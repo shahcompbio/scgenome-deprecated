@@ -13,6 +13,7 @@ from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS, BHC_ID, \
     DEBUG_LINKAGE_COLS
 from .utils import cn_data_to_mat_data_ids
 from scipy.spatial.distance import pdist
+from scgenome import utils, jointcnmodels
 
 
 def umap_hdbscan_cluster(
@@ -192,8 +193,15 @@ def bayesian_cluster(cn_data,
     matrix_data, measurement, cell_ids = (
         cn_data_to_mat_data_ids(cn_data, data_id=clustering_id,
                                 value_ids=value_ids))
-    n_cells = measurement.shape[0]
     variances = get_variances(cn_data, matrix_data, n_states)
+    #matrix_data = utils.plot_get_mat(cn_data, cluster_field_name=None,
+    #                                 origin_field_name=None,
+    #                                 cn_field_name=clustering_id)
+    #measurement = matrix_data.values.T
+    #variances = jointcnmodels.single_get_variances(cn_data, matrix_data,
+    #                                               n_states)
+    #cell_ids = pd.Series(matrix_data.columns.get_level_values(0))
+    n_cells = measurement.shape[0]
 
     transmodel = {"kind": "twoparam", "e0": prob_cn_change,
                   "e1": 1 - prob_cn_change}
@@ -278,6 +286,9 @@ def debug_additions(selected_cluster):
         selected_cluster.pi,
         selected_cluster.d,
         selected_cluster.cluster_ind,
+        selected_cluster.sample_inds,
+        selected_cluster.left_child.sample_inds,
+        selected_cluster.right_child.sample_inds,
         selected_cluster.left_child.d,
         selected_cluster.right_child.d,
         selected_cluster.left_child.ll,

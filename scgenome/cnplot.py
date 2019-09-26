@@ -50,9 +50,9 @@ def _secondary_clustering(data, linkage=None, flip=False):
         Y = sch.linkage(D, method='complete')
         Z = sch.dendrogram(Y, color_threshold=-1, no_plot=True)
         idx = np.array(Z['leaves'])
-        ordering = np.zeros(idx.shape[0], dtype=int)
-        ordering[idx] = np.arange(idx.shape[0])
-        return ordering
+        #ordering = np.zeros(idx.shape[0], dtype=int)
+        #ordering[idx] = np.arange(idx.shape[0])
+        #return ordering
     else:
         Z = sch.dendrogram(linkage, color_threshold=-1, no_plot=True,
                            orientation="left")
@@ -60,7 +60,16 @@ def _secondary_clustering(data, linkage=None, flip=False):
         if flip:
             idx = np.flip(idx)
         print(f"idx: {idx}")
-        return idx
+        ordering = np.zeros(idx.shape[0], dtype=int)
+        ordering[idx] = np.arange(idx.shape[0])
+        print(f"ordering: {ordering}")
+        #return idx
+        #if flip:
+        #    ordering = np.flip(ordering)
+        #return idx
+    ordering = np.zeros(idx.shape[0], dtype=int)
+    ordering[idx] = np.arange(idx.shape[0])
+    return ordering
 
 
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
@@ -68,15 +77,18 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
                                   raw=False, max_cn=13, linkage=None,
                                   fig=None, origin_field_name=None,
                                   flip=False):
-    plot_data = cn_data.merge(utils.chrom_idxs)
-    columns = ['chr_index', 'start', 'cell_id', cluster_field_name]
-    levels = ['cell_id', cluster_field_name]
-    if origin_field_name is not None:
-        columns.append(origin_field_name)
-        levels.append(origin_field_name)
-    plot_data = (plot_data.set_index(columns)[cn_field_name]
-                    .unstack(level=levels).fillna(0))
+    plot_data = utils.plot_get_mat(cn_data, cluster_field_name,
+                                   origin_field_name, cn_field_name)
+    #plot_data = cn_data.merge(utils.chrom_idxs)
+    #columns = ['chr_index', 'start', 'cell_id', cluster_field_name]
+    #levels = ['cell_id', cluster_field_name]
+    #if origin_field_name is not None:
+    #    columns.append(origin_field_name)
+    #    levels.append(origin_field_name)
+    #plot_data = (plot_data.set_index(columns)[cn_field_name]
+    #                .unstack(level=levels).fillna(0))
     #plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
+    pre_sort = plot_data.copy()
 
     ordering = _secondary_clustering(plot_data.values, linkage, flip)
     ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
@@ -126,7 +138,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
     for val in chrom_boundaries[:-1]:
         ax.axvline(x=val, linewidth=1, color='black', zorder=100)
 
-    return plot_data
+    return plot_data, pre_sort
 
 
 def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
@@ -135,7 +147,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
                                          linkage=None, origin_field_name=None,
                                          flip=False):
     ax = fig.add_axes([0.1, 0.0, 0.9, 1.])
-    plot_data = plot_clustered_cell_cn_matrix(
+    plot_data, pre_sort = plot_clustered_cell_cn_matrix(
         ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name,
         raw=raw, max_cn=max_cn, linkage=linkage, fig=fig,
         origin_field_name=origin_field_name, flip=flip)
@@ -164,7 +176,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
         ax.set_yticks([])
 
 
-    return plot_data
+    return plot_data, pre_sort
 
 
 def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13, chromosome=None, s=5):
