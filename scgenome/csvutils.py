@@ -199,13 +199,17 @@ class CsvInput(object):
             if not list(df.columns.values) == self.columns:
                 raise CsvParseError("metadata mismatch in {}".format(self.filepath))
 
-    def read_csv(self, chunksize=None):
+    def read_csv(self, chunksize=None, dtypes_override=None):
         def return_gen(df_iterator):
             for df in df_iterator:
                 self.__verify_data(df)
                 yield df
 
         dtypes = {k: v for k, v in self.dtypes.items() if v != "NA"}
+
+        if dtypes_override is not None:
+            dtypes.update(dtypes_override)
+
         # if header exists then use first line (0) as header
         header = 0 if self.header else None
 

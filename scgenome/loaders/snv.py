@@ -232,10 +232,14 @@ def load_snv_data(
     analysis_dirs = scgenome.loaders.utils.find_results_directories(
         results_dir)
 
-    if 'pseudobulk' not in analysis_dirs:
-        raise ValueError(f'no pseudobulk found for directory {results_dir}')
+    if 'pseudobulk' in analysis_dirs:
+        pseudobulk_dir = analysis_dirs['pseudobulk']
 
-    pseudobulk_dir = analysis_dirs['pseudobulk']
+    elif 'variant_calling' in analysis_dirs:
+        pseudobulk_dir = analysis_dirs['variant_calling']
+
+    else:
+        raise ValueError(f'no pseudobulk found for directory {results_dir}')
 
     snv_data = load_snv_annotation_results(
         pseudobulk_dir,

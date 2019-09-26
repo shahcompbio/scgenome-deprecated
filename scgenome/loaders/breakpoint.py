@@ -74,10 +74,14 @@ def load_breakpoint_data(results_dir):
     analysis_dirs = scgenome.loaders.utils.find_results_directories(
         results_dir)
 
-    if 'pseudobulk' not in analysis_dirs:
-        raise ValueError(f'no pseudobulk found for directory {results_dir}')
+    if 'pseudobulk' in analysis_dirs:
+        pseudobulk_dir = analysis_dirs['pseudobulk']
 
-    pseudobulk_dir = analysis_dirs['pseudobulk']
+    elif 'destruct' in analysis_dirs:
+        pseudobulk_dir = analysis_dirs['destruct']
+
+    else:
+        raise ValueError(f'no breakpoints found for directory {results_dir}')
 
     breakpoint_data = load_breakpoint_annotation_data(pseudobulk_dir)
     breakpoint_count_data = load_breakpoint_count_data(pseudobulk_dir)
