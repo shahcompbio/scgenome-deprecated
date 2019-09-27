@@ -178,45 +178,41 @@ def expand_grid(dictionary):
                         columns=dictionary.keys())
 
 
-def get_cn_data_submixture(cn_data, num_cells, hmmcopy_tickets, sample_ids,
-                           proportions=None, origin_field_name=ORIGIN_ID,
-                           id_field_name=CELL_ID,
-                           seed=None):
+def get_cn_data_submixture(cn_data, num_cells, hmmcopy_tickets,
+                           proportions=None, origin_field="origin_id",
+                           id_field_name="cell_id", seed=None):
     """
 
-   :param hmmcopy_tickets: list of hmmcopy tickets
-   :param sample_ids: list of lists of sample ids. first element corresponds
-   to first element in `hmmcopy_tickets` etc.
-   :return:
-   """
+    :param hmmcopy_tickets: list of hmmcopy tickets
+    :param sample_ids: list of lists of sample ids. first element corresponds
+    to first element in `hmmcopy_tickets` etc.
+    :return:
+    """
+    n_sample = len(hmmcopy_tickets)
     if proportions is None:
-        if seed is not None:
-            np.random.seed(seed)
-        proportions = np.abs(np.random.normal(size=len(sample_ids)))
-        proportions = proportions / proportions.sum()
+        proportions = [1/n_sample for i in range(n_sample)]
 
     cell_counts = (num_cells * np.array(proportions)).astype("int")
 
     sub_datasets = []
-    for i in range(len(hmmcopy_tickets)):
-        jira_cn_data = cn_data[cn_data["sample_id"].isin(sample_ids[i])]
-        jira_cn_data[origin_field_name] = hmmcopy_tickets[i]
+    for i in range(n_sample):
+        jira_cn_data = cn_data[cn_data[origin_field] == hmmcopy_tickets[i]]
         sub_cn_data = subsample_cn_data(jira_cn_data, cell_counts[i],
                                         id_field_name, seed)
-
         sub_datasets.append(sub_cn_data)
 
     mixed = pd.concat(sub_datasets)
-    return {"mixed_cn_data": mixed, "proportions": proportions,
-            "cell_counts": cell_counts}
+    return mixed
 
 
-def subsample_cn_data(cn_data, num_cells, id_field_name=CELL_ID,
-                      seed=None):
-    if seed is not None:
-        np.random.seed(seed)
-
+def subsample_cn_data(cn_data, num_cells, id_field_name="cell_id", seed=None):
     keep_ids = pd.Series(
         cn_data[id_field_name].unique()).sample(num_cells, random_state=seed)
 
     return cn_data[cn_data[id_field_name].isin(keep_ids)]
+
+
+def get_mixture_labels(cn_data, obs_name="bhc_cluster_id",
+                       exp_name="origin_id_int"):
+    sub_cn_data = cn_data[["cell_id", obs_name, exp_name]].drop_duplicates()
+    return sub_cn_data
