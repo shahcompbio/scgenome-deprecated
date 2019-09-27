@@ -29,8 +29,8 @@ dtypes_check = {
         'effect_impact': 'category',
         'amino_acid_change': 'category',
         'tri_nucleotide_context': 'category',
-        'strelka_score': 'float64',
-        'museq_score': 'float64',
+        'max_strelka_score': 'float64',
+        'max_museq_score': 'float64',
     },
     'snv_count_data': {
         'chrom': 'category',

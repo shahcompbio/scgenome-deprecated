@@ -142,7 +142,7 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
         [[
             'chrom', 'coord', 'ref', 'alt',
             'gene_name', 'effect', 'effect_impact',
-            'is_cosmic', 'museq_score', 'strelka_score',
+            'is_cosmic', 'max_museq_score', 'max_strelka_score',
         ]]
         .drop_duplicates())
     high_impact = high_impact.merge(
