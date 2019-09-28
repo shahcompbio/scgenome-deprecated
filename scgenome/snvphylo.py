@@ -73,7 +73,7 @@ def snv_hierarchical_clustering_figure(snv_data, allele_cn, clusters):
     snv_matrix['state'] = snv_matrix['is_hom'] * 3 + snv_matrix['is_het'] * 2 + snv_matrix['is_absent']
     snv_presence_matrix = snv_matrix.set_index(['chrom', 'coord', 'cluster_id'])['is_present'].unstack(fill_value=0)
 
-    logging.info(f'snv matrix with shape{snv_presence_matrix.shape}')
+    logging.info(f'snv matrix with shape {snv_presence_matrix.shape}, memory {snv_presence_matrix.memory_usage().sum()}')
 
     # KLUDGE: currently recursion in dendrograms
     # breaks with large datasets

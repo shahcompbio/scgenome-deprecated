@@ -42,13 +42,13 @@ def load_haplotype_allele_data(results_dir):
                 'cell_id': 'category',
         })
 
-        logging.info(f'Loaded haplotype allele counts table with shape {data.shape}, size {data.memory_usage()}')
+        logging.info(f'Loaded haplotype allele counts table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
         allele_counts.append(data)
 
     allele_counts = scgenome.utils.concat_with_categories(allele_counts, ignore_index=True)
 
-    logging.info(f'Loaded all haplotype allele counts table with shape {allele_counts.shape}, size {allele_counts.memory_usage()}')
+    logging.info(f'Loaded all haplotype allele counts table with shape {allele_counts.shape}, memory {allele_counts.memory_usage().sum()}')
 
     return {
         'allele_counts': allele_counts,

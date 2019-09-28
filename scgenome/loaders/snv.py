@@ -48,20 +48,20 @@ def load_snv_count_data(pseudobulk_dir, positions):
                 'cell_id': 'category',
             })
 
-        logging.info(f'Loaded snv counts table with shape {data.shape}, size {data.memory_usage().sum()}')
+        logging.info(f'Loaded snv counts table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
         scgenome.utils.union_categories(
             [data, positions],
             cat_cols=['chrom', 'ref', 'alt'])
         data = data.merge(positions, how='inner')
 
-        logging.info(f'Filtered snv counts table to shape {data.shape}, size {data.memory_usage().sum()}')
+        logging.info(f'Filtered snv counts table to shape {data.shape}, memory {data.memory_usage().sum()}')
 
         snv_count_data.append(data)
 
     snv_count_data = scgenome.utils.concat_with_categories(snv_count_data, ignore_index=True)
 
-    logging.info(f'Loaded all snv counts tables with shape {snv_count_data.shape}, size {snv_count_data.memory_usage().sum()}')
+    logging.info(f'Loaded all snv counts tables with shape {snv_count_data.shape}, memory {snv_count_data.memory_usage().sum()}')
 
     return snv_count_data
 
@@ -175,18 +175,18 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
         museq_results[col] = museq_results[col].astype(str)
 
     cosmic = load_snv_annotation_table(pseudobulk_dir, 'cosmic_status')
-    logging.info(f'cosmic table with shape {cosmic.shape}, size {cosmic.memory_usage().sum()}')
+    logging.info(f'cosmic table with shape {cosmic.shape}, memory {cosmic.memory_usage().sum()}')
     cosmic['is_cosmic'] = True
     cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
 
     snpeff = load_snv_annotation_table(pseudobulk_dir, 'snpeff')
     snpeff = get_highest_snpeff_effect(snpeff)
-    logging.info(f'snpeff table with shape {snpeff.shape}, size {snpeff.memory_usage().sum()}')
+    logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
 
     tnc = load_snv_annotation_table(pseudobulk_dir, 'trinuc')
 
     data = load_snv_annotation_table(pseudobulk_dir, 'allele_counts')
-    logging.info(f'initial snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'initial snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     logging.info('summing snv counts')
     data = (
@@ -194,48 +194,48 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
         .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)[['alt_counts', 'ref_counts']]
         .sum().rename(columns={'alt_counts': 'alt_counts_sum', 'ref_counts': 'ref_counts_sum'}).reset_index())
     logging.info('total snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-    logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(mappability)
     logging.info('post mappability with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-    logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(cosmic, how='left')
     logging.info('post cosmic with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-    logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(snpeff, how='left')
     logging.info('post snpeff with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-    logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(tnc, how='left')
-    logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(strelka_results, how='left')
     logging.info('post strelka with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-    logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(museq_results, how='left')
     logging.info('post museq with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-    logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     if museq_filter != -np.inf:
         data = data[data['max_museq_score'] > museq_filter]
         logging.info('post museq filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-        logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+        logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     if strelka_filter != -np.inf:
         data = data[data['max_strelka_score'] > strelka_filter]
         logging.info('post strelka filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-        logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+        logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     logging.info('finishing load with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-    logging.info(f'snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     for column in categorical_columns:
         data[column] = data[column].astype('category')
 
-    logging.info(f'final snv table with shape {data.shape}, size {data.memory_usage().sum()}')
+    logging.info(f'final snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     return data
 
