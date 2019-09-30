@@ -217,6 +217,8 @@ def bayesian_cluster(cn_data,
     # TODO can stop at 2 and merge the last 2 if it saves time
     cluster_map = {}
     while len(clusters) > 1:
+        if debug:
+            print(f"li {li}")
         r = np.empty((len(clusters), len(clusters)))
         r.fill(np.nan)
         next_level = [[None for i in range(len(clusters))]

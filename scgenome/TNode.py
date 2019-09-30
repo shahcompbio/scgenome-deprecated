@@ -1,4 +1,4 @@
-from math import gamma
+from scipy.special import loggamma
 
 from scgenome.jointcnmodels import calculate_marginal_ll_simple
 from .constants import ALPHA, NO_CHILDREN
@@ -43,7 +43,8 @@ class TNode:
             n_k = (len(self.left_child.sample_inds) +
                    len(self.right_child.sample_inds))
 
-            log_gnk = np.log(gamma(n_k))
+            #log_gnk = np.log(gamma(n_k))
+            log_gnk = loggamma(n_k)
             self.d = logsumexp([log_alpha + log_gnk,
                                 self.left_child.d + self.right_child.d])
             self.pi = log_alpha + log_gnk - self.d
@@ -53,10 +54,8 @@ class TNode:
             self.tree_ll = self.ll
         else:
             first = self.pi + self.ll
-            #pmo = np.log(1 - np.exp(self.pi))
             pmo = 0 if self.pi == 0 else np.log(1 - np.exp(self.pi))
             second = pmo + self.left_child.tree_ll + self.right_child.tree_ll
-            #np.seterr(**old_settings)
             self.tree_ll = logsumexp([first, second])
 
     def update_ll(self, measurement, variances, transmodel):

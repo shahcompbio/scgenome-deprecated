@@ -1,4 +1,3 @@
-###############
 # Do BHC, Naive and UMAP/HDBSCAN clustering on a dataset
 import pandas as pd
 import numpy as np
@@ -28,13 +27,14 @@ NAIVE_METHOD = 'single'
 NAIVE_METRIC = 'euclidean'
 
 # UMAP / HDBSCAN params
-UMAP_NN = 5
+UMAP_NN = 15
 UMAP_MIN_DIST = 0.1
 
 # Spike in params (not always used)
 SAMPLE_IDS = ['SC-1935', 'SC-1936', 'SC-1937']
 spike_in = True
 PROPORTIONS = None  # Set to None for equal proportion of each sample
+
 
 if not os.path.exists(OUT_DIR):
     print(f"{OUT_DIR} does not exist, creating it")
@@ -65,6 +65,31 @@ n_bin = np.unique(cn_data["end"]).shape[0]
 
 print(f"cn_data.shape {cn_data.shape}")
 
+print(f"Doing BHC on {n_cell} cells, {n_bin} bins")
+start = time.time()
+bhc_linkage, bhc_root, bhc_cell_ids, matrix_data, measurement, variances = (
+    cncluster.bayesian_cluster(cn_data, n_states=N_STATES, alpha=ALPHA,
+                               prob_cn_change=PROB_CN_SAME,
+                               debug=True, clustering_id="copy")
+)
+print(f"{time.time()-start}s for BHC on {n_cell} cells, {n_bin} bins\n\n")
+bhc_linkage, bhc_plot_data = simulation.get_plot_data(bhc_linkage)
+lbhc_plot_data = bhc_plot_data.copy()
+lbhc_plot_data[:, 2] = np.log(bhc_plot_data[:, 2])
+bhc_linkage.to_csv(os.path.join(OUT_DIR, "bhc_linkage.csv"))
+bhc_cell_ids.to_csv(os.path.join(OUT_DIR, "bhc_cell_ids.csv"), header=False)
+np.savetxt(os.path.join(OUT_DIR, "measurement.txt"), measurement)
+np.savetxt(os.path.join(OUT_DIR, "variances.txt"), variances)
+np.savetxt(os.path.join(OUT_DIR, "bhc_plot_data.txt"), bhc_plot_data)
+np.savetxt(os.path.join(OUT_DIR, "lbhc_plot_data.txt"), lbhc_plot_data)
+
+print(f"Doing NHC on {n_cell} cells, {n_bin} bins")
+start = time.time()
+naive_linkage = sch.linkage(np.nan_to_num(measurement), method=NAIVE_METHOD,
+                            metric=NAIVE_METRIC)
+print(f"{time.time()-start}s for NHC on {n_cell} cells, {n_bin} bins\n\n")
+np.savetxt(os.path.join(OUT_DIR, "naive_plot_data.txt"), naive_linkage)
+
 print(f"Doing UM+HDB on {n_cell} cells, {n_bin} bins")
 start = time.time()
 cn = (cn_data.set_index(['chr', 'start', 'end', 'cell_id'])['copy']
@@ -74,12 +99,39 @@ uh_cluster = cncluster.umap_hdbscan_cluster(cn, n_components=2,
                                             min_dist=UMAP_MIN_DIST)
 print(f"{time.time()-start}s for UM+HDB on {n_cell} cells, {n_bin} bins\n\n")
 uh_cluster.columns = ['cell_id', 'umap_cluster_id', 'umap1', 'umap2']
-print(set(uh_cluster['umap_cluster_id']))
+uh_cluster.to_csv(os.path.join(OUT_DIR, "umap_hdb_clust.csv"))
 
 print("Plotting")
+# BHC
+bhc_clusters = sch.fcluster(lbhc_plot_data, 12, criterion="distance")
+assert len(set(bhc_clusters)) > 1
+cn_data = cncluster.prune_cluster(bhc_clusters, bhc_cell_ids, cn_data,
+                                  cluster_field_name="bhc_cluster_id")
+
+origin = 'origin_id_int' if spike_in else None
+
+fig = plt.figure(figsize=(10, 8))
+bimatrix_data, ps = cnplot.plot_clustered_cell_cn_matrix_figure(
+    fig, cn_data, "copy", cluster_field_name="bhc_cluster_id",
+    linkage=lbhc_plot_data, origin_field_name=origin, raw=True,
+    flip=True, cell_id_order=bhc_cell_ids)
+fig.savefig(os.path.join(OUT_DIR, "bhc_heatmap.png"), bbox_inches='tight')
+
+# NHC
+naive_clusters = sch.fcluster(naive_linkage, 12, criterion="distance")
+assert len(set(naive_clusters)) > 1
+cn_data = cncluster.prune_cluster(naive_clusters, bhc_cell_ids, cn_data,
+                                  cluster_field_name="naive_cluster_id")
+
+fig = plt.figure(figsize=(10, 8))
+bimatrix_data, ps = cnplot.plot_clustered_cell_cn_matrix_figure(
+    fig, cn_data, "copy", cluster_field_name="naive_cluster_id",
+    linkage=naive_linkage, origin_field_name=origin, raw=True,
+    flip=True, cell_id_order=bhc_cell_ids)
+fig.savefig(os.path.join(OUT_DIR, "naive_heatmap.png"), bbox_inches='tight')
+
 # UMAP+HDBSCAN
 cn_data = cn_data.merge(uh_cluster)
-print(f"cn_data.shape {cn_data.shape}")
 # Scatterplot
 fig = plt.figure(figsize=(8, 8))
 nuh_cluster = uh_cluster.copy()
@@ -90,10 +142,16 @@ fig.savefig(os.path.join(OUT_DIR, "uh_scatter.png"), bbox_inches='tight')
 fig = plt.figure(figsize=(10, 8))
 bimatrix_data, ps = cnplot.plot_clustered_cell_cn_matrix_figure(
     fig, cn_data, "copy", cluster_field_name="umap_cluster_id",
-    linkage=None, origin_field_name=None,
-    raw=True,
+    linkage=None, origin_field_name=origin, raw=True,
     flip=False)
 fig.savefig(os.path.join(OUT_DIR, "umap_heatmap.png"), bbox_inches='tight')
 
 # TODO make it so you can plot when there is no origin
+
+################## Metrics
+clabels = utils.get_mixture_labels(cn_data)
+scores = skm.homogeneity_completeness_v_measure(clabels["origin_id_int"],
+                                                clabels["bhc_cluster_id"])
+print(f"homogeneity: {scores[0]}, completeness: {scores[1]}, "
+      f"v-measure: {scores[2]}")
 

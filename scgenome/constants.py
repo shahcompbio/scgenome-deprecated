@@ -40,8 +40,9 @@ DEBUG_LINKAGE_COLS = ["i", "j", "r_merge", "naive_dist", "log_like",
 ]
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 CACHE_DIR = "Scratch/tantalus_data"
-BHC_ID = "state"
+BHC_ID = "copy"
 ORIGIN_ID = "origin_id"
+LOG_P5 = np.log(0.5)
 
 # Error messages
 NO_CHILDREN = "Node has no children to comptue pi, d with"

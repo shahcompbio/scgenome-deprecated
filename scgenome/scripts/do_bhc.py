@@ -8,55 +8,88 @@ import time
 import matplotlib.pyplot as plt
 import sklearn.metrics as skm
 
+from scgenome.constants import LOG_P5
 
-OUT_DIR = "/Users/massoudmaher/data/test_do_bhc/"
-CN_DATA_FP = "/Users/massoudmaher/data/clean_sc_1935_1936_1937_cn_data_qc.csv"
-SAMPLE_IDS = ['SC-1935', 'SC-1936', 'SC-1937']
-N_CELLS = 20  # Set to None if we want all cells
+OUT_DIR = "/Users/massoudmaher/data/bhc_sc1935/"
+CN_DATA_FP = "/Users/massoudmaher/data/sc1935_clean_qc.csv"
+#SAMPLE_IDS = ['SC-1935', 'SC-1936', 'SC-1937']
+SAMPLE_IDS = ['SC-1935']
+N_CELLS = 200  # Set to None if we want all cells
+N_BIN = None
+spike_in = False
 PROPORTIONS = None  # Set to None for equal proportion of each sample
 N_STATES = 12
 ALPHA = 10
 PROB_CN_CHANGE = 0.8
+params = pd.DataFrame({
+    "CN_DATA_FP": CN_DATA_FP,
+    "SAMPLE_IDS": SAMPLE_IDS,
+    "N_CELLS": N_CELLS,
+    "spike_in": spike_in,
+    "PROPORTIONS": PROPORTIONS,
+    "N_STATES": N_STATES,
+    "ALPHA": ALPHA,
+    "PROB_CN_CHANGE": PROB_CN_CHANGE
+})
 
-if not os.path.exists(CN_DATA_FP):
-    print(f"{CN_DATA_FP} does not exist, creating it")
-    os.makedirs(CN_DATA_FP)
+if not os.path.exists(OUT_DIR):
+    print(f"{OUT_DIR} does not exist, creating it")
+    os.makedirs(OUT_DIR)
+params.to_csv(os.path.join(OUT_DIR, "params.csv"))
 
 print(f"Reading in {CN_DATA_FP}")
 cn_data = pd.read_csv(CN_DATA_FP)
 
 if N_CELLS is not None:
-    cn_data = utils.get_cn_data_submixture(cn_data, N_CELLS, SAMPLE_IDS,
-                                           proportions=PROPORTIONS)
+    if spike_in:
+        cn_data = utils.get_cn_data_submixture(cn_data, N_CELLS, SAMPLE_IDS,
+                                               proportions=PROPORTIONS)
+    else:
+        cn_data = utils.subsample_cn_data(cn_data, N_CELLS)
 
-print(f"Doing BHC on {N_CELLS} cells")
+if N_BIN is not None:
+    end_val = np.unique(cn_data["end"])[N_BIN]
+    print(f"Reducing to {N_BIN} bins, end: {end_val}")
+    cn_data = cn_data[cn_data["end"] <= end_val]
 
+n_cell = np.unique(cn_data["cell_id"]).shape[0]
+n_bin = np.unique(cn_data["end"]).shape[0]
+
+print(f"Doing BHC on {n_cell} cells, {n_bin} bins")
 start = time.time()
 bhc_linkage, bhc_root, bhc_cell_ids, matrix_data, measurement, variances = (
     cncluster.bayesian_cluster(cn_data, n_states=N_STATES, alpha=ALPHA,
-                               prob_cn_change=PROB_CN_CHANGE)
+                               prob_cn_change=PROB_CN_CHANGE,
+                               debug=True, clustering_id="copy")
 )
-print(f"{time.time()-start}s for BHC on {N_CELLS} cells")
+print(f"{time.time()-start}s for BHC on {n_cell} cells, {n_bin} bins")
+
+print(f"measurement {measurement.shape}, variances {variances.shape}")
+
+bhc_linkage, bhc_plot_data = simulation.get_plot_data(bhc_linkage)
+lbhc_plot_data = bhc_plot_data.copy()
+lbhc_plot_data[:, 2] = np.log(bhc_plot_data[:, 2])
 
 bhc_linkage.to_csv(os.path.join(OUT_DIR, "linkage.csv"))
 bhc_cell_ids.to_csv(os.path.join(OUT_DIR, "cell_ids.csv"), header=False)
 matrix_data.to_csv(os.path.join(OUT_DIR, "matrix_data.csv"))
 np.savetxt(os.path.join(OUT_DIR, "measurement.txt"), measurement)
 np.savetxt(os.path.join(OUT_DIR, "variances.txt"), variances)
+np.savetxt(os.path.join(OUT_DIR, "bhc_plot_data.txt"), bhc_plot_data)
+np.savetxt(os.path.join(OUT_DIR, "lbhc_plot_data.txt"), lbhc_plot_data)
 
 ################ Plotting
-bhc_linkage, bhc_plot_data = simulation.get_plot_data(bhc_linkage)
-lbhc_plot_data = bhc_plot_data.copy()
-lbhc_plot_data[:, 2] = np.log(bhc_plot_data[:, 2])
 
-bhc_clusters = sch.fcluster(lbhc_plot_data, 12, criterion="distance")
+#bhc_clusters = sch.fcluster(lbhc_plot_data, 12, criterion="distance")
+bhc_clusters = sch.cut_tree(bhc_plot_data, height=-1*LOG_P5).flatten()
 assert len(set(bhc_clusters)) > 1
 cn_data = cncluster.prune_cluster(bhc_clusters, bhc_cell_ids, cn_data)
 
 fig = plt.figure(figsize=(10, 8))
+origin = "origin_id_int" if spike_in else None
 bimatrix_data, ps = cnplot.plot_clustered_cell_cn_matrix_figure(
     fig, cn_data, "copy", cluster_field_name="bhc_cluster_id",
-    linkage=lbhc_plot_data, origin_field_name="origin_id_int", raw=True,
+    linkage=lbhc_plot_data, origin_field_name=origin, raw=True,
     flip=True, cell_id_order=bhc_cell_ids)
 fig.savefig(os.path.join(OUT_DIR, "heatmap.pdf"), bbox_inches='tight')
 

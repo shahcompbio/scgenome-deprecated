@@ -93,7 +93,10 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
     if linkage is None:
         plot_data = plot_data.sort_index(axis=1, level=[1, 2])
     else:
-        plot_data = plot_data.sort_index(axis=1, level=[3])
+        if origin_field_name is None:
+            plot_data = plot_data.sort_index(axis=1, level=[2])
+        else:
+            plot_data = plot_data.sort_index(axis=1, level=[3])
 
     if max_cn is not None:
         plot_data[plot_data > max_cn] = max_cn
@@ -140,10 +143,10 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
     cluster_ids = plot_data.columns.get_level_values(1).values
     color_mat = cncluster.get_cluster_colors(cluster_ids)
 
-    if linkage is None:
-        ax = fig.add_axes([0.0, 0.0, 0.05, 1.])
-    else:
-        ax = fig.add_axes([1.03, 0, 0.05, 1.])
+    #if linkage is None:
+    #    ax = fig.add_axes([0.0, 0.0, 0.05, 1.])
+    #else:
+    ax = fig.add_axes([1.03, 0, 0.05, 1.])
     ax.imshow(np.array(color_mat)[::-1, np.newaxis], aspect='auto',
               origin='lower')
     ax.grid(False)
