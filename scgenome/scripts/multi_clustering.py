@@ -1,4 +1,7 @@
 # Do BHC, Naive and UMAP/HDBSCAN multiple times
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from scgenome import cncluster, utils, simulation, cnplot, qc
@@ -7,16 +10,17 @@ from os.path import join
 import os
 import time
 import sklearn.metrics as skm
-import matplotlib.pyplot as plt
 import seaborn as sns
 
-OUT_DIR = "/Users/massoudmaher/data/test_mult_clst/"
-METRICS_FP = "/Users/massoudmaher/data/high_q_low_r/sc1661_1802_metrics.csv"
+#OUT_DIR = "/Users/massoudmaher/data/test_mult_clst/"
+#METRICS_FP = "/Users/massoudmaher/data/high_q_low_r/sc1661_1802_metrics.csv"
+OUT_DIR = "/work/shah/maherm/low_reads100/"
+METRICS_FP = "/work/shah/maherm/high_q_low_r/sc1661_1802_metrics.csv"
 SEED = None
 
 N_CELLS = 100  # Set to None if we want all cells
-N_BIN = 20
-N_TRIAL = 3
+N_BIN = None
+N_TRIAL = 30
 
 # QC params
 #N_READ = [50e3, 100e3, 250e3, 500e3]
@@ -27,7 +31,8 @@ LIMIT_FPS = [
     "sc1661_1802_qc_cnd_reads_lt_400k.csv",
     "sc1661_1802_qc_cnd_reads_lt_500k.csv"
 ]
-LIMIT_FPS = [join("/Users/massoudmaher/data/high_q_low_r", fp)
+#LIMIT_FPS = [join("/Users/massoudmaher/data/high_q_low_r", fp)
+LIMIT_FPS = [join("/work/shah/maherm/high_q_low_r", fp)
              for fp in LIMIT_FPS]
 
 # BHC Params
@@ -161,7 +166,7 @@ for i in range(len(N_READ)):
     bhc_max_row = grid.iloc[i, :]
     v_meas = grid["v_measure"][i]
     rand = grid["rand"][i]
-    num_clusters = grid["num_clusters"]
+    num_clusters = grid["num_clusters"][i]
     transform = grid["transform"][i]
     criterion = grid["criterion"][i]
     thresh = grid["threshold"][i]
