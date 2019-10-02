@@ -67,7 +67,8 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
                                   cluster_field_name='cluster_id',
                                   raw=False, max_cn=13, linkage=None,
                                   fig=None, origin_field_name=None,
-                                  flip=False, cell_id_order=None):
+                                  flip=False, cell_id_order=None,
+                                  dummy_linkage=False):
     plot_data = utils.plot_get_mat(cn_data, cluster_field_name,
                                    origin_field_name, cn_field_name)
     if cell_id_order is not None:
@@ -77,12 +78,13 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name,
     ordering = _secondary_clustering(plot_data.values, linkage, flip)
     ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
     plot_data = plot_data.T.set_index(ordering, append=True).T
-    if linkage is not None:
+    if linkage is not None or dummy_linkage:
         if fig is None:
             raise ValueError("Must supply linkage with fig")
         # add axes, plot it, fix ordering and plot_data
         dend_ax = fig.add_axes([0.0, 0, 0.1, 1.])
-        Z = sch.dendrogram(linkage, color_threshold=-1, orientation='left')
+        if not dummy_linkage:
+            Z = sch.dendrogram(linkage, color_threshold=-1, orientation='left')
         dend_ax.set_xticks([])
         dend_ax.set_yticks([])
         dend_ax.spines['left'].set_visible(False)
@@ -132,13 +134,14 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
                                          cluster_field_name='cluster_id',
                                          raw=False, max_cn=13,
                                          linkage=None, origin_field_name=None,
-                                         flip=False, cell_id_order=None):
+                                         flip=False, cell_id_order=None,
+                                         dummy_linkage=False):
     ax = fig.add_axes([0.1, 0.0, 0.9, 1.])
     plot_data, pre_sort = plot_clustered_cell_cn_matrix(
         ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name,
         raw=raw, max_cn=max_cn, linkage=linkage, fig=fig,
         origin_field_name=origin_field_name, flip=flip,
-        cell_id_order=cell_id_order)
+        cell_id_order=cell_id_order, dummy_linkage=dummy_linkage)
 
     cluster_ids = plot_data.columns.get_level_values(1).values
     color_mat = cncluster.get_cluster_colors(cluster_ids)

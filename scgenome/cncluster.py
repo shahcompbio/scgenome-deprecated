@@ -12,7 +12,8 @@ from .TNode import TNode
 from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS, BHC_ID, \
     DEBUG_LINKAGE_COLS
 from .utils import cn_data_to_mat_data_ids
-from scipy.spatial.distance import pdist
+from scipy.spatial.distance import pdist, cdist
+from scipy.stats import pearsonr
 from scgenome import utils, jointcnmodels
 
 
@@ -170,7 +171,7 @@ def bayesian_cluster(cn_data,
     :param n_states: maximum allowed copy number in model
     :param alpha: dirichlet parameter, related to how many clusters are made
     :param prob_cn_change: model parameter, probability that copy number
-    changes from one bin to another
+    DOES NOT change from one bin to another. name is misleading
     :param value_ids: column names in `cn_data` to extract and return in
     `matrix_data`
     :param clustering_id: name of column in cn_data we want to cluster on
@@ -304,3 +305,38 @@ def prune_cluster(fclustering, cell_ids, cn_data,
                        for i in range(len(fclustering))}
     cn_data[cluster_field_name] = cn_data["cell_id"].map(cell_id_to_clst)
     return cn_data
+
+
+def group_clusters(cn_data, clst_col, data_id="reads", sample_col="sample_id"):
+    clusters = cn_data[clst_col].unique()
+    cluster_cnds = [cn_data[cn_data[clst_col] == cl] for cl in clusters]
+    cluster_mats = [cn_data_to_mat_data_ids(cnd, data_id)[1]
+                    for cnd in cluster_cnds]
+
+    samples = list(cn_data[sample_col].unique())
+    sample_cnds = [cn_data[cn_data[sample_col] == s] for s in samples]
+    sample_mats = [cn_data_to_mat_data_ids(cnd, data_id)[1]
+                   for cnd in sample_cnds]
+
+    corrs = np.zeros((len(cluster_mats), len(sample_mats)))
+    for i in range(len(cluster_mats)):
+        for j in range(len(sample_mats)):
+            corr_mat = cdist(cluster_mats[i], sample_mats[j],
+                             lambda u, v: abs(pearsonr(u, v)[0]))
+            corrs[i, j] = np.mean(corr_mat)
+            #corrs[i, j] = np.mean(cdist(cluster_mats[i], sample_mats[j],
+            #                            metric="correlation"))
+
+    row_max = np.argmax(corrs, 1)
+    clst2sample = {clusters[i]: samples[row_max[i]]
+                      for i in range(len(row_max))}
+    cluster_samples = [clst2sample[cl] for cl in cn_data[clst_col]]
+
+    return cluster_samples
+    #return {'clusters': clusters, 'cluster_mats': cluster_mats,
+    #        'samples': samples, 'sample_mats': sample_mats,
+    #        "corrs": corrs, "cluster_samples": cluster_samples}
+
+
+def correlation(u, v):
+    return np.corrcoef(u, v)

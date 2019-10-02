@@ -89,6 +89,15 @@ class TestCluster(TestCase):
             print(variances)
             print("variances\n")
 
+    def test_group_cluster(self):
+        res = cncluster.group_clusters(E4_CN_DATA, "bhc_cluster_id")
+        print(res)
+
+        np.testing.assert_equal(res['clusters'], E4_EXP_CLUSTERS)
+        np.testing.assert_equal(res['cluster_mats'], E4_EXP_CLUSTER_MATS)
+        np.testing.assert_equal(res['samples'], E4_EXP_SAMPLES)
+        np.testing.assert_equal(res['sample_mats'], E4_EXP_SAMPLE_MATS)
+        print(res['corrs'])
 
 if __name__ == "__main__":
     main()

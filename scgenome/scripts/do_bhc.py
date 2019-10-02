@@ -10,12 +10,12 @@ import sklearn.metrics as skm
 
 from scgenome.constants import LOG_P5
 
-OUT_DIR = "/Users/massoudmaher/data/bhc_sc1935/"
+OUT_DIR = "/Users/massoudmaher/data/test_bhc/"
 CN_DATA_FP = "/Users/massoudmaher/data/sc1935_clean_qc.csv"
 #SAMPLE_IDS = ['SC-1935', 'SC-1936', 'SC-1937']
 SAMPLE_IDS = ['SC-1935']
 N_CELLS = 200  # Set to None if we want all cells
-N_BIN = None
+N_BIN = 100
 spike_in = False
 PROPORTIONS = None  # Set to None for equal proportion of each sample
 N_STATES = 12

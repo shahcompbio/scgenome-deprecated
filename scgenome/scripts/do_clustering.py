@@ -10,12 +10,12 @@ import sklearn.metrics as skm
 
 from scgenome.constants import LOG_P5
 
-OUT_DIR = "/Users/massoudmaher/data/test_do_clustering/"
+OUT_DIR = "/Users/massoudmaher/data/test/"
 CN_DATA_FP = "/Users/massoudmaher/data/clean_sc_1935_1936_1937_cn_data_qc.csv"
 SEED = None
 
-N_CELLS = 100  # Set to None if we want all cells
-N_BIN = 100
+N_CELLS = 150  # Set to None if we want all cells
+N_BIN = None
 
 # BHC Params
 N_STATES = 12
@@ -34,7 +34,6 @@ UMAP_MIN_DIST = 0.1
 SAMPLE_IDS = ['SC-1935', 'SC-1936', 'SC-1937']
 spike_in = True
 PROPORTIONS = None  # Set to None for equal proportion of each sample
-
 
 if not os.path.exists(OUT_DIR):
     print(f"{OUT_DIR} does not exist, creating it")
@@ -146,7 +145,7 @@ bimatrix_data, ps = cnplot.plot_clustered_cell_cn_matrix_figure(
     flip=False)
 fig.savefig(os.path.join(OUT_DIR, "umap_heatmap.png"), bbox_inches='tight')
 
-# TODO make it so you can plot when there is no origin
+# TODO save cn_data with all the clustering columns
 
 ################## Metrics
 clabels = utils.get_mixture_labels(cn_data)
