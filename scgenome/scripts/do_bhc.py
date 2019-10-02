@@ -7,14 +7,15 @@ import os
 import time
 import matplotlib.pyplot as plt
 import sklearn.metrics as skm
+import sys
 
 from scgenome.constants import LOG_P5
 
-OUT_DIR = "/Users/massoudmaher/data/test_bhc/"
+OUT_DIR = "/Users/massoudmaher/data/ntest_bhc/"
 CN_DATA_FP = "/Users/massoudmaher/data/sc1935_clean_qc.csv"
 #SAMPLE_IDS = ['SC-1935', 'SC-1936', 'SC-1937']
 SAMPLE_IDS = ['SC-1935']
-N_CELLS = 200  # Set to None if we want all cells
+N_CELLS = 50  # Set to None if we want all cells
 N_BIN = 100
 spike_in = False
 PROPORTIONS = None  # Set to None for equal proportion of each sample
@@ -31,6 +32,16 @@ params = pd.DataFrame({
     "ALPHA": ALPHA,
     "PROB_CN_CHANGE": PROB_CN_CHANGE
 })
+
+if len(sys.argv) >= 3:
+    OUT_DIR = sys.argv[1]
+    CN_DATA_FP = sys.argv[2]
+    if len(sys.argv) >= 4:
+        N_CELLS = int(sys.argv[3])
+    if len(sys.argv) >= 5:
+        N_BIN = int(sys.argv[4])
+
+    print(f"args {OUT_DIR}, {CN_DATA_FP}, {N_CELLS} {N_BIN}")
 
 if not os.path.exists(OUT_DIR):
     print(f"{OUT_DIR} does not exist, creating it")
