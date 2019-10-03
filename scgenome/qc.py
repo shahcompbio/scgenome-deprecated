@@ -41,10 +41,12 @@ def qc_cn(metrics_data, cn_data, quality=0.75, n_reads=500000):
     # Remove cells with divergence between copy state and norm copy number
     # Remove cells with outlier proportion of homozygous deletion
     bool_filter = (
-        (~metrics_data['is_s_phase']) &
+        #(~metrics_data['is_s_phase']) &
         metrics_data['filter_copy_state_diff'] &
         metrics_data['filter_prop_hom_del']
     )
+    if 'is_s_phase' in metrics_data.columns:
+      bool_filter = bool_filter & (~metrics_data['is_s_phase'])
     if quality is not None:
         bool_filter = bool_filter & metrics_data['filter_quality']
     if n_reads is not None:
@@ -61,7 +63,6 @@ def qc_cn(metrics_data, cn_data, quality=0.75, n_reads=500000):
     print(f"filtered_cells.shape: {filtered_cells.shape}")
 
     cn_data = cn_data.merge(filtered_cells[['cell_id']].drop_duplicates())
-    assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
 
     cn = (
         cn_data

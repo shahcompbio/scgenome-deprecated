@@ -1,11 +1,13 @@
 # Do BHC on a spike in experiment
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from scgenome import cncluster, utils, simulation, cnplot
 import scipy.cluster.hierarchy as sch
 import os
 import time
-import matplotlib.pyplot as plt
 import sklearn.metrics as skm
 import sys
 
@@ -15,8 +17,8 @@ OUT_DIR = "/Users/massoudmaher/data/ntest_bhc/"
 CN_DATA_FP = "/Users/massoudmaher/data/sc1935_clean_qc.csv"
 #SAMPLE_IDS = ['SC-1935', 'SC-1936', 'SC-1937']
 SAMPLE_IDS = ['SC-1935']
-N_CELLS = 50  # Set to None if we want all cells
-N_BIN = 100
+N_CELLS = None  # Set to None if we want all cells
+N_BIN = None
 spike_in = False
 PROPORTIONS = None  # Set to None for equal proportion of each sample
 N_STATES = 12
@@ -33,6 +35,7 @@ params = pd.DataFrame({
     "PROB_CN_CHANGE": PROB_CN_CHANGE
 })
 
+print(f"sys.argv {sys.argv}")
 if len(sys.argv) >= 3:
     OUT_DIR = sys.argv[1]
     CN_DATA_FP = sys.argv[2]
@@ -105,9 +108,10 @@ bimatrix_data, ps = cnplot.plot_clustered_cell_cn_matrix_figure(
 fig.savefig(os.path.join(OUT_DIR, "heatmap.pdf"), bbox_inches='tight')
 
 ################## Metrics
-clabels = utils.get_mixture_labels(cn_data)
-scores = skm.homogeneity_completeness_v_measure(clabels["origin_id_int"],
-                                                clabels["bhc_cluster_id"])
-print(f"homogeneity: {scores[0]}, completeness: {scores[1]}, "
-      f"v-measure: {scores[2]}")
+if spike_in:
+  clabels = utils.get_mixture_labels(cn_data)
+  scores = skm.homogeneity_completeness_v_measure(clabels["origin_id_int"],
+                                                  clabels["bhc_cluster_id"])
+  print(f"homogeneity: {scores[0]}, completeness: {scores[1]}, "
+        f"v-measure: {scores[2]}")
 
