@@ -3,6 +3,7 @@ import sys
 import click
 import logging
 import shutil
+import yaml
 import pandas as pd
 
 import cell_cycle_classifier.api
@@ -10,22 +11,21 @@ import dbclients.tantalus
 import datamanagement.transfer_files
 from datamanagement.utils.utils import make_dirs
 
-from scgenome.loaders.qc import load_cached_qc_data
-from scgenome.db.qc import cache_qc_results
+from scgenome.loaders.qc import load_qc_data
 
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
 
 analysis_type = 'cell_state_classifier'
-analysis_version = 'v0.0.2'
+analysis_version = 'v0.0.3'
 
 
 results_type = 'cell_state_prediction'
-results_version = 'v0.0.2'
+results_version = 'v0.0.3'
 
 
-def get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=None):
+def get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=None, rerun=False):
     if hmmcopy_tickets is None or len(hmmcopy_tickets) == 0:
         hmmcopy_results = list(tantalus_api.list('results', results_type='hmmcopy'))
 
@@ -52,7 +52,7 @@ def get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=None):
         except dbclients.basicclient.NotFoundError:
             analysis = None
 
-        if analysis is not None:
+        if analysis is not None and not rerun:
             logging.info('hmmcopy ticket {} has cell cycle analysis {}'.format(
                 jira_ticket, analysis['name']))
             continue
@@ -64,8 +64,8 @@ def get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=None):
 
 
 def run_analysis(
-        tantalus_api, hmmcopy_results, jira_ticket, hmmcopy_jira_ticket,
-        cache_directory, results_storage_name, archive_storage_name=None):
+        tantalus_api, hmmcopy_results, jira_ticket,
+        results_storage_name, archive_storage_name=None, rerun=False):
 
     assert len(hmmcopy_results['libraries']) == 1
     library_id = hmmcopy_results['libraries'][0]['library_id']
@@ -76,18 +76,20 @@ def run_analysis(
         name=results_storage_name,
     )
 
-    results_filename = os.path.join(
-        'single_cell_indexing',
-        '{results_type}',
-        '{results_version}',
+    results_dir = os.path.join(
         '{jira_ticket}',
-        '{hmmcopy_jira_ticket}_{library_id}.csv',
+        'results',
+        '{results_type}',
     ).format(
-        results_type=results_type,
-        results_version=results_version,
-        hmmcopy_jira_ticket=hmmcopy_jira_ticket,
         jira_ticket=jira_ticket,
-        library_id=library_id,
+        results_type=results_type,
+    )
+
+    relative_filename = f'{library_id}_{results_type}.csv'
+
+    results_filename = os.path.join(
+        results_dir,
+        relative_filename,
     )
 
     results_filepath = os.path.join(
@@ -95,13 +97,23 @@ def run_analysis(
         results_filename,
     )
 
+    metadata_filename = os.path.join(
+        results_dir,
+        'metadata.yaml',
+    )
+
+    metadata_filepath = os.path.join(
+        results_storage['storage_directory'],
+        metadata_filename,
+    )
+
     make_dirs(os.path.dirname(results_filepath))
 
     logging.info('loading data for hmmcopy ticket {}'.format(
-        hmmcopy_jira_ticket))
+        jira_ticket))
 
-    cache_qc_results(hmmcopy_jira_ticket, local_cache_directory)
-    results = load_cached_qc_data(hmmcopy_jira_ticket, local_cache_directory)
+    hmmcopy_results_dir = os.path.join(results_storage['storage_directory'], jira_ticket)
+    results = load_qc_data(hmmcopy_results_dir)
 
     cn_data = results['hmmcopy_reads']
     metrics_data = results['hmmcopy_metrics']
@@ -112,11 +124,26 @@ def run_analysis(
     cell_cycle_data = cell_cycle_classifier.api.train_classify(cn_data, metrics_data, align_metrics_data)
     cell_cycle_data.to_csv(results_filepath, index=False)
 
+    metadata = {
+        'filenames': [
+            relative_filename,
+        ],
+        'meta': {
+            'library_id': hmmcopy_results['libraries'][0]['library_id'],
+            'sample_id': [a['sample_id'] for a in hmmcopy_results['samples']],
+            'type': results_type,
+            'version': results_version,
+        }
+    }
+
+    with open(metadata_filepath, 'w') as f:
+        yaml.dump(metadata, f, default_flow_style=False)
+
     logging.info('registering results with tantalus')
 
     analysis_name = '{}_{}_{}_{}'.format(
         analysis_type, analysis_version,
-        hmmcopy_jira_ticket, library_id,
+        jira_ticket, library_id,
     )
 
     analysis = tantalus_api.get_or_create(
@@ -132,12 +159,16 @@ def run_analysis(
 
     results_name = '{}_{}_{}_{}'.format(
         results_type, results_version,
-        hmmcopy_jira_ticket, library_id,
+        jira_ticket, library_id,
     )
 
     results_file_resource, results_file_instance = tantalus_api.add_file(
-        results_storage_name, results_filepath, update=True)
+        results_storage_name, results_filepath, update=rerun)
     results_file_pk = results_file_resource['id']
+
+    metadata_file_resource, metadata_file_instance = tantalus_api.add_file(
+        results_storage_name, metadata_filepath, update=rerun)
+    metadata_file_pk = metadata_file_resource['id']
 
     results = tantalus_api.get_or_create(
         'results',
@@ -146,7 +177,7 @@ def run_analysis(
         results_version=results_version,
         libraries=[library_pk],
         analysis=analysis['id'],
-        file_resources=[results_file_pk],
+        file_resources=[results_file_pk, metadata_file_pk],
     )
 
     if archive_storage_name is not None:
@@ -160,35 +191,26 @@ def run_analysis(
 
 
 @click.command()
-@click.argument('jira_ticket', nargs=1)
-@click.argument('cache_directory', nargs=1)
 @click.argument('results_storage_name', nargs=1)
 @click.option('--archive_storage_name', required=False)
-@click.option('--hmmcopy_ticket', multiple=True)
-def run_all_analyses(jira_ticket, cache_directory, results_storage_name, archive_storage_name=None, hmmcopy_ticket=None):
+@click.option('--jira_ticket', multiple=True)
+@click.option('--rerun', is_flag=True)
+def run_all_analyses(results_storage_name, archive_storage_name=None, jira_ticket=None, rerun=False):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
-    datasets = get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=hmmcopy_ticket)
+    datasets = get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=jira_ticket, rerun=rerun)
 
     logging.info('processing {} datasets'.format(len(datasets)))
 
-    for hmmcopy_jira_ticket, dataset in datasets.items():
-        logging.info('processing dataset {}'.format(dataset['name']))
+    for jira_ticket, dataset in datasets.items():
+        logging.info('processing dataset {}, ticket {}'.format(dataset['name'], jira_ticket))
 
         try:
             run_analysis(
-                tantalus_api, dataset, jira_ticket, hmmcopy_jira_ticket,
-                cache_directory, results_storage_name,
-                archive_storage_name=archive_storage_name)
+                tantalus_api, dataset, jira_ticket, results_storage_name,
+                archive_storage_name=archive_storage_name, rerun=rerun)
         except Exception as e:
             logging.exception('processing of dataset {} failed with exception {}'.format(dataset['name'], e))
-
-        ticket_directory = os.path.join(cache_directory, hmmcopy_jira_ticket)
-        logging.info('cleaning ticket directory {}'.format(ticket_directory))
-        try:
-            shutil.rmtree(ticket_directory)
-        except Exception as e:
-            logging.warning('unable to remove {}, exception {}'.format(ticket_directory, e))
 
 
 if __name__ == "__main__":
