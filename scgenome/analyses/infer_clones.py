@@ -139,7 +139,7 @@ def import_image_feature_data(
     return image_feature_data
 
 
-def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory):
+def retrieve_cn_data(tantalus_api, library_id, local_storage_directory, download_to_cache=False):
     """ Retrieve comprehensive metrics data for a library
     """
 
@@ -148,11 +148,12 @@ def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory
     analysis = scgenome.db.search.search_hmmcopy_analysis(tantalus_api, library_id)
     jira_ticket = analysis['jira_ticket']
 
-    scgenome.db.qc.cache_qc_results(
-        analysis['jira_ticket'],
-        local_cache_directory)
+    if download_to_cache:
+        scgenome.db.qc.cache_qc_results(
+            analysis['jira_ticket'],
+            local_storage_directory)
 
-    ticket_directory = os.path.join(local_cache_directory, analysis['jira_ticket'])
+    ticket_directory = os.path.join(local_storage_directory, analysis['jira_ticket'])
 
     results = scgenome.loaders.qc.load_qc_data(ticket_directory)
 
@@ -187,7 +188,7 @@ def retrieve_cn_data(tantalus_api, library_id, sample_ids, local_cache_directory
     return cn_data, metrics_data
 
 
-def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory):
+def retrieve_cn_data_multi(library_ids, local_storage_directory, sample_ids=None, download_to_cache=False):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     cn_data = []
@@ -195,7 +196,8 @@ def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory):
 
     for library_id in library_ids:
         lib_cn_data, lib_metrics_data = retrieve_cn_data(
-            tantalus_api, library_id, sample_ids, local_cache_directory)
+            tantalus_api, library_id, local_storage_directory,
+            download_to_cache=download_to_cache)
 
         cn_data.append(lib_cn_data)
         metrics_data.append(lib_metrics_data)
@@ -209,6 +211,10 @@ def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory):
     # Filter by experimental condition
     metrics_data = metrics_data[~metrics_data['experimental_condition'].isin(['NTC'])]
 
+    # Optionally filter by experimental condition
+    if sample_ids is not None:
+        metrics_data = metrics_data[metrics_data['sample_id'].isin(sample_ids)]
+
     cell_ids = metrics_data['cell_id']
     cn_data = cn_data[cn_data['cell_id'].isin(cell_ids)]
 
@@ -216,13 +222,30 @@ def retrieve_cn_data_multi(library_ids, sample_ids, local_cache_directory):
 
 
 def retrieve_pseudobulk_data(
-        ticket_id, clusters, local_cache_directory, results_prefix,
+        ticket_id, clusters, local_storage_directory, results_prefix,
         museq_score_threshold=None, strelka_score_threshold=None,
         snvs_num_cells_threshold=2, snvs_sum_alt_threshold=2,
+        download_to_cache=False,
     ):
     """ Retrieve SNV, breakpoint and allele data
     """
-    ticket_directory = os.path.join(local_cache_directory, ticket_id)
+    tantalus_api = dbclients.tantalus.TantalusApi()
+
+    ticket_results = tantalus_api.get(
+        'resultsdataset',
+        analysis__jira_ticket=ticket_id,
+    )
+
+    if download_to_cache:
+        filepaths = datamanagement.transfer_files.cache_dataset(
+            tantalus_api,
+            ticket_results['id'],
+            'resultsdataset',
+            'singlecellresults',
+            local_storage_directory,
+        )
+
+    ticket_directory = os.path.join(local_storage_directory, ticket_id)
 
     logging.info('snv data')
     snv_results = scgenome.loaders.snv.load_snv_data(
@@ -293,30 +316,27 @@ def retrieve_pseudobulk_data(
 
 
 @click.group()
-@click.pass_context
+def infer_clones_cmd():
+    pass
+
+
+@infer_clones_cmd.command('retrieve-cn')
 @click.argument('results_prefix')
-@click.argument('local_cache_directory')
-def infer_clones_cmd(ctx, results_prefix, local_cache_directory):
-    ctx.obj['results_prefix'] = results_prefix
-    ctx.obj['local_cache_directory'] = local_cache_directory
-
-
-@infer_clones_cmd.command('retriever-cn')
-@click.pass_context
+@click.argument('local_storage_directory')
 @click.option('--library_id')
 @click.option('--sample_id')
 @click.option('--library_ids_filename')
 @click.option('--sample_ids_filename')
+@click.option('--download_to_cache', is_flag=True)
 def retrieve_cn_cmd(
-        ctx,
+        results_prefix,
+        local_storage_directory,
         library_id=None,
         library_ids_filename=None,
         sample_id=None,
         sample_ids_filename=None,
+        download_to_cache=False,
     ):
-
-    results_prefix = ctx.obj['results_prefix']
-    local_cache_directory = ctx.obj['local_cache_directory']
 
     if library_id is not None:
         library_ids = [library_id]
@@ -325,22 +345,22 @@ def retrieve_cn_cmd(
     else:
         raise Exception('must specify library_id or library_ids_filename')
 
+    sample_ids = None
     if sample_id is not None:
         sample_ids = [sample_id]
     elif sample_ids_filename is not None:
         sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
-    else:
-        raise Exception('must specify sample_id or sample_ids_filename')
 
-    retrieve_cn(library_ids, sample_ids, results_prefix, local_cache_directory)
+    retrieve_cn(library_ids, results_prefix, local_storage_directory, sample_ids=sample_ids, download_to_cache=download_to_cache)
 
 
-def retrieve_cn(library_ids, sample_ids, results_prefix, local_cache_directory):
+def retrieve_cn(library_ids, results_prefix, local_storage_directory, sample_ids=None, download_to_cache=False):
     logging.info('retrieving cn data')
     cn_data, metrics_data = retrieve_cn_data_multi(
         library_ids,
-        sample_ids,
-        local_cache_directory,
+        local_storage_directory,
+        sample_ids=sample_ids,
+        download_to_cache=download_to_cache,
     )
 
     cn_data.to_pickle(results_prefix + 'cn_data.pickle')
@@ -348,9 +368,8 @@ def retrieve_cn(library_ids, sample_ids, results_prefix, local_cache_directory):
 
 
 @infer_clones_cmd.command('cluster-cn')
-@click.pass_context
-def cluster_cn_cmd(ctx):
-    results_prefix = ctx.obj['results_prefix']
+@click.argument('results_prefix')
+def cluster_cn_cmd(results_prefix):
     cluster_cn(results_prefix)
 
 
@@ -395,15 +414,15 @@ def cluster_cn(results_prefix, cluster_size_threshold=50):
 
 
 @infer_clones_cmd.command('pseudobulk-analysis')
-@click.pass_context
+@click.argument('results_prefix')
+@click.argument('local_storage_directory')
 @click.argument('pseudobulk_ticket')
-def pseudobulk_analysis_cmd(ctx, pseudobulk_ticket):
-    results_prefix = ctx.obj['results_prefix']
-    local_cache_directory = ctx.obj['local_cache_directory']
-    pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory)
+@click.option('--download_to_cache', is_flag=True)
+def pseudobulk_analysis_cmd(results_prefix, local_storage_directory, pseudobulk_ticket, download_to_cache=False):
+    pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_storage_directory, download_to_cache=download_to_cache)
 
 
-def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory):
+def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_storage_directory, download_to_cache=False):
     cn_data = pd.read_pickle(results_prefix + 'cn_data.pickle')
     clusters = pd.read_pickle(results_prefix + 'clusters.pickle')
     final_clusters = pd.read_pickle(results_prefix + 'final_clusters.pickle')
@@ -412,8 +431,9 @@ def pseudobulk_analysis(pseudobulk_ticket, results_prefix, local_cache_directory
     snv_data, snv_count_data, allele_data, breakpoint_data, breakpoint_count_data = retrieve_pseudobulk_data(
         pseudobulk_ticket,
         final_clusters,
-        local_cache_directory,
+        local_storage_directory,
         results_prefix + 'retrieve_pseudobulk_data_',
+        download_to_cache=download_to_cache,
     )
 
     logging.info('calculate cluster allele cn')
