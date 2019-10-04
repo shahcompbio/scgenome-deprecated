@@ -40,7 +40,7 @@ table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
     'v0.3.0': _table_suffixes_v0_2_25,
     'v0.3.1': _table_suffixes_v0_2_25,
 }
-                             )
+)
 
 
 def _table_fixes_v0_0_0(results_tables):
@@ -68,7 +68,7 @@ _table_fixes = defaultdict(lambda: _table_fixes_v0_2_25, {
     'v0.3.0': _table_fixes_v0_2_25,
     'v0.3.1': _table_fixes_v0_2_25,
 }
-                           )
+)
 
 
 def load_align_data(
