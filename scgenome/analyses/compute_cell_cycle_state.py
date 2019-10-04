@@ -11,7 +11,8 @@ import dbclients.tantalus
 import datamanagement.transfer_files
 from datamanagement.utils.utils import make_dirs
 
-from scgenome.loaders.qc import load_qc_data
+from scgenome.loaders.align import load_align_data
+from scgenome.loaders.hmmcopy import load_hmmcopy_data
 
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
@@ -113,7 +114,9 @@ def run_analysis(
         jira_ticket))
 
     hmmcopy_results_dir = os.path.join(results_storage['storage_directory'], jira_ticket)
-    results = load_qc_data(hmmcopy_results_dir)
+
+    results = load_align_data(hmmcopy_results_dir)
+    results.update(load_hmmcopy_data(hmmcopy_results_dir))
 
     cn_data = results['hmmcopy_reads']
     metrics_data = results['hmmcopy_metrics']
