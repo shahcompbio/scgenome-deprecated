@@ -12,11 +12,14 @@ class TNode:
     def __init__(self, sample_inds, left_child, right_child, cluster_ind,
                  pi=None, d=None, ll=None, tree_ll=None, log_r=None):
 
+        # Indeces of sampels in this cluster
         self.sample_inds = sample_inds
         self.left_child = left_child
         self.right_child = right_child
+        # Cluster index, maps to i/j in linkage matrix
         self.cluster_ind = cluster_ind
 
+        # pi and d are actally log(pi), log(d)
         self.pi = pi
         self.d = d
         self.ll = ll
@@ -43,8 +46,7 @@ class TNode:
             n_k = (len(self.left_child.sample_inds) +
                    len(self.right_child.sample_inds))
 
-            #log_gnk = np.log(gamma(n_k))
-            log_gnk = loggamma(n_k)
+            log_gnk = loggamma(n_k) # Need this or else gamma(n_k) too large
             self.d = logsumexp([log_alpha + log_gnk,
                                 self.left_child.d + self.right_child.d])
             self.pi = log_alpha + log_gnk - self.d
@@ -54,6 +56,8 @@ class TNode:
             self.tree_ll = self.ll
         else:
             first = self.pi + self.ll
+            # pi becomes 0 sometimes at later iterations of bhc. This
+            # prevents pmo from becoming infinity
             pmo = 0 if self.pi == 0 else np.log(1 - np.exp(self.pi))
             second = pmo + self.left_child.tree_ll + self.right_child.tree_ll
             self.tree_ll = logsumexp([first, second])

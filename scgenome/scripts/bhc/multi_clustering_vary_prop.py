@@ -1,4 +1,7 @@
-# Do BHC, Naive and UMAP/HDBSCAN multiple times
+"""
+Do BHC, Naive and UMAP/HDBSCAN on mixtures of sample, varying the proportion of
+samples in mixture and plot results
+"""
 import pandas as pd
 import numpy as np
 from scgenome import cncluster, utils, simulation, cnplot, qc
@@ -57,6 +60,7 @@ if N_BIN is not None:
     print(f"Reducing to {N_BIN} bins, end: {end_val}")
     cn_data = cn_data[cn_data["end"] <= end_val]
 
+# Get all the submixtures were going to need
 prop_prod = PROPORTIONS*TRIAL_PER_PROP
 print(f"prop_prod {prop_prod}")
 cnds = []
@@ -65,7 +69,6 @@ for prop in prop_prod:
                                        proportions=prop)
     random.shuffle(SAMPLE_IDS)
     cnds.append(cnd)
-
 
 out_rows = []
 for i in range(len(cnds)):
@@ -80,7 +83,7 @@ for i in range(len(cnds)):
     start = time.time()
     bhc_linkage, bhc_root, bhc_cell_ids, matrix_data, measurement, variances = (
         cncluster.bayesian_cluster(cnd, n_states=N_STATES, alpha=ALPHA,
-                                   prob_cn_change=PROB_CN_SAME,
+                                   prob_cn_same=PROB_CN_SAME,
                                    debug=True, clustering_id="copy")
     )
     print(f"--{time.time()-start}s for BHC. {n_cell} cells, {n_bin} bins\n\n")

@@ -1,4 +1,7 @@
-# Do BHC, Naive and UMAP/HDBSCAN multiple times
+"""
+Do BHC, Naive and UMAP/HDBSCAN on submixtures from datasets with only cells
+below a certain read count. Calculate accuracy, plot results
+"""
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -31,6 +34,7 @@ LIMIT_FPS = [
     "sc1661_1802_qc_cnd_reads_lt_400k.csv",
     "sc1661_1802_qc_cnd_reads_lt_500k.csv"
 ]
+assert len(N_READ) == len(LIMIT_FPS)
 #LIMIT_FPS = [join("/Users/massoudmaher/data/high_q_low_r", fp)
 LIMIT_FPS = [join("/work/shah/maherm/high_q_low_r", fp)
              for fp in LIMIT_FPS]
@@ -109,7 +113,7 @@ for i in range(len(N_READ)):
     start = time.time()
     bhc_linkage, bhc_root, bhc_cell_ids, matrix_data, measurement, variances = (
         cncluster.bayesian_cluster(cnd, n_states=N_STATES, alpha=ALPHA,
-                                   prob_cn_change=PROB_CN_SAME,
+                                   prob_cn_same=PROB_CN_SAME,
                                    debug=True, clustering_id="copy")
     )
     print(f"--{time.time()-start}s for BHC. {n_cell} cells, {n_bin} bins\n\n")

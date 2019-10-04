@@ -1,4 +1,9 @@
-# Script for selecting parameters for pruning tree
+"""
+Script for selecting parameters for pruning hierarchical clustering tree.
+Parameters are provided in arg, and script generates plots that show how
+changing parameter effects number of clusters
+"""
+
 import pandas as pd
 from os.path import join
 import numpy as np
@@ -19,6 +24,7 @@ arg = {
         "criterion": ["distance"],
         "threshold": np.arange(1e6, 3e6, step=1e5)
     },
+    # Selection of parameter that we will plot
     'selection': {
         "transform": "none",
         "criterion": "distance",
@@ -34,13 +40,11 @@ origin = 'origin_id_int' if arg['spike_in'] else None
 cluster_field_name = arg['prefix'] + "_cluster_id"
 
 
-
 linkage = np.loadtxt(arg['linkage_fp'])
 llinkage = linkage.copy()
 llinkage[:, 2] = np.log(llinkage[:, 2])
 
 grid = simulation.expand_grid(arg['grid'])
-
 
 def apply_fn(row):
     if row["transform"] == "log":

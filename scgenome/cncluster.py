@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from adjustText import adjust_text
-from scgenome.jointcnmodels import get_variances, get_tr_probs
+from scgenome.jointcnmodels import get_variances
 from itertools import combinations
 from .TNode import TNode
 from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS, BHC_ID, \
@@ -14,8 +14,6 @@ from .constants import ALPHA, MAX_CN, VALUE_IDS, LINKAGE_COLS, BHC_ID, \
 from .utils import cn_data_to_mat_data_ids
 from scipy.spatial.distance import pdist, cdist
 from scipy.stats import pearsonr
-from scgenome import utils, jointcnmodels
-
 
 def umap_hdbscan_cluster(
         cn,
@@ -160,21 +158,22 @@ def plot_umap_clusters(ax, df):
 
 def bayesian_cluster(cn_data,
                      n_states=MAX_CN, alpha=ALPHA,
-                     prob_cn_change=0.8, value_ids=VALUE_IDS,
+                     prob_cn_same=0.8, value_ids=VALUE_IDS,
                      clustering_id=BHC_ID, debug=False, print_r=False):
     """
-    Performs bayesian hierarchical clustering on copy-number data (defaults
-    configured for HMMCopy)
+    Performs bayesian hierarchical clustering on copy-number data
 
     :param cn_data: `DataFrame` with columns: 'chr', 'start', 'end', 'copy',
     'state', 'cell_id'
     :param n_states: maximum allowed copy number in model
     :param alpha: dirichlet parameter, related to how many clusters are made
-    :param prob_cn_change: model parameter, probability that copy number
+    :param prob_cn_same: model parameter, probability that copy number
     DOES NOT change from one bin to another. name is misleading
     :param value_ids: column names in `cn_data` to extract and return in
     `matrix_data`
     :param clustering_id: name of column in cn_data we want to cluster on
+    :param debug if True, returns additional columns in linkage
+    :param if True, prints r_merge matrix at each iteration
 
     :return: tuple of:
     linkage: `DataFrame` with columns:
@@ -189,8 +188,8 @@ def bayesian_cluster(cn_data,
     cell_ids: cell_ids that correspond to rows of measurement
     matrix_data: `cn_data` columns `value_ids` in `MultiIndex` matrix form
     measurement: `clustering_id` values in matrix form
+    variances: copy number variances for each cell, state pair
     """
-    # TODO return measurement or allow calling of this function on measurement
     matrix_data, measurement, cell_ids = (
         cn_data_to_mat_data_ids(cn_data, data_id=clustering_id,
                                 value_ids=value_ids))
@@ -198,13 +197,12 @@ def bayesian_cluster(cn_data,
     no_nan_meas = np.nan_to_num(measurement)
     n_cells = measurement.shape[0]
 
-    transmodel = {"kind": "twoparam", "e0": prob_cn_change,
-                  "e1": 1 - prob_cn_change}
+    transmodel = {"kind": "twoparam", "e0": prob_cn_same,
+                  "e1": 1 - prob_cn_same}
 
+    # Initialize each datapoint into its own cluster
     clusters = [TNode([i], None, None, i,
                       0, alpha) for i in range(n_cells)]
-    #def __init__(self, sample_inds, left_child, right_child, cluster_ind,
-    #             pi=None, d=None, ll=None, tree_ll=None, log_r=None):
     [node.update_vars(measurement, variances, transmodel, alpha)
      for node in clusters]
 
@@ -246,6 +244,7 @@ def bayesian_cluster(cn_data,
             naive_dist[i, j] = (
                 pdist(no_nan_meas[merge_cluster.sample_inds, :]).min())
 
+        # Find largest r
         max_r_flat_ind = np.nanargmax(r)
         i_max, j_max = np.unravel_index(max_r_flat_ind, r.shape)
         selected_cluster = next_level[i_max][j_max]

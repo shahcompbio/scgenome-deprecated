@@ -75,7 +75,7 @@ class TestCluster(TestCase):
                                        value_ids=["copy", "state"],
                                        clustering_id="copy",
                                        alpha=E2_ALPHA,
-                                       prob_cn_change=E2_TRANS["e0"])
+                                       prob_cn_same=E2_TRANS["e0"])
         )
 
         np.testing.assert_almost_equal(variances, E2_VAR)

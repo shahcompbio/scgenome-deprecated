@@ -1,4 +1,6 @@
-# Do BHC on a spike in experiment
+"""
+Script for running BHC on a dataset
+"""
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -13,17 +15,18 @@ import sys
 
 from scgenome.constants import LOG_P5
 
+# Directory where all output files go
 OUT_DIR = "/Users/massoudmaher/data/ntest_bhc/"
 CN_DATA_FP = "/Users/massoudmaher/data/sc1935_clean_qc.csv"
 #SAMPLE_IDS = ['SC-1935', 'SC-1936', 'SC-1937']
-SAMPLE_IDS = ['SC-1935']
+SAMPLE_IDS = ['SC-1935'] # Only if we're doing mixture experiments
 N_CELLS = None  # Set to None if we want all cells
 N_BIN = None
-spike_in = False
+spike_in = False # Set to true if we're doing mixture experiment
 PROPORTIONS = None  # Set to None for equal proportion of each sample
 N_STATES = 12
 ALPHA = 10
-PROB_CN_CHANGE = 0.8
+PROB_CN_SAME = 0.8
 params = pd.DataFrame({
     "CN_DATA_FP": CN_DATA_FP,
     "SAMPLE_IDS": SAMPLE_IDS,
@@ -32,9 +35,10 @@ params = pd.DataFrame({
     "PROPORTIONS": PROPORTIONS,
     "N_STATES": N_STATES,
     "ALPHA": ALPHA,
-    "PROB_CN_CHANGE": PROB_CN_CHANGE
+    "PROB_CN_CHANGE": PROB_CN_SAME
 })
 
+# Have the option of using command line arguments
 print(f"sys.argv {sys.argv}")
 if len(sys.argv) >= 3:
     OUT_DIR = sys.argv[1]
@@ -73,7 +77,7 @@ print(f"Doing BHC on {n_cell} cells, {n_bin} bins")
 start = time.time()
 bhc_linkage, bhc_root, bhc_cell_ids, matrix_data, measurement, variances = (
     cncluster.bayesian_cluster(cn_data, n_states=N_STATES, alpha=ALPHA,
-                               prob_cn_change=PROB_CN_CHANGE,
+                               prob_cn_same=PROB_CN_SAME,
                                debug=True, clustering_id="copy")
 )
 print(f"{time.time()-start}s for BHC on {n_cell} cells, {n_bin} bins")

@@ -1,3 +1,6 @@
+"""
+Runs bayesian hierarchical clustering on a simulation of poisson random walk
+"""
 import scgenome.simulation as sim
 import numpy as np
 from scgenome import cncluster
@@ -23,15 +26,5 @@ cn_data["copy2"] = (cn_data["copy"] +
 cn_data.columns = ["chr", "bin", "cell_id", "state", "start", "end",
                    "cluster_id", "copy"]
 
-tlinkage, root, cl_cell_ids = (
+tlinkage, root, cl_cell_ids, matrix_data, measurement, variances = (
     cncluster.bayesian_cluster(cn_data, n_states=max_cn, value_ids=["copy"]))
-
-#plinkage = tlinkage[["i", "j", "r_merge", "merge_count"]]
-#plinkage["r_merge"] = plinkage["r_merge"].astype("float")
-#plinkage["dist"] = -1 * plinkage["r_merge"]
-#plot_data = (
-#    plinkage[["i", "j", "dist", "merge_count"]].to_numpy().astype("float"))
-#
-#cl_cell_ids = cl_cell_ids.str[2]
-#fig = plt.figure(figsize=(16, 5))
-#dend = dendrogram(plot_data, labels=cl_cell_ids)

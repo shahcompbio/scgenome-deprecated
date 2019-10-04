@@ -10,6 +10,7 @@ import sklearn.metrics as skm
 
 from scgenome.constants import LOG_P5
 
+# Directory where all output files are saved
 OUT_DIR = "/Users/massoudmaher/data/test/"
 CN_DATA_FP = "/Users/massoudmaher/data/clean_sc_1935_1936_1937_cn_data_qc.csv"
 SEED = None
@@ -32,7 +33,7 @@ UMAP_MIN_DIST = 0.1
 
 # Spike in params (not always used)
 SAMPLE_IDS = ['SC-1935', 'SC-1936', 'SC-1937']
-spike_in = True
+spike_in = True # If False, does not mix samples. Just runs algorithms
 PROPORTIONS = None  # Set to None for equal proportion of each sample
 
 if not os.path.exists(OUT_DIR):
@@ -68,7 +69,7 @@ print(f"Doing BHC on {n_cell} cells, {n_bin} bins")
 start = time.time()
 bhc_linkage, bhc_root, bhc_cell_ids, matrix_data, measurement, variances = (
     cncluster.bayesian_cluster(cn_data, n_states=N_STATES, alpha=ALPHA,
-                               prob_cn_change=PROB_CN_SAME,
+                               prob_cn_same=PROB_CN_SAME,
                                debug=True, clustering_id="copy")
 )
 print(f"{time.time()-start}s for BHC on {n_cell} cells, {n_bin} bins\n\n")

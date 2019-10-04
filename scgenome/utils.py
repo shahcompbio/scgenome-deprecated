@@ -174,6 +174,15 @@ def cn_mat_as_df(cn_mat, chr_names):
 
 
 def expand_grid(dictionary):
+    """
+    Given a dictionary of key-value pairs, returns a grid that has every
+    combination of every value for each key
+
+    :param dictionary: keys are columns that are parameter names, values are
+    all the values of that parameter desired in output grid
+    :return: DataFrame with columns that are keys of input and has a row
+    for each combination of values
+    """
     return pd.DataFrame([row for row in product(*dictionary.values())],
                         columns=dictionary.keys())
 
@@ -182,11 +191,20 @@ def get_cn_data_submixture(cn_data, num_cells, hmmcopy_tickets,
                            proportions=None, origin_field="origin_id",
                            id_field_name="cell_id", seed=None):
     """
+    Given a dataset composed of different samples, returns a subset with known
+    proportions of each sample
 
-    :param hmmcopy_tickets: list of hmmcopy tickets
-    :param sample_ids: list of lists of sample ids. first element corresponds
-    to first element in `hmmcopy_tickets` etc.
-    :return:
+    :param cn_data: copy number data made by hmmcopy
+    :param num_cells: total number of cells in subset
+    :param hmmcopy_tickets: names of samples found in origin_field
+    :param proportions: proportion to mix samples. If None, mixes with
+    even proportion
+    :param origin_field: column name where we find sample origin specified by
+    hmmcopy_tickets param
+    :param id_field_name: name of column that holds cell id
+    :param seed: random seed for randomly sampling cells
+    :return: subset of cn_data with num_cells cells, and hmmcopy_ticket samples
+    are mixed in specified proportion
     """
     n_sample = len(hmmcopy_tickets)
     if proportions is None:
@@ -206,6 +224,15 @@ def get_cn_data_submixture(cn_data, num_cells, hmmcopy_tickets,
 
 
 def subsample_cn_data(cn_data, num_cells, id_field_name="cell_id", seed=None):
+    """
+    Given an hmmcopy output, returns a random sampling of cells
+
+    :param cn_data: copy number data made by hmmcopy
+    :param num_cells: total number of cells in subset
+    :param id_field_name: name of column that holds cell id
+    :param seed: random seed for randomly sampling cells
+    :return:
+    """
     keep_ids = pd.Series(
         cn_data[id_field_name].unique()).sample(num_cells, random_state=seed)
 

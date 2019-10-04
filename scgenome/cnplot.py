@@ -136,6 +136,28 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name,
                                          linkage=None, origin_field_name=None,
                                          flip=False, cell_id_order=None,
                                          dummy_linkage=False):
+    """
+
+    :param fig: figure we are plotting
+    :param cn_data: copy number data
+    :param cn_field_name: field we are plotting in heatmap
+    :param cluster_field_name: column name of observed clustering / clustering
+    we did. Should be encoded as integers
+    :param raw: set to True if we are plotting raw copy number,
+    False for hmmcopy state
+    :param max_cn: Maximum copy number allowed in model
+    :param linkage: Linkage matrix if we want to plot dendrogram
+    :param origin_field_name: column name of expected cluster. Should be
+    encoded as integers
+    :param flip: Whether to flip the heatmap accross the vertical axis. If
+    supplying dendrogram. This should be true
+    :param cell_id_order: Ordering of cell ids that linkage matrix follows.
+    Should be output `cell_ids` from bayesian_cluster()
+    See bhc_README.md for more details
+    :param dummy_linkage: Set to True if you want plot to be arranged as if
+    there was a dendrogram, but don't actually have a dendrogram
+    :return:
+    """
     ax = fig.add_axes([0.1, 0.0, 0.9, 1.])
     plot_data, pre_sort = plot_clustered_cell_cn_matrix(
         ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name,

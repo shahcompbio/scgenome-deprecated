@@ -1,3 +1,5 @@
+# Script for submitting multiple jobs doing BHC, each job on a different
+# dataset
 #BSUB -J tyler_sets_bhc[1-11]
 #BSUB -o "/home/maherm/bs_out/tyler_sets_bhc.%J.o"
 #BSUB -e "/home/maherm/bs_out/tyler_sets_bhc.%J.e"
