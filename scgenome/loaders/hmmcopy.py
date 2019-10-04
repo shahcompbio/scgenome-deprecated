@@ -83,6 +83,11 @@ _table_fixes = defaultdict(lambda: _table_fixes_v0_2_25, {
     'v0.3.1': _table_fixes_v0_2_25,
 })
 
+_type_fixes = [
+    ('hmmcopy_reads', 'state'),
+    ('hmmcopy_metrics', 'total_mapped_reads_hmmcopy'),
+    ('hmmcopy_metrics', 'state_mode'),
+]
 
 def load_hmmcopy_data(
         results_dir,
@@ -151,6 +156,11 @@ def load_hmmcopy_data(
     # FIXUP: older hmmcopy results have total_mapped_reads instead of total_mapped_reads_hmmcopy
     results_tables['hmmcopy_metrics'] = results_tables['hmmcopy_metrics'].rename(
         columns={'total_mapped_reads': 'total_mapped_reads_hmmcopy'})
+
+    # Some Hmmcopy columns should be int, fill with 0 for cells with 0 reads
+    for table_name, column in _type_fixes:
+        if results_tables[table_name][column].dtype.name == 'float64':
+            results_tables[table_name][column] = results_tables[table_name][column].fillna(0).astype(int)
 
     scgenome.utils.union_categories(results_tables.values())
 
