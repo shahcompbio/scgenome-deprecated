@@ -1,4 +1,5 @@
-import click
+import os
+import yaml
 import pandas as pd
 
 import scgenome.loaders.utils
@@ -26,6 +27,35 @@ def _calculate_annotation_metrics(results_tables):
         on=common_columns,
         how='left',
     )
+
+    return data
+
+
+def load_cell_state_prediction(results_dir):
+    """ Load cell state prediction table.
+
+    Args:
+        results_dir (str): results directory to load from.
+    """
+
+    analysis_dirs = scgenome.loaders.utils.find_results_directories(
+        results_dir)
+
+    if 'cell_state_prediction' not in analysis_dirs:
+        raise ValueError(f'no cell state prediction found for directory {results_dir}')
+
+    cell_state_results_dir = analysis_dirs['cell_state_prediction']
+
+    manifest_filename = os.path.join(cell_state_results_dir, 'metadata.yaml')
+    manifest = yaml.load(open(manifest_filename))
+
+    filenames = scgenome.loaders.utils.find_filenames(manifest['filenames'], 'cell_state_prediction.csv')
+
+    if len(filenames) != 1:
+        raise ValueError(f'found {len(filenames)} filenames with suffix cell_state_prediction.csv')
+
+    filepath = os.path.join(cell_state_results_dir, filenames[0])
+    data = pd.read_csv(filepath)
 
     return data
 
@@ -62,6 +92,12 @@ def load_qc_data(
 
     else:
         results_tables['annotation_metrics'] = _calculate_annotation_metrics(results_tables)
+
+    # For older results annotation metrics will not contain s phase, load directly
+    if 'is_s_phase' not in results_tables['annotation_metrics']:
+        cell_state = load_cell_state_prediction(ticket_results_dirs['cell_state_prediction'])
+        results_tables['annotation_metrics'] = results_tables['annotation_metrics'].merge(
+            cell_state[['cell_id', 'is_s_phase', 'is_s_phase_prob']].drop_duplicates())
 
     # Optionally select specific samples
     if sample_ids is not None:
