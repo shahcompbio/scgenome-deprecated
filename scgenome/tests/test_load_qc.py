@@ -35,7 +35,6 @@ dtypes_check = {
     'hmmcopy_segs': {
         'chr': 'category',
         'start': 'int64',
-        'end': 'float64',
         'state': 'int64',
         'median': 'float64',
         'multiplier': 'int64',
@@ -63,7 +62,7 @@ dtypes_check = {
         'order': 'float64',
         'experimental_condition': 'object',
         'quality': 'float64',
-        'is_s_phase': 'boolean',
+        'is_s_phase': 'bool',
     },
     'gc_metrics': {
     },
@@ -136,7 +135,8 @@ def test_cached_single_ticket(ticket_id, local_cache_directory=None, local_stora
 @cli.command()
 @click.option('--local_cache_directory')
 @click.option('--local_storage_name')
-def test_cached_multi_ticket(ticket_id, local_cache_directory=None, local_storage_name=None):
+@click.option('--one_of_each')
+def test_cached_multi_ticket(local_cache_directory=None, local_storage_name=None, one_of_each=False):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     hmmcopy_analyses = tantalus_api.list('analysis', analysis_type__name='hmmcopy')
@@ -147,16 +147,32 @@ def test_cached_multi_ticket(ticket_id, local_cache_directory=None, local_storag
     
     ticket_ids = []
     for version in version_tickets:
-        ticket_ids.append(version_tickets[version][-1])
+        if one_of_each:
+            ticket_ids.append(version_tickets[version][-1])
+        else:
+            ticket_ids.extend(version_tickets[version])
 
     for ticket_id in ticket_ids:
         logging.info(ticket_id)
-        test_load_stored_qc_data(
-            tantalus_api,
-            ticket_id,
-            local_cache_directory=local_cache_directory,
-            local_storage_name=local_storage_name,
-        )
+
+        ticket_results = list(tantalus_api.list('resultsdataset', analysis__jira_ticket=ticket_id))
+        if len(ticket_results) == 0:
+            logging.error(f'ticket {ticket_id} has no associated results')
+            continue
+
+        try:
+            test_load_stored_qc_data(
+                tantalus_api,
+                ticket_id,
+                local_cache_directory=local_cache_directory,
+                local_storage_name=local_storage_name,
+            )
+        except KeyboardInterrupt:
+            raise
+        except:
+            logging.exception(f"{ticket_id} failed")
+        else:
+            logging.exception(f"{ticket_id} succeeded")
 
 
 @cli.command()
