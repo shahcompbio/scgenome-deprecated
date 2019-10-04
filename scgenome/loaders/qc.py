@@ -95,6 +95,8 @@ def load_qc_data(
 
     # For older results annotation metrics will not contain s phase, load directly
     if 'is_s_phase' not in results_tables['annotation_metrics']:
+        if 'cell_state_prediction' not in ticket_results_dirs:
+            raise ValueError(f'no cell state predictions found in {results_dir}')
         cell_state = load_cell_state_prediction(ticket_results_dirs['cell_state_prediction'])
         results_tables['annotation_metrics'] = results_tables['annotation_metrics'].merge(
             cell_state[['cell_id', 'is_s_phase', 'is_s_phase_prob']].drop_duplicates())
