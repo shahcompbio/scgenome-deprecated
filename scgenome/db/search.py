@@ -10,14 +10,15 @@ from dbclients.basicclient import NotFoundError
 def _get_analysis_inputs_info(tantalus_api, analysis):
     aligners = set()
     is_complete = True
-    for dataset_id in analysis['input_datasets']:
-        dataset = tantalus_api.get('sequencedataset', id=dataset_id)
+    bam_datasets = list(tantalus_api.list('sequencedataset', analysis__jira_ticket=analysis['jira_ticket'], dataset_type='BAM'))
+    for dataset in bam_datasets:
         if not dataset['is_complete']:
             is_complete = False
         aligners.add(dataset['aligner'])
     if len(aligners) != 1:
-        raise Exception('found {} aligners for analysis {}'.format(
+        logging.warning('found {} aligners for analysis {}'.format(
             len(aligners), analysis['id']))
+        return None
     aligner = aligners.pop()
 
     info = {
@@ -56,6 +57,9 @@ def search_hmmcopy_analysis(
         results_analysis[results['id']] = analysis
 
         info = _get_analysis_inputs_info(tantalus_api, analysis)
+
+        if info is None:
+            continue
 
         info['results_id'] = results['id']
         info['jira_ticket'] = analysis['jira_ticket']

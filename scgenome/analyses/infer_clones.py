@@ -158,29 +158,7 @@ def retrieve_cn_data(tantalus_api, library_id, local_storage_directory, download
     results = scgenome.loaders.qc.load_qc_data(ticket_directory)
 
     cn_data = results['hmmcopy_reads']
-    metrics_data = results['hmmcopy_metrics']
-    align_metrics_data = results['align_metrics']
-
-    assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
-    assert isinstance(metrics_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
-
-    metrics_data = metrics_data.merge(align_metrics_data, how='left')
-    assert 'cell_id_x' not in metrics_data
-
-    if 'is_s_phase' not in metrics_data:
-        cell_cycle_data = load_cell_cycle_data(
-            tantalus_api,
-            analysis['jira_ticket'])
-        cell_cycle_data['cell_id'] = cell_cycle_data['cell_id'].astype('category')
-
-        scgenome.utils.union_categories([
-            cn_data,
-            metrics_data,
-            align_metrics_data,
-            cell_cycle_data])
-
-        metrics_data = metrics_data.merge(cell_cycle_data, how='left')
-        assert 'cell_id_x' not in metrics_data
+    metrics_data = results['annotation_metrics']
 
     assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
     assert isinstance(metrics_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
