@@ -81,6 +81,7 @@ def test_qc_data(results_tables):
 def test_load_local_qc_data(results_dir):
     results_tables = load_qc_data(results_dir)
     test_qc_data(results_tables)
+    logging.info(f'successfully loaded results from {results_dir}')
 
 
 def test_load_stored_qc_data(tantalus_api, ticket_id, local_cache_directory=None, local_storage_name=None):
@@ -91,17 +92,7 @@ def test_load_stored_qc_data(tantalus_api, ticket_id, local_cache_directory=None
         raise ValueError('require one of local_cache_directory and local_storage_name')
 
     if local_cache_directory is not None:
-        ticket_results = tantalus_api.list('results', analysis__jira_ticket=ticket_id)
-
-        for results in ticket_results:
-            filepaths = datamanagement.transfer_files.cache_dataset(
-                tantalus_api,
-                results['id'],
-                'resultsdataset',
-                'singlecellresults',
-                local_cache_directory,
-            )
-
+        cache_qc_results(ticket_id, local_cache_directory)
         local_results_directory = local_cache_directory
 
     elif local_storage_name is not None:

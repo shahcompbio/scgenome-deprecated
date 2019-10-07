@@ -32,6 +32,9 @@ def cache_qc_results(
             elif results['results_type'] == 'annotation':
                 csv_suffixes = scgenome.loaders.annotation.table_suffixes[results['results_version']]
 
+            elif results['results_type'] == 'cell_state_prediction':
+                csv_suffixes = (None,)
+
             else:
                 continue
 
