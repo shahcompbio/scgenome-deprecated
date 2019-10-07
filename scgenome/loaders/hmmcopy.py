@@ -26,17 +26,17 @@ _categorical_cols = [
     'library_id',
 ]
 
-_table_suffixes_v0_0_0 = {
+_table_suffixes_v0_0_0 = (
     ('hmmcopy_reads', '_multiplier0_reads.csv.gz'),
     ('hmmcopy_segs', '_multiplier0_segments.csv.gz'),
     ('hmmcopy_metrics', '_multiplier0_metrics.csv.gz'),
-}
+)
 
-_table_suffixes_v0_2_25 = {
+_table_suffixes_v0_2_25 = (
     ('hmmcopy_reads', '_reads.csv.gz'),
     ('hmmcopy_segs', '_segments.csv.gz'),
     ('hmmcopy_metrics', '_metrics.csv.gz'),
-}
+)
 
 table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
     'v0.0.0': _table_suffixes_v0_0_0,

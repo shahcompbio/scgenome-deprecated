@@ -14,14 +14,14 @@ _categorical_cols = [
     'library_id',
 ]
 
-_table_suffixes_v0_0_0 = [
+_table_suffixes_v0_0_0 = (
     ('align_metrics', '_alignment_metrics.csv.gz'),
-]
+)
 
-_table_suffixes_v0_2_25 = [
+_table_suffixes_v0_2_25 = (
     ('align_metrics', '_alignment_metrics.csv.gz'),
     ('gc_metrics', '_gc_metrics.csv.gz'),
-]
+)
 
 table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
     'v0.0.0': _table_suffixes_v0_0_0,

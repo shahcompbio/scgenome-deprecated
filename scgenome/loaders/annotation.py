@@ -14,9 +14,9 @@ _categorical_cols = [
     'library_id',
 ]
 
-_table_suffixes_v0_2_25 = [
+_table_suffixes_v0_2_25 = (
     ('annotation_metrics', '_metrics.csv.gz'),
-]
+)
 
 table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
     'v0.2.25': _table_suffixes_v0_2_25,
