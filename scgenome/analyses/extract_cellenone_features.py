@@ -116,6 +116,13 @@ def process_cellenone_table(tantalus_api, cellenone_dataset, inputs_storage_name
         else:
             continue
 
+        data = data.rename(columns={
+            'Circularity': 'Circ',
+            'Elongation': 'Elong',
+        })
+
+        data.columns = [c.strip() for c in data.columns]
+
         # Filter rows for which no cell was found
         # these have misaligned data in the TSV
         data = data[data['XPos'].notnull()]
@@ -285,7 +292,7 @@ def run_all_analyses(jira_ticket, inputs_storage_name, results_storage_name, lib
                 tantalus_api, jira_ticket, dataset, inputs_storage_name, results_storage_name,
                 archive_storage_name=archive_storage_name, update=update)
         except Exception as e:
-            logging.warning('processing of dataset {} failed with exception {}'.format(dataset['name'], e))
+            logging.exception('processing of dataset {} failed'.format(dataset['name']))
 
 
 if __name__ == "__main__":
