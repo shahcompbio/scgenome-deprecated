@@ -76,7 +76,7 @@ def search_hmmcopy_analysis(
         raise ValueError(f'no results for library {library_id} with aligner {aligner_name}')
 
     # If any of the results are true, select amongst those
-    if True in results_info['is_complete']:
+    if results_info['is_complete'].any():
         results_info = results_info.query('is_complete')
 
     else:
