@@ -110,7 +110,7 @@ The following example code snippet will provide access to HMMCopy data for the O
 import dbclients
 import scgenome.utils
 
-from scgenome.loaders.qc import load_cached_qc_data
+from scgenome.loaders.qc import load_qc_data
 from scgenome.db.qc import cache_qc_results
 
 
@@ -142,7 +142,8 @@ for jira_ticket in hmmcopy_tickets:
         jira_ticket=jira_ticket)
 
     cache_qc_results(jira_ticket, local_cache_directory)
-    hmmcopy_data = load_cached_qc_data(jira_ticket, local_cache_directory)
+    ticket_directory = os.path.join(local_cache_directory, ticket_id)
+    hmmcopy_data = load_qc_data(ticket_directory)
 
     cn_data.append(hmmcopy_data['hmmcopy_reads'])
     segs_data.append(hmmcopy_data['hmmcopy_segs'])
