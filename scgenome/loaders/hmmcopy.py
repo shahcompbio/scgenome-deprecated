@@ -142,7 +142,8 @@ def load_hmmcopy_data(
         if table_name == 'hmmcopy_reads':
             usecols = hmmcopy_reads_cols
 
-        data = pd.read_csv(filepath, usecols=usecols)
+        csv_input = scgenome.csvutils.CsvInput(filepath)
+        data = csv_input.read_csv(usecols=usecols)
 
         data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
         data['library_id'] = [a.split('-')[1] for a in data['cell_id']]

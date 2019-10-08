@@ -39,9 +39,9 @@ def load_snv_count_data(pseudobulk_dir, positions):
     for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, 'snv_union_counts.csv.gz'):
         logging.info('Loading snv counts from {}'.format(filepath))
 
-        data = pd.read_csv(
-            filepath,
-            dtype={
+        csv_input = scgenome.csvutils.CsvInput(filepath)
+        data = csv_input.read_csv(
+            dtypes_override={
                 'chrom': 'category',
                 'ref': 'category',
                 'alt': 'category',
@@ -81,9 +81,9 @@ def load_snv_annotation_table(pseudobulk_dir, table_name):
     for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, f'snv_{table_name}.csv.gz'):
         logging.info(f'Loading snv {table_name} annotations from {filepath}')
 
-        data = pd.read_csv(
-            filepath,
-            dtype={
+        csv_input = scgenome.csvutils.CsvInput(filepath)
+        data = csv_input.read_csv(
+            dtypes_override={
                 'chrom': 'category',
                 'ref': 'category',
                 'alt': 'category',

@@ -79,7 +79,8 @@ def load_annotation_data(
 
         filepath = os.path.join(annotation_results_dir, filename)
 
-        data = pd.read_csv(filepath)
+        csv_input = scgenome.csvutils.CsvInput(filepath)
+        data = csv_input.read_csv()
 
         data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
         data['library_id'] = [a.split('-')[1] for a in data['cell_id']]

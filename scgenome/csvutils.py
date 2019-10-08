@@ -199,7 +199,7 @@ class CsvInput(object):
             if not list(df.columns.values) == self.columns:
                 raise CsvParseError("metadata mismatch in {}".format(self.filepath))
 
-    def read_csv(self, chunksize=None, dtypes_override=None):
+    def read_csv(self, chunksize=None, dtypes_override=None, **kwargs):
         def return_gen(df_iterator):
             for df in df_iterator:
                 self.__verify_data(df)
@@ -216,8 +216,7 @@ class CsvInput(object):
         try:
             data = pd.read_csv(
                 self.filepath, compression=self.compression, chunksize=chunksize,
-                sep=self.sep, header=header, dtype=dtypes
-            )
+                sep=self.sep, header=header, dtype=dtypes, **kwargs)
         except pd.errors.EmptyDataError:
             data = pd.DataFrame(columns=self.columns)
             for column_name, dtype in dtypes.items():
