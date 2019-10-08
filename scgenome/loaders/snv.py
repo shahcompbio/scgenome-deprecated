@@ -6,6 +6,7 @@ import numpy as np
 
 import scgenome.utils
 import scgenome.loaders.utils
+import scgenome.csvutils
 
 
 default_museq_filter = 0.9

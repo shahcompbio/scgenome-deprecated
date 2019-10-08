@@ -3,9 +3,8 @@ from collections import defaultdict
 
 import pandas as pd
 import scgenome.loaders.utils
-import scgenome.loaders.utils
 import scgenome.utils
-import scgenome.utils
+import scgenome.csvutils
 import yaml
 
 standard_hmmcopy_reads_cols = [
