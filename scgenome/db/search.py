@@ -36,7 +36,7 @@ def search_hmmcopy_analysis(
     ):
     """ Search for hmmcopy results and analyses for a specific library.
     """
-    logging.info('hmmcopy data for {}'.format(library_id))
+    logging.info('searching for hmmcopy data for {}'.format(library_id))
 
     library_results = list(tantalus_api.list(
         'resultsdataset',
@@ -75,7 +75,7 @@ def search_hmmcopy_analysis(
     if len(results_info) == 0:
         raise ValueError(f'no results for library {library_id} with aligner {aligner_name}')
 
-    # If any of the results are true, select amongst those
+    # If any of the results are complete, select amongst those
     if results_info['is_complete'].any():
         results_info = results_info.query('is_complete')
 
