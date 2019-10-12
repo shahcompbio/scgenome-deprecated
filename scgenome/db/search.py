@@ -85,7 +85,12 @@ def search_hmmcopy_analysis(
     # Select the latest by jira ticket number for multiple
     if len(results_info) > 1:
         logging.warning(f'selecting latest of {len(results_info)} results for {library_id} by jira ticket number')
-    results_id = results_info.sort_values('jira_ticket_number').iloc[-1, :]['results_id']
+    results_info = results_info.sort_values('jira_ticket_number', ascending=False)
+
+    results_id = results_info.iloc[0, :]['results_id']
+    jira_ticket = results_info.iloc[0, :]['jira_ticket']
+
+    logging.info(f'found results from jira ticket {jira_ticket}') 
 
     return results_analysis[results_id]
 
