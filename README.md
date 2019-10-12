@@ -166,11 +166,31 @@ import scgenome.loaders.snv
 import scgenome.loaders.allele
 import scgenome.loaders.breakpoint
 
+import dbclients.tantalus
+import datamanagement.transfer_files
+
 ticket_id = 'SC-1939'
 
 results_prefix = './results'
 
 local_cache_directory = '/Your/Local/Cache'
+
+# Download the results
+
+tantalus_api = dbclients.tantalus.TantalusApi()
+
+ticket_results = tantalus_api.list('results', analysis__jira_ticket=ticket_id)
+
+for results in ticket_results:
+    filepaths = datamanagement.transfer_files.cache_dataset(
+        tantalus_api,
+        results['id'],
+        'resultsdataset',
+        'singlecellresults',
+        local_cache_directory,
+    )
+
+# Load from cache
 
 museq_score_threshold = None
 strelka_score_threshold = None
