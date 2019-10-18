@@ -3,7 +3,7 @@ import os
 import shutil
 import gzip
 
-
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -192,40 +192,67 @@ class CsvInput(object):
             dtypes = self.__generate_dtypes(sep=sep)
             return header, sep, dtypes, columns
 
-    def __verify_data(self, df):
-        if not self.header:
-            df.columns = self.columns
-        else:
-            if not list(df.columns.values) == self.columns:
-                raise CsvParseError("metadata mismatch in {}".format(self.filepath))
+    def __verify_data(self, df, usecols):
+        cols = self.columns
+        if usecols is not None:
+            cols = []
+            for col in usecols:
+                if col not in self.columns:
+                    raise ValueError(f'requested column {col} not in columns')
+            for col in self.columns:
+                if col in usecols:
+                    cols.append(col)
+        if not list(df.columns.values) == cols:
+            raise CsvParseError("metadata mismatch in {}".format(self.filepath))
 
-    def read_csv(self, chunksize=None, dtypes_override=None, **kwargs):
+    def read_csv(self, chunksize=None, dtypes_override=None, usecols=None):
         def return_gen(df_iterator):
             for df in df_iterator:
-                self.__verify_data(df)
+                self.__verify_data(df, usecols)
                 yield df
 
         dtypes = {k: v for k, v in self.dtypes.items() if v != "NA"}
 
         if dtypes_override is not None:
-            dtypes.update(dtypes_override)
+            for name, dtype in dtypes_override.items():
+                if name in dtypes:
+                    dtypes[name] = dtype
 
-        # if header exists then use first line (0) as header
-        header = 0 if self.header else None
+        if self.header:
+            header = 0
+            names = None
+
+        else:
+            header = None
+            names = self.columns
 
         try:
             data = pd.read_csv(
                 self.filepath, compression=self.compression, chunksize=chunksize,
-                sep=self.sep, header=header, dtype=dtypes, **kwargs)
+                sep=self.sep, header=header, names=names, usecols=usecols)
         except pd.errors.EmptyDataError:
             data = pd.DataFrame(columns=self.columns)
-            for column_name, dtype in dtypes.items():
-                data[column_name] = data[column_name].astype(dtype)
+
+        for column_name, dtype in dtypes.items():
+            if usecols is not None and column_name not in usecols:
+                continue
+            try:
+                if dtype == 'int':
+                    data[column_name] = data[column_name].astype(float).astype('Int64')
+                elif dtype == 'bool':
+                    values = set(data[column_name].unique())
+                    if len(values - {False, True, np.nan}) != 0:
+                        raise ValueError(f'{column_name} is expected to be bool, has values {values}')
+                else:
+                    data[column_name] = data[column_name].astype(dtype)
+            except TypeError:
+                logging.exception(f'unable to convert {column_name} to {dtype}')
+                raise
 
         if chunksize:
             return return_gen(data)
         else:
-            self.__verify_data(data)
+            self.__verify_data(data, usecols)
             return data
 
 

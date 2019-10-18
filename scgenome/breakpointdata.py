@@ -103,9 +103,9 @@ def plot_library_portrait(breakpoint_data, figures_prefix):
     """ Plot a library level portrait of breakpoint features.
     """
 
-    breakpoint_data['log_num_reads'] = np.log10(breakpoint_data['num_reads'])
-    breakpoint_data['log_num_split'] = np.log10(breakpoint_data['num_split'])
-    breakpoint_data['log_num_cells'] = np.log10(breakpoint_data['num_cells'])
+    breakpoint_data['log_num_reads'] = np.log10(breakpoint_data['num_reads'].astype(float))
+    breakpoint_data['log_num_split'] = np.log10(breakpoint_data['num_split'].astype(float))
+    breakpoint_data['log_num_cells'] = np.log10(breakpoint_data['num_cells'].astype(float))
 
     # Plot per library feature distributions
     features = [
@@ -137,7 +137,7 @@ def plot_library_portrait(breakpoint_data, figures_prefix):
     for idx, (col, desc) in enumerate(features):
         ax = fig.add_subplot(len(features) + 1, 1, idx + 2)
         seaborn.boxplot(
-            ax=ax, data=breakpoint_data,
+            ax=ax, data=breakpoint_data[['library_id', 'rearrangement_type', col]].dropna(),
             x='library_id', y=col, hue='rearrangement_type',
             order=order, hue_order=hue_order)
         ax.set_title(f'Distribution of {desc} across libraries')

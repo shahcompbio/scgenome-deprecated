@@ -38,36 +38,7 @@ table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
     'v0.2.25': _table_suffixes_v0_2_25,
     'v0.3.0': _table_suffixes_v0_2_25,
     'v0.3.1': _table_suffixes_v0_2_25,
-}
-)
-
-
-def _table_fixes_v0_0_0(results_tables):
-    pass  # TODO
-
-
-def _table_fixes_v0_2_25(results_tables):
-    pass  # TODO
-
-
-_table_fixes = defaultdict(lambda: _table_fixes_v0_2_25, {
-    'v0.0.0': _table_fixes_v0_0_0,
-    'v0.1.5': _table_fixes_v0_0_0,
-    'v0.2.2': _table_fixes_v0_0_0,
-    'v0.2.3': _table_fixes_v0_0_0,
-    'v0.2.6': _table_fixes_v0_0_0,
-    'v0.2.7': _table_fixes_v0_0_0,
-    'v0.2.9': _table_fixes_v0_0_0,
-    'v0.2.10': _table_fixes_v0_0_0,
-    'v0.2.11': _table_fixes_v0_0_0,
-    'v0.2.15': _table_fixes_v0_0_0,
-    'v0.2.19': _table_fixes_v0_0_0,
-    'v0.2.20': _table_fixes_v0_0_0,
-    'v0.2.25': _table_fixes_v0_2_25,
-    'v0.3.0': _table_fixes_v0_2_25,
-    'v0.3.1': _table_fixes_v0_2_25,
-}
-)
+})
 
 
 def load_align_data(
@@ -112,7 +83,20 @@ def load_align_data(
         filepath = os.path.join(align_results_dir, filename)
 
         csv_input = scgenome.csvutils.CsvInput(filepath)
-        data = csv_input.read_csv()
+
+        dtypes_override = None
+        if table_name == 'align_metrics':
+            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
+            dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
+            dtypes_override = yaml.load(open(dtypes_filename))
+            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
+        elif table_name == 'gc_metrics':
+            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
+            dtypes_filename = os.path.join(dtypes_directory, 'alignment_gc_metrics_defs.yaml')
+            dtypes_override = yaml.load(open(dtypes_filename))
+            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
+
+        data = csv_input.read_csv(dtypes_override=dtypes_override)
 
         data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
         data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
@@ -124,7 +108,5 @@ def load_align_data(
         results_tables[table_name] = data
 
     scgenome.utils.union_categories(results_tables.values())
-
-    _table_fixes[version](results_tables)
 
     return results_tables

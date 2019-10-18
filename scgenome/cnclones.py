@@ -45,7 +45,7 @@ def calculate_clusters(cn_data, metrics_data, results_prefix):
     # Remove cells with a large divergence between copy state and norm copy number
     # Remove cells with outlier proportion of homozygous deletion
     filtered_cells = metrics_data.loc[
-        (~metrics_data['is_s_phase']) &
+        metrics_data['is_s_phase == False'] &
         metrics_data['filter_quality'] &
         metrics_data['filter_reads'] &
         metrics_data['filter_copy_state_diff'] &
@@ -176,12 +176,12 @@ def finalize_clusters(
         'cluster_size >= {}'.format(cluster_size_threshold))
 
     # Assign clusters to s phase cells
-    if not metrics_data.query('is_s_phase').empty:
+    if metrics_data['is_s_phase'].any():
         # Assign s phase cells to the cluster they are most correlated with
         cell_filtered_clone_distances = cell_clone_distances.merge(
             cluster_annotation[['cluster_id']].drop_duplicates())
         s_phase_cluster = cell_filtered_clone_distances.merge(
-            metrics_data.query('is_s_phase')[['cell_id']])
+            metrics_data.query('is_s_phase == True')[['cell_id']])
         s_phase_cluster = (
             s_phase_cluster
             .set_index(['cell_id', 'cluster_id'])['pearsonr']

@@ -47,9 +47,6 @@ import datamanagement.transfer_files
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
 
-# Threshold on total cell read counts
-read_count_threshold = 500000
-
 # SNV Calling thresholds
 museq_score_threshold = None
 strelka_score_threshold = None
@@ -145,7 +142,7 @@ def retrieve_cn_data(tantalus_api, library_id, local_storage_directory, download
 
     logging.info(f'library {library_id}')
 
-    analysis = scgenome.db.search.search_hmmcopy_analysis(tantalus_api, library_id)
+    analysis = scgenome.db.search.search_hmmcopy_analysis(tantalus_api, library_id, aligner_name='BWA_MEM_0_7_6A')
     jira_ticket = analysis['jira_ticket']
 
     if download_to_cache:
@@ -166,7 +163,14 @@ def retrieve_cn_data(tantalus_api, library_id, local_storage_directory, download
     return cn_data, metrics_data
 
 
-def retrieve_cn_data_multi(library_ids, local_storage_directory, sample_ids=None, download_to_cache=False):
+def retrieve_cn_data_multi(
+        library_ids,
+        local_storage_directory,
+        sample_ids=None,
+        download_to_cache=False,
+        read_count_threshold=None,
+    ):
+
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     cn_data = []
@@ -182,9 +186,11 @@ def retrieve_cn_data_multi(library_ids, local_storage_directory, sample_ids=None
 
     cn_data = scgenome.utils.concat_with_categories(cn_data)
     metrics_data = scgenome.utils.concat_with_categories(metrics_data)
+    scgenome.utils.union_categories([cn_data, metrics_data])
 
     # Read count filtering
-    metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > read_count_threshold]
+    if read_count_threshold is not None:
+        metrics_data = metrics_data[metrics_data['total_mapped_reads_hmmcopy'] > read_count_threshold]
 
     # Filter by experimental condition
     metrics_data = metrics_data[~metrics_data['experimental_condition'].isin(['NTC'])]
@@ -306,6 +312,7 @@ def infer_clones_cmd():
 @click.option('--library_ids_filename')
 @click.option('--sample_ids_filename')
 @click.option('--download_to_cache', is_flag=True)
+@click.option('--read_count_threshold', type=float)
 def retrieve_cn_cmd(
         results_prefix,
         local_storage_directory,
@@ -314,6 +321,7 @@ def retrieve_cn_cmd(
         sample_id=None,
         sample_ids_filename=None,
         download_to_cache=False,
+        read_count_threshold=None,
     ):
 
     if library_id is not None:
@@ -329,16 +337,31 @@ def retrieve_cn_cmd(
     elif sample_ids_filename is not None:
         sample_ids = [l.strip() for l in open(sample_ids_filename).readlines()]
 
-    retrieve_cn(library_ids, results_prefix, local_storage_directory, sample_ids=sample_ids, download_to_cache=download_to_cache)
+    retrieve_cn(
+        library_ids,
+        results_prefix,
+        local_storage_directory,
+        sample_ids,
+        download_to_cache,
+        read_count_threshold,
+    )
 
 
-def retrieve_cn(library_ids, results_prefix, local_storage_directory, sample_ids=None, download_to_cache=False):
+def retrieve_cn(
+        library_ids,
+        results_prefix,
+        local_storage_directory,
+        sample_ids=None,
+        download_to_cache=False,
+        read_count_threshold=None,
+    ):
     logging.info('retrieving cn data')
     cn_data, metrics_data = retrieve_cn_data_multi(
         library_ids,
         local_storage_directory,
         sample_ids=sample_ids,
         download_to_cache=download_to_cache,
+        read_count_threshold=read_count_threshold,
     )
 
     cn_data.to_pickle(results_prefix + 'cn_data.pickle')

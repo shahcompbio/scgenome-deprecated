@@ -57,6 +57,9 @@ def load_cell_state_prediction(results_dir):
     filepath = os.path.join(cell_state_results_dir, filenames[0])
     data = pd.read_csv(filepath)
 
+    if 'is_s_phase' in data:
+        data['is_s_phase'] = data['is_s_phase'].fillna(False).astype(bool)
+
     return data
 
 
