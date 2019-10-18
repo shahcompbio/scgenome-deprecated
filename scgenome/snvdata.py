@@ -28,18 +28,19 @@ def filter_snv_data(
     Returns:
         pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
     """
+    logging.info('Filtering and annotating SNVs')
 
     # Calculate cell counts
     cell_counts = (
         snv_count_data
         .query('alt_counts > 0')
         .drop_duplicates(['chrom', 'coord', 'ref', 'alt', 'cell_id'])
-        .groupby(['chrom', 'coord', 'ref', 'alt']).size().rename('num_cells')
+        .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True).size().rename('num_cells')
         .reset_index())
 
     if figures_prefix is not None:
         fig = plt.figure(figsize=(4, 4))
-        cell_counts['num_cells'].hist(bins=50)
+        cell_counts['num_cells'].astype(float).hist(bins=50)
         fig.savefig(figures_prefix + 'snv_cell_counts.pdf', bbox_inches='tight')
 
     snv_data = snv_data.merge(cell_counts, how='left')
@@ -48,13 +49,13 @@ def filter_snv_data(
     # Calculate total alt counts for each SNV
     sum_alt_counts = (
         snv_count_data
-        .groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts']
+        .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['alt_counts']
         .sum().rename('sum_alt_counts')
         .reset_index())
 
     if figures_prefix is not None:
         fig = plt.figure(figsize=(4, 4))
-        sum_alt_counts['sum_alt_counts'].hist(bins=50)
+        sum_alt_counts['sum_alt_counts'].astype(float).hist(bins=50)
         fig.savefig(figures_prefix + 'snv_alt_counts.pdf', bbox_inches='tight')
 
     # Filter SNVs by num cells in which they are detected
@@ -133,7 +134,7 @@ def run_mutation_signature_analysis(snv_data, results_prefix):
 def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_prefix):
     # Filter cells
     snv_count_data = snv_count_data.merge(filtered_cell_ids)
-    total_alt_counts = snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts'].sum().reset_index()
+    total_alt_counts = snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['alt_counts'].sum().reset_index()
     snv_data = snv_data.merge(
         total_alt_counts.query('alt_counts > 0')[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
 
@@ -146,11 +147,11 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
         ]]
         .drop_duplicates())
     high_impact = high_impact.merge(
-        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['alt_counts'].sum().reset_index())
+        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['alt_counts'].sum().reset_index())
     high_impact = high_impact.merge(
-        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['ref_counts'].sum().reset_index())
+        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['ref_counts'].sum().reset_index())
     high_impact = high_impact.merge(
-        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'])['total_counts'].sum().reset_index())
+        snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['total_counts'].sum().reset_index())
     high_impact.to_csv(results_prefix + 'snvs_high_impact.csv')
 
     # Annotate adjacent distance

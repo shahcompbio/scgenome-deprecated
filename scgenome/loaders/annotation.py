@@ -7,34 +7,31 @@ import scgenome.utils
 import scgenome.csvutils
 import yaml
 
+
 _categorical_cols = [
     'cell_id',
     'sample_id',
     'library_id',
 ]
 
+
 _table_suffixes_v0_2_25 = (
     ('annotation_metrics', '_metrics.csv.gz'),
 )
+
 
 table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
     'v0.2.25': _table_suffixes_v0_2_25,
     'v0.3.0': _table_suffixes_v0_2_25,
     'v0.3.1': _table_suffixes_v0_2_25,
-}
-                             )
+})
 
 
-def _table_fixes_v0_2_25(results_tables):
-    pass  # TODO
-
-
-_table_fixes = defaultdict(lambda: _table_fixes_v0_2_25, {
-    'v0.2.25': _table_fixes_v0_2_25,
-    'v0.3.0': _table_fixes_v0_2_25,
-    'v0.3.1': _table_fixes_v0_2_25,
-}
-                           )
+_dtype_fixes = [
+#    ('annotation_metrics', 'total_mapped_reads_hmmcopy', 'Int64'),
+#    ('annotation_metrics', 'is_s_phase_prob', 'float64'),
+#    ('annotation_metrics', 'mad_neutral_state', 'float64'),
+]
 
 
 def load_annotation_data(
@@ -79,7 +76,15 @@ def load_annotation_data(
         filepath = os.path.join(annotation_results_dir, filename)
 
         csv_input = scgenome.csvutils.CsvInput(filepath)
-        data = csv_input.read_csv()
+
+        dtypes_override = None
+        if table_name == 'annotation_metrics':
+            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
+            dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
+            dtypes_override = yaml.load(open(dtypes_filename))
+            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
+
+        data = csv_input.read_csv(dtypes_override=dtypes_override)
 
         data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
         data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
@@ -92,6 +97,14 @@ def load_annotation_data(
 
     scgenome.utils.union_categories(results_tables.values())
 
-    _table_fixes[version](results_tables)
+    for table_name, column_name, dtype in _dtype_fixes:
+        if dtype == 'Int64':
+            results_tables[table_name][column_name] = results_tables[table_name][column_name].astype('float').astype(dtype)
+        else:
+            results_tables[table_name][column_name] = results_tables[table_name][column_name].astype(dtype)
+
+    if 'is_s_phase' in results_tables['annotation_metrics']:
+        results_tables['annotation_metrics']['is_s_phase'] = results_tables['annotation_metrics']['is_s_phase'].fillna(False).astype(bool)
 
     return results_tables
+

@@ -3,6 +3,7 @@ import sys
 import click
 import logging
 import collections
+import numpy as np
 
 import dbclients.tantalus
 import datamanagement.transfer_files
@@ -53,16 +54,77 @@ dtypes_check = {
         'state_mode': 'int64',
     },
     'annotation_metrics': {
-        'cell_id': 'category',
-        'sample_id': 'category',
-        'library_id': 'category',
-        'total_mapped_reads_hmmcopy': 'int64',
-        'mean_copy': 'float64',
-        'state_mode': 'int64',
-        'order': 'float64',
-        'experimental_condition': 'object',
-        'quality': 'float64',
+        'autocorrelation_hmmcopy': 'float64',
+        'breakpoints': 'int64',
+        'cell_call': 'str',
+        'cell_id': 'str',
+        'column': 'float64',
+        'coverage_breadth': 'float64',
+        'coverage_depth': 'float64',
+        'cv_hmmcopy': 'float64',
+        'empty_bins_hmmcopy': 'int64',
+        'estimated_library_size': 'int64',
+        'experimental_condition': 'str',
+        'fastqscreen_grch37_multihit': 'int64',
+        'fastqscreen_grch37': 'int64',
+        'fastqscreen_mm10_multihit': 'int64',
+        'fastqscreen_mm10': 'int64',
+        'fastqscreen_nohit': 'int64',
+        'fastqscreen_salmon_multihit': 'int64',
+        'fastqscreen_salmon': 'int64',
+        'grch37_multihit': 'int64',
+        'grch37': 'int64',
+        'img_col': 'float64',
+        'index_i5': 'str',
+        'index_i7': 'str',
+        'index_sequence': 'str',
+        'is_contaminated': 'bool',
+        'is_s_phase_prob': 'float64',
         'is_s_phase': 'bool',
+        'log_likelihood': 'float64',
+        'mad_hmmcopy': 'float64',
+        'mad_neutral_state': 'float64',
+        'MBRSI_dispersion_non_integerness': 'float64',
+        'MBRSM_dispersion': 'float64',
+        'mean_copy': 'float64',
+        'mean_hmmcopy_reads_per_bin': 'float64',
+        'mean_insert_size': 'float64',
+        'mean_state_mads': 'float64',
+        'mean_state_vars': 'float64',
+        'median_hmmcopy_reads_per_bin': 'float64',
+        'median_insert_size': 'float64',
+        'mm10_multihit': 'int64',
+        'mm10': 'int64',
+        'MSRSI_non_integerness': 'float64',
+        'multiplier': 'int64',
+        'nohit': 'int64',
+        'order_corrupt_tree': 'float64',
+        'order': 'float64',
+        'paired_duplicate_reads': 'int64',
+        'paired_mapped_reads': 'int64',
+        'percent_duplicate_reads': 'float64',
+        'primer_i5': 'str',
+        'primer_i7': 'str',
+        'quality': 'float64',
+        'row': 'float64',
+        'salmon_multihit': 'int64',
+        'salmon': 'int64',
+        'sample_id': 'str',
+        'sample_type': 'str',
+        'scaled_halfiness': 'float64',
+        'standard_deviation_insert_size': 'float64',
+        'state_mode': 'int64',
+        'std_hmmcopy_reads_per_bin': 'float64',
+        'total_duplicate_reads': 'int64',
+        'total_halfiness': 'float64',
+        'total_mapped_reads_hmmcopy': 'int64',
+        'total_mapped_reads': 'int64',
+        'total_properly_paired': 'int64',
+        'total_reads': 'int64',
+        'true_multiplier': 'float64',
+        'unmapped_reads': 'int64',
+        'unpaired_duplicate_reads': 'int64',
+        'unpaired_mapped_reads': 'int64',
     },
     'gc_metrics': {
     },
@@ -70,12 +132,41 @@ dtypes_check = {
 
 
 def test_qc_data(results_tables):
+    failed = False
     for table_name, table_data in results_tables.items():
         logging.info(f'table {table_name} has size {len(table_data)}')
+
         for column_name, dtype_name in dtypes_check[table_name].items():
+            if column_name not in results_tables[table_name]:
+                logging.warning(f'{column_name} not in table {table_name}')
+                continue
+
             column_dtype = str(results_tables[table_name][column_name].dtype)
-            if not column_dtype == dtype_name:
-                raise Exception(f'{column_name} in {table_name} has dtype {column_dtype} not {dtype_name}')
+
+            expected_dtype_names = (dtype_name,)
+            if dtype_name == 'str':
+                expected_dtype_names = ('object', 'category')
+            elif dtype_name == 'int64':
+                expected_dtype_names = ('int64', 'Int64')
+#            elif dtype_name == 'bool':
+#                expected_dtype_names = ('bool', 'object')
+
+            if not column_dtype in expected_dtype_names:
+                logging.error(f'{column_name} in {table_name} has dtype {column_dtype} not any of {expected_dtype_names}')
+                failed = True
+
+            if dtype_name == 'str' and not results_tables[table_name][column_name].apply(lambda a: isinstance(a, str)).all():
+                logging.error(f'{column_name} in {table_name} is expected to be str')
+                failed = True
+
+#            if dtype_name == 'bool':
+#                values = set(results_tables[table_name][column_name].unique())
+#                if len(values - {True, False, None, np.nan}) > 0:
+#                    logging.error(f'{column_name} in {table_name} is expected to be bool, has values {values}')
+#                    failed = True
+
+    if failed:
+        raise Exception('one or more tests failed')
 
 
 def test_load_local_qc_data(results_dir):
