@@ -16,5 +16,5 @@ setup(name='scgenome',
             'generate_copynumber_clone_tree_hac = scgenome.generate_copynumber_clone_tree_hac:main'
         ]
       },
-      package_data={'':['data/GRCh37-lite.fa.fai']},
+      package_data={'':['data/GRCh37-lite.fa.fai', 'dtypes/*.yaml']},
     )
