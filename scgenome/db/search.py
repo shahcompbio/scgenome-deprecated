@@ -7,6 +7,15 @@ import datamanagement.transfer_files
 from dbclients.basicclient import NotFoundError
 
 
+def _get_analysis_lanes(tantalus_api, analysis):
+    bam_datasets = list(tantalus_api.list('sequencedataset', analysis__jira_ticket=analysis['jira_ticket'], dataset_type='BAM'))
+    lane_set = set()
+    for dataset in bam_datasets:
+        for lane in dataset['sequence_lanes']:
+            lane_set.add('{}_{}'.format(lane['flowcell_id'], lane['lane_number']))
+    return lane_set
+
+
 def _get_analysis_inputs_info(tantalus_api, analysis):
     aligners = set()
     is_complete = True
