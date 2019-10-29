@@ -13,6 +13,7 @@ from datamanagement.utils.utils import make_dirs
 
 from scgenome.loaders.align import load_align_data
 from scgenome.loaders.hmmcopy import load_hmmcopy_data
+from scgenome.loaders.utils import find_results_directories
 
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
@@ -64,7 +65,81 @@ def get_unprocessed_hmmcopy(tantalus_api, hmmcopy_tickets=None, rerun=False):
     return unprocessed
 
 
-def run_analysis(
+def _get_hmmcopy_meta(results_dir):
+    analysis_dirs = find_results_directories(
+        results_dir)
+
+    if 'hmmcopy' not in analysis_dirs:
+        raise ValueError(f'no hmmcopy found for directory {results_dir}')
+
+    align_results_dir = analysis_dirs['hmmcopy']
+
+    manifest_filename = os.path.join(align_results_dir, 'metadata.yaml')
+    manifest = yaml.load(open(manifest_filename))
+
+    return manifest
+
+
+def run_analysis(results_dir):
+
+    # Read in hmmcopy and align results
+    logging.info(f'reading hmmcopy and align results from {results_dir}')
+
+    hmmcopy_metadata = _get_hmmcopy_meta(results_dir)
+    library_id = hmmcopy_metadata['meta']['library_id']
+    sample_ids = hmmcopy_metadata['meta']['sample_ids']
+
+    results = load_align_data(results_dir)
+    results.update(load_hmmcopy_data(results_dir))
+
+    cn_data = results['hmmcopy_reads']
+    metrics_data = results['hmmcopy_metrics']
+    align_metrics_data = results['align_metrics']
+
+    # Calculating cell cycle state
+    logging.info('calculating cell cycle state')
+    cell_cycle_data = cell_cycle_classifier.api.train_classify(cn_data, metrics_data, align_metrics_data)
+
+    # Writing out cell cycle state results
+    output_cellcycle_dir = os.path.join(
+        results_dir,
+        'results',
+        results_type,
+    )
+
+    cell_cycle_results_filename = f'{library_id}_{results_type}.csv'
+
+    results_filepath = os.path.join(
+        output_cellcycle_dir,
+        cell_cycle_results_filename,
+    )
+
+    metadata_filepath = os.path.join(
+        output_cellcycle_dir,
+        'metadata.yaml',
+    )
+
+    make_dirs(os.path.dirname(results_filepath))
+
+    cell_cycle_data.to_csv(results_filepath, index=False)
+
+    metadata = {
+        'filenames': [
+            cell_cycle_results_filename,
+        ],
+        'meta': {
+            'library_id': library_id,
+            'sample_id': sample_ids,
+            'type': results_type,
+            'version': results_version,
+        }
+    }
+
+    with open(metadata_filepath, 'w') as f:
+        yaml.dump(metadata, f, default_flow_style=False)
+
+
+def run_tantalus_analysis(
         tantalus_api, hmmcopy_results, jira_ticket,
         results_storage_name, archive_storage_name=None, rerun=False):
 
@@ -77,70 +152,11 @@ def run_analysis(
         name=results_storage_name,
     )
 
-    results_dir = os.path.join(
-        '{jira_ticket}',
-        'results',
-        '{results_type}',
-    ).format(
-        jira_ticket=jira_ticket,
-        results_type=results_type,
-    )
+    ticket_directory = os.path.join(results_storage['storage_directory'], jira_ticket)
 
-    relative_filename = f'{library_id}_{results_type}.csv'
+    run_analysis(ticket_directory)
 
-    results_filename = os.path.join(
-        results_dir,
-        relative_filename,
-    )
-
-    results_filepath = os.path.join(
-        results_storage['storage_directory'],
-        results_filename,
-    )
-
-    metadata_filename = os.path.join(
-        results_dir,
-        'metadata.yaml',
-    )
-
-    metadata_filepath = os.path.join(
-        results_storage['storage_directory'],
-        metadata_filename,
-    )
-
-    make_dirs(os.path.dirname(results_filepath))
-
-    logging.info('loading data for hmmcopy ticket {}'.format(
-        jira_ticket))
-
-    hmmcopy_results_dir = os.path.join(results_storage['storage_directory'], jira_ticket)
-
-    results = load_align_data(hmmcopy_results_dir)
-    results.update(load_hmmcopy_data(hmmcopy_results_dir))
-
-    cn_data = results['hmmcopy_reads']
-    metrics_data = results['hmmcopy_metrics']
-    align_metrics_data = results['align_metrics']
-
-    logging.info('calculating cell cycle state')
-
-    cell_cycle_data = cell_cycle_classifier.api.train_classify(cn_data, metrics_data, align_metrics_data)
-    cell_cycle_data.to_csv(results_filepath, index=False)
-
-    metadata = {
-        'filenames': [
-            relative_filename,
-        ],
-        'meta': {
-            'library_id': hmmcopy_results['libraries'][0]['library_id'],
-            'sample_id': [a['sample_id'] for a in hmmcopy_results['samples']],
-            'type': results_type,
-            'version': results_version,
-        }
-    }
-
-    with open(metadata_filepath, 'w') as f:
-        yaml.dump(metadata, f, default_flow_style=False)
+    metadata = yaml.load(open(os.path.join(results_dir, 'metadata.yaml')))
 
     logging.info('registering results with tantalus')
 
@@ -165,13 +181,12 @@ def run_analysis(
         jira_ticket, library_id,
     )
 
-    results_file_resource, results_file_instance = tantalus_api.add_file(
-        results_storage_name, results_filepath, update=rerun)
-    results_file_pk = results_file_resource['id']
-
-    metadata_file_resource, metadata_file_instance = tantalus_api.add_file(
-        results_storage_name, metadata_filepath, update=rerun)
-    metadata_file_pk = metadata_file_resource['id']
+    file_resources = []
+    for filename in metadata['filenames']:
+        filepath = os.path.join(results_dir, filename)
+        file_resource, _ = tantalus_api.add_file(
+            results_storage_name, filepath, update=rerun)
+        file_resources.append(file_resource['id'])
 
     results = tantalus_api.get_or_create(
         'results',
@@ -180,7 +195,7 @@ def run_analysis(
         results_version=results_version,
         libraries=[library_pk],
         analysis=analysis['id'],
-        file_resources=[results_file_pk, metadata_file_pk],
+        file_resources=file_resources,
     )
 
     if archive_storage_name is not None:
@@ -193,7 +208,18 @@ def run_analysis(
         )
 
 
-@click.command()
+@click.group()
+def run_cell_cycle():
+    pass
+
+
+@run_cell_cycle.command('single')
+@click.argument('results_directory', nargs=1)
+def run_single_analysis(results_directory):
+    run_analysis(results_directory)
+
+
+@run_cell_cycle.command('multi')
 @click.argument('results_storage_name', nargs=1)
 @click.option('--archive_storage_name', required=False)
 @click.option('--jira_ticket', multiple=True)
@@ -209,7 +235,7 @@ def run_all_analyses(results_storage_name, archive_storage_name=None, jira_ticke
         logging.info('processing dataset {}, ticket {}'.format(dataset['name'], jira_ticket))
 
         try:
-            run_analysis(
+            run_tantalus_analysis(
                 tantalus_api, dataset, jira_ticket, results_storage_name,
                 archive_storage_name=archive_storage_name, rerun=rerun)
         except Exception as e:
@@ -220,5 +246,5 @@ if __name__ == "__main__":
     # Set up the root logger
     logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
 
-    run_all_analyses()
+    run_cell_cycle()
 
