@@ -228,7 +228,6 @@ For additional filtering and annotation see `scgenome.analyses.infer_clones.retr
 
 ### Testing on ceto/juno
 
-Console:
 ```
 (venv) -bash-4.2$ bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_qc.py test-cached-single-ticket SC-2140 --local_storage_name juno
 Job <23793165> is submitted to default queue <general>.
@@ -256,4 +255,40 @@ Job <23793165> is submitted to default queue <general>.
 2019-11-01 14:27:37,026 - WARNING - salmon_multihit not in table annotation_metrics
 2019-11-01 14:27:37,026 - WARNING - salmon not in table annotation_metrics
 2019-11-01 14:27:37,030 - INFO - successfully loaded results from /juno/work/shah/tantalus/SC-2140
+```
+
+```
+(venv) -bash-4.2$ bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_pseudobulk.py test-cached-single-ticket SC-2658 --local_storage_name juno
+Job <23795221> is submitted to default queue <general>.
+<<Waiting for dispatch ...>>
+<<Starting on ja10>>
+2019-11-01 15:19:29,456 - INFO - starting load
+Traceback (most recent call last):
+  File "scgenome/tests/test_load_pseudobulk.py", line 189, in <module>
+    cli()
+  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 764, in __call__
+    return self.main(*args, **kwargs)
+  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 717, in main
+    rv = self.invoke(ctx)
+  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 1137, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 956, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 555, in invoke
+    return callback(*args, **kwargs)
+  File "scgenome/tests/test_load_pseudobulk.py", line 151, in test_cached_single_ticket
+    local_storage_name=local_storage_name,
+  File "scgenome/tests/test_load_pseudobulk.py", line 132, in test_load_stored_pseudobulk_data
+    test_load_local_pseudobulk_data(ticket_directory)
+  File "scgenome/tests/test_load_pseudobulk.py", line 88, in test_load_local_pseudobulk_data
+    results_dir,
+  File "/home/vatrtwaa/scgenome/scgenome/loaders/snv.py", line 274, in load_snv_data
+    strelka_filter=strelka_filter)
+  File "/home/vatrtwaa/scgenome/scgenome/loaders/snv.py", line 158, in load_snv_annotation_results
+    mappability = load_snv_annotation_table(pseudobulk_dir, 'mappability')
+  File "/home/vatrtwaa/scgenome/scgenome/loaders/snv.py", line 82, in load_snv_annotation_table
+    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, f'snv_{table_name}.csv.gz'):
+  File "/home/vatrtwaa/scgenome/scgenome/loaders/utils.py", line 85, in get_pseudobulk_files
+    raise ValueError(f'found {len(sample_lib_filenames)} {suffix} files for {sample_id}, {library_id}, {results_dir}')
+ValueError: found 0 snv_mappability.csv.gz files for SA1090, A96213A, /juno/work/shah/tantalus/SC-2658/results/variants
 ```
