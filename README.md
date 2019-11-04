@@ -269,6 +269,7 @@ The following code will load SNV tables for `SC-1939` from a local cache.  Note 
 > note that loading SNV data can be memory intensive
 
 ```
+import os
 import sys
 import logging
 
@@ -319,10 +320,11 @@ dict_keys(['snv_data', 'snv_count_data'])
 The following code will load breakpoint tables for `SC-1939` from a local cache.  Note that to load from a server storage simply replace `local_cache_directory` with the storage directory (eg `/work/shah/tantalus/`).
 
 ```
+import os
 import sys
 import logging
 
-import scgenome.loaders.snv
+import scgenome.loaders.breakpoint
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
@@ -386,10 +388,11 @@ The following code will load haplotype allele tables for `SC-1939` from a local 
 > note that loading SNV data can be memory intensive
 
 ```
+import os
 import sys
 import logging
 
-import scgenome.loaders.snv
+import scgenome.loaders.allele
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
@@ -405,7 +408,7 @@ allele_results = scgenome.loaders.allele.load_haplotype_allele_data(
 )
 
 print(allele_results.keys())
-print(allele_results['snv_data'].head())
+print(allele_results['allele_counts'].head())
 
 >>>
 dict_keys(['allele_counts'])
