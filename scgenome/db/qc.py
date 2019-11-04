@@ -1,9 +1,10 @@
-
+import os
 import dbclients.tantalus
 import datamanagement.transfer_files
 
 import scgenome.loaders.align
 import scgenome.loaders.hmmcopy
+import scgenome.loaders.qc
 
 
 def cache_qc_results(
@@ -49,3 +50,31 @@ def cache_qc_results(
             if csv_suffix is not None and len(filepaths) != 1:
                 raise Exception(f'found {len(filepaths)} filepaths for {csv_suffix}, results {results["id"]}')
 
+
+def get_qc_data(
+        ticket_ids,
+        local_directory,
+        sample_ids=None,
+        do_caching=False,
+    ):
+
+    results_tables = {}
+
+    for ticket_id in ticket_ids:
+        if do_caching:
+            cache_qc_results(ticket_id, local_directory)
+
+        ticket_directory = os.path.join(local_directory, ticket_id)
+        ticket_results = scgenome.loaders.qc.load_qc_data(ticket_directory, sample_ids=sample_ids)
+
+        for table_name, table_data in ticket_results.items():
+            if table_name not in results_tables:
+                results_tables[table_name] = []
+            results_tables[table_name].append(table_data)
+
+    for table_name, table_data in results_tables.items():
+        results_tables[table_name] = scgenome.utils.concat_with_categories(table_data)
+
+    scgenome.utils.union_categories(results_tables.values())
+
+    return results_tables

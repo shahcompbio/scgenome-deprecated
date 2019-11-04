@@ -66,7 +66,6 @@ def load_cell_state_prediction(results_dir):
 def load_qc_data(
         results_dir,
         sample_ids=None,
-        subsample=None,
         additional_hmmcopy_reads_cols=None,
     ):
     """ Load qc data (align, hmmcopy, annotation)
@@ -74,7 +73,6 @@ def load_qc_data(
     Args:
         results_dir (str): results directory to load from.
         sample_ids (list of str, optional): Set of sample ids to filter for. Defaults to None.
-        subsample (float, optional): Proportion of the cells to downsample to. Defaults to None.
         additional_hmmcopy_reads_cols (list of str, optional): Additional columns to obtain from the reads table. Defaults to None.
     """
 
@@ -109,15 +107,8 @@ def load_qc_data(
         for table_name, table_data in results_tables.items():
             results_tables[table_name] = table_data[table_data['sample_id'].isin(sample_ids)]
 
-    # Optionally subsample cells
-    if subsample is not None:
-        cell_ids = (
-            results_tables['hmmcopy_metrics'][['cell_id']]
-            .drop_duplicates().sample(frac=subsample))
-        for table_name in results_tables.keys():
-            results_tables[table_name] = results_tables[table_name].merge(cell_ids)
-
     scgenome.utils.union_categories(results_tables.values())
 
     return results_tables
+
 

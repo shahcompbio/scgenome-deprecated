@@ -88,33 +88,54 @@ where classified is a file with cell classifications, and qndaseq_blacklist is a
 * residual
 * use
 
-## API
+## Retrieving QC data
 
-The API allows access to both HMMCopy and Pseudobulk data stored in blob and managed by tantalus.
+QC data is referenced by the jira ticket of the analysis that created that data.  The primary data store is in the `singlecellresults` azure blob storage.  A secondary store is on juno in the directory `/work/shah/tantalus/`.  Filesystem layout is `{storage_prefix}/{jira_ticket}` with analyses as subdirectories under the jira ticket directory.
 
-### Prerequisites
+For instance, library `A96199A` was analyzed with ticket `SC-1711`.  The alignment and hmmcopy results are stored under the directories `/work/shah/tantalus/SC-1711/results/results/alignment/` and `/work/shah/tantalus/SC-1711/results/results/hmmcopy_autoploidy/` respectively.  In Azure, the results are stored with blob prefixes `SC-1711/results/results/alignment/` and `SC-1711/results/results/hmmcopy_autoploidy/` respectively in the results container of the singlecellresults storage account.
 
-#### Software
+### Dataset search
 
-You should set up an environment with the requirements from `requirements.txt` including sisyphus.
+Given a library id, it will be necessary to search tantalus for a jira ticket corresponding to a QC analysis of that library in order to access the QC results.  This can be done with the `search_hmmcopy_analysis` function of the `scgenome.db.search` module.  
 
-#### Accounts
-
-You must have a tantalus account and access to azure blob storage.  Tantalus and azure blob credentials should be in your environment.
-
-### HMMCopy Data
-
-The following example code snippet will provide access to HMMCopy data for the OV cell line data:
+> Note that the logging setup is important in order to be able to obtain useful messages regarding caveats about the identified datasets, including whether they include all the available sequence data.
 
 ```
-import dbclients
-import scgenome.utils
+import sys
+import logging
+import scgenome.db.search
 
-from scgenome.loaders.qc import load_qc_data
-from scgenome.db.qc import cache_qc_results
+LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
 
+library_id = 'A96157C'
 
-tantalus_api = dbclients.tantalus.TantalusApi()
+analysis = scgenome.db.search.search_hmmcopy_analysis(
+    library_id,
+    aligner_name='BWA_MEM_0_7_6A',
+)
+
+print(analysis['jira_ticket'])
+
+>>>
+SC-3041
+```
+
+### Loading from azure with caching
+
+Given a list of jira tickets, it is possible to download data from azure blob storage to a local cache.  Repeated loads will not re-download.  Sample ids can be specified to filter for only a required list of samples.
+
+> You must have a tantalus account and access to azure blob storage.  Tantalus and azure blob credentials should be in your environment.
+
+```
+import sys
+import logging
+import scgenome.db.qc
+
+LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
+
+local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
 
 hmmcopy_tickets = [
     'SC-1935',
@@ -128,54 +149,104 @@ sample_ids = [
     'SA922',
 ]
 
-local_cache_directory = '/Your/Local/Cache'
+results_tables = scgenome.db.qc.get_qc_data(
+    hmmcopy_tickets,
+    local_cache_directory,
+    sample_ids=sample_ids,
+    do_caching=True,
+)
 
-cn_data = []
-segs_data = []
-metrics_data = []
-align_metrics_data = []
+cn_data, metrics_data = (
+    results_tables['hmmcopy_reads'],
+    results_tables['annotation_metrics'],
+)
 
-for jira_ticket in hmmcopy_tickets:
-    analysis = tantalus_api.get(
-        'analysis',
-        analysis_type__name='hmmcopy',
-        jira_ticket=jira_ticket)
+print(cn_data.head())
 
-    cache_qc_results(jira_ticket, local_cache_directory)
-    ticket_directory = os.path.join(local_cache_directory, ticket_id)
-    hmmcopy_data = load_qc_data(ticket_directory)
-
-    cn_data.append(hmmcopy_data['hmmcopy_reads'])
-    segs_data.append(hmmcopy_data['hmmcopy_segs'])
-    metrics_data.append(hmmcopy_data['hmmcopy_metrics'])
-    align_metrics_data.append(hmmcopy_data['align_metrics'])
-
-cn_data = scgenome.utils.concat_with_categories(cn_data)
-segs_data = scgenome.utils.concat_with_categories(segs_data)
-metrics_data = scgenome.utils.concat_with_categories(metrics_data)
-align_metrics_data = scgenome.utils.concat_with_categories(align_metrics_data)
+>>> 
+  chr    start      end  reads        gc      copy  state                cell_id sample_id library_id
+0   1        1   500000     13 -1.000000       NaN      6  SA922-A90554B-R34-C70     SA922    A90554B
+1   1   500001  1000000    442 -1.000000       NaN      6  SA922-A90554B-R34-C70     SA922    A90554B
+2   1  1000001  1500000    461  0.598332  6.672340      6  SA922-A90554B-R34-C70     SA922    A90554B
+3   1  1500001  2000000    478  0.539498  5.211916      6  SA922-A90554B-R34-C70     SA922    A90554B
+4   1  2000001  2500000    594  0.594508  8.384862      6  SA922-A90554B-R34-C70     SA922    A90554B
 ```
 
-### Pseudobulk Data
+### Loading from a storage directory
 
-The following example code snippet will provide access to pseudobulk SNV, allele and breakpoint data for the OV cell line data:
+Given a list of jira tickets, it is also possible to load data directly from an existing storage, such as juno.  Simply set the storage directory to the directory containing the data and remember to leave do_caching as `False` (default).
 
 ```
-import scgenome.snvdata
-import scgenome.loaders.snv
-import scgenome.loaders.allele
-import scgenome.loaders.breakpoint
+import sys
+import logging
+import scgenome.db.qc
+
+LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
+
+storage_directory = '/work/shah/tantalus/'
+
+hmmcopy_tickets = [
+    'SC-1935',
+    'SC-1936',
+    'SC-1937',
+]
+
+sample_ids = [
+    'SA1090',
+    'SA921',
+    'SA922',
+]
+
+results_tables = scgenome.db.qc.get_qc_data(
+    hmmcopy_tickets,
+    storage_directory,
+    sample_ids=sample_ids,
+)
+
+cn_data, metrics_data = (
+    results_tables['hmmcopy_reads'],
+    results_tables['annotation_metrics'],
+)
+
+print(cn_data.head())
+
+>>> 
+  chr    start      end  reads        gc      copy  state                cell_id sample_id library_id
+0   1        1   500000     13 -1.000000       NaN      6  SA922-A90554B-R34-C70     SA922    A90554B
+1   1   500001  1000000    442 -1.000000       NaN      6  SA922-A90554B-R34-C70     SA922    A90554B
+2   1  1000001  1500000    461  0.598332  6.672340      6  SA922-A90554B-R34-C70     SA922    A90554B
+3   1  1500001  2000000    478  0.539498  5.211916      6  SA922-A90554B-R34-C70     SA922    A90554B
+4   1  2000001  2500000    594  0.594508  8.384862      6  SA922-A90554B-R34-C70     SA922    A90554B
+```
+
+### Retrieving pseudobulk data
+
+Pseudobulk data is referenced by the jira ticket of the analysis that created that data.  As with QC data, the primary data store is in the `singlecellresults` azure blob storage.  A secondary store is on juno in the directory `/work/shah/tantalus/`.  Filesystem layout is `{storage_prefix}/{jira_ticket}` with analyses as subdirectories under the jira ticket directory.
+
+For instance, the ovarian cell 2295 lines were analyzed with ticket `SC-1939`.  The pseudobulk results including SNVs, breakpoints, and haplotype allele results are stored under the directories `/work/shah/tantalus/SC-1939/results`.  In Azure, the results are stored with blob prefix `SC-1939/results` in the results container of the singlecellresults storage account.
+
+Pseudobulk data can either be loaded directly from an existing server storage (eg `/work/shah/tantalus/`) or downloaded from the primary data store in azure and cached locally.
+
+#### Caching pseudobulk data
+
+To download from the primary data store, use the `datamanagement.transfer_files.cache_dataset` function from sisyphus.  The following code is searching for all results produced by an analysis with the jira ticket SC-1939, and then caching those results to the provided cache directory.
+
+> You must have a tantalus account and access to azure blob storage.  Tantalus and azure blob credentials should be in your environment.
+
+```
+import sys
+import logging
 
 import dbclients.tantalus
 import datamanagement.transfer_files
 
+LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
+
 ticket_id = 'SC-1939'
 
-results_prefix = './results'
-
-local_cache_directory = '/Your/Local/Cache'
-
-# Download the results
+local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
 
 tantalus_api = dbclients.tantalus.TantalusApi()
 
@@ -189,31 +260,168 @@ for results in ticket_results:
         'singlecellresults',
         local_cache_directory,
     )
+```
 
-# Load from cache
+#### Loading SNV data
 
-museq_score_threshold = None
-strelka_score_threshold = None
-snvs_num_cells_threshold = 2
-snvs_sum_alt_threshold = 2
+The following code will load SNV tables for `SC-1939` from a local cache.  Note that to load from a server storage simply replace `local_cache_directory` with the storage directory (eg `/work/shah/tantalus/`).
+
+> note that loading SNV data can be memory intensive
+
+```
+import sys
+import logging
+
+import scgenome.loaders.snv
+
+LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
+
+ticket_id = 'SC-1939'
+
+local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
 
 ticket_directory = os.path.join(local_cache_directory, ticket_id)
 
 snv_results = scgenome.loaders.snv.load_snv_data(
     ticket_directory,
-    museq_filter=museq_score_threshold,
-    strelka_filter=strelka_score_threshold,
 )
 
-allele_results = scgenome.loaders.allele.load_haplotype_allele_data(
-    ticket_directory,
-)
+print(snv_results.keys())
+print(snv_results['snv_data'].head())
+
+>>>
+dict_keys(['snv_data', 'snv_count_data'])
+   chrom    coord ref alt  alt_counts_sum  ref_counts_sum  mappability  \
+17     1   985349   G   A            32.0            27.0          1.0   
+24     1  1079129   G   T            80.0             0.0          1.0   
+66     1  2032634   T   C            65.0            62.0          1.0   
+68     1  2063033   C   A           354.0             1.0          1.0   
+74     1  2117392   G   A           430.0             2.0          1.0   
+
+   is_cosmic gene_name effect effect_impact amino_acid_change  \
+17      True       NaN    NaN           NaN               NaN   
+24       NaN       NaN    NaN           NaN               NaN   
+66       NaN       NaN    NaN           NaN               NaN   
+68       NaN       NaN    NaN           NaN               NaN   
+74       NaN       NaN    NaN           NaN               NaN   
+
+   tri_nucleotide_context  max_strelka_score  max_museq_score  
+17                    CGT                 93             0.99  
+24                    TGC                316             1.00  
+66                    NaN                124             0.95  
+68                    ACA                479             0.99  
+74                    CGG                433             0.99  
+```
+
+#### Loading breakpoint data
+
+The following code will load breakpoint tables for `SC-1939` from a local cache.  Note that to load from a server storage simply replace `local_cache_directory` with the storage directory (eg `/work/shah/tantalus/`).
+
+```
+import sys
+import logging
+
+import scgenome.loaders.snv
+
+LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
+
+ticket_id = 'SC-1939'
+
+local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
+
+ticket_directory = os.path.join(local_cache_directory, ticket_id)
 
 breakpoint_results = scgenome.loaders.breakpoint.load_breakpoint_data(
     ticket_directory,
 )
 
+print(breakpoint_results.keys())
+print(breakpoint_results['breakpoint_data'].head())
+
+>>>
+dict_keys(['breakpoint_data', 'breakpoint_count_data'])
+   prediction_id chromosome_1 strand_1  position_1 chromosome_2 strand_2  \
+0            456            1        -    17084897            1        -   
+1            569            1        -   234914910            1        -   
+2           1032            1        -   148902774            1        -   
+3           1313            1        -   204051209            1        -   
+4           2081            1        -    64520958            1        -   
+
+   position_2  homology  num_split inserted  ...  dgv_ids  is_germline  \
+0    17084866         8          3      nan  ...      NaN        False   
+1   234914883        13          6      nan  ...      NaN        False   
+2   148902756         6          2      nan  ...      NaN        False   
+3   204051202         0          2      nan  ...      NaN        False   
+4    64520949         3          2      nan  ...      NaN        False   
+
+   is_dgv  num_patients  is_filtered  dist_filtered  balanced  \
+0   False             1        False         2769.0     False   
+1   False             1        False         2695.0     False   
+2   False             1        False         3302.0     False   
+3   False             1        False        15009.0     False   
+4   False             1        False        28133.0     False   
+
+   rearrangement_type library_id  sample_id  
+0            foldback    A90554A      SA921  
+1            foldback    A90554A      SA921  
+2            foldback    A90554A      SA921  
+3            foldback    A90554A      SA921  
+4            foldback    A90554A      SA921  
+
+[5 rows x 37 columns]
+    prediction_id                cell_id  read_count library_id sample_id
+1               0  SA921-A90554A-R10-C22           1    A90554A     SA921
+34              1  SA921-A90554A-R03-C08           1    A90554A     SA921
+35              1  SA921-A90554A-R03-C19           1    A90554A     SA921
+36              1  SA921-A90554A-R03-C27           1    A90554A     SA921
+37              1  SA921-A90554A-R03-C36           1    A90554A     SA921
 ```
 
-For additional filtering and annotation see `scgenome.analyses.infer_clones.retrieve_pseudobulk_data`.
+#### Loading haplotype data
+
+The following code will load haplotype allele tables for `SC-1939` from a local cache.  Note that to load from a server storage simply replace `local_cache_directory` with the storage directory (eg `/work/shah/tantalus/`).
+
+> note that loading SNV data can be memory intensive
+
+```
+import sys
+import logging
+
+import scgenome.loaders.snv
+
+LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
+
+ticket_id = 'SC-1939'
+
+local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
+
+ticket_directory = os.path.join(local_cache_directory, ticket_id)
+
+allele_results = scgenome.loaders.allele.load_haplotype_allele_data(
+    ticket_directory,
+)
+
+print(allele_results.keys())
+print(allele_results['snv_data'].head())
+
+>>>
+dict_keys(['allele_counts'])
+   allele_id                cell_id chromosome      end  hap_label  readcount  \
+0          0  SA921-A90554A-R12-C09          1  1000000         27          1   
+1          0  SA921-A90554A-R12-C09          1  2500000        151          1   
+2          1  SA921-A90554A-R12-C09          1  3845268        259          1   
+3          0  SA921-A90554A-R12-C09          1  4500000        285          1   
+4          0  SA921-A90554A-R12-C09          1  7000000        406          1   
+
+     start  
+0   521368  
+1  2000000  
+2  3500000  
+3  4000000  
+4  6500000  
+```
+
 
