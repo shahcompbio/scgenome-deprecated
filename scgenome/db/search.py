@@ -146,8 +146,6 @@ def search_cell_cycle_results(
 ):
     """ Import cell cycle predictions for a list of libraries
     """
-    logging.info(f'cell cycle data for {library_id}')
-
     analysis = tantalus_api.get(
         'analysis',
         analysis_type='cell_state_classifier',
