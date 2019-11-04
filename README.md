@@ -125,6 +125,8 @@ SC-3041
 
 Given a list of jira tickets, it is possible to download data from azure blob storage to a local cache.  Repeated loads will not re-download.  Sample ids can be specified to filter for only a required list of samples.
 
+> The environment variable `TANTALUS_CACHE_DIR` is assumed to have been set to the path to the local cache directory.
+
 > You must have a tantalus account and access to azure blob storage.  Tantalus and azure blob credentials should be in your environment.
 
 ```
@@ -135,7 +137,7 @@ import scgenome.db.qc
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO)
 
-local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
+local_cache_directory = os.environ['TANTALUS_CACHE_DIR']
 
 hmmcopy_tickets = [
     'SC-1935',
@@ -232,6 +234,8 @@ Pseudobulk data can either be loaded directly from an existing server storage (e
 
 To download from the primary data store, use the `datamanagement.transfer_files.cache_dataset` function from sisyphus.  The following code is searching for all results produced by an analysis with the jira ticket SC-1939, and then caching those results to the provided cache directory.
 
+> The environment variable `TANTALUS_CACHE_DIR` is assumed to have been set to the path to the local cache directory.
+
 > You must have a tantalus account and access to azure blob storage.  Tantalus and azure blob credentials should be in your environment.
 
 ```
@@ -246,7 +250,7 @@ logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO
 
 ticket_id = 'SC-1939'
 
-local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
+local_cache_directory = os.environ['TANTALUS_CACHE_DIR']
 
 tantalus_api = dbclients.tantalus.TantalusApi()
 
@@ -264,9 +268,11 @@ for results in ticket_results:
 
 #### Loading SNV data
 
-The following code will load SNV tables for `SC-1939` from a local cache.  Note that to load from a server storage simply replace `local_cache_directory` with the storage directory (eg `/work/shah/tantalus/`).
+The following code will load SNV tables for `SC-1939` from a local cache.
 
-> note that loading SNV data can be memory intensive
+> Note that to load from a server storage simply replace `local_cache_directory` with the storage directory (eg `/work/shah/tantalus/`).
+
+> Note that loading SNV data can be memory intensive
 
 ```
 import os
@@ -280,7 +286,7 @@ logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO
 
 ticket_id = 'SC-1939'
 
-local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
+local_cache_directory = os.environ['TANTALUS_CACHE_DIR']
 
 ticket_directory = os.path.join(local_cache_directory, ticket_id)
 
@@ -331,7 +337,7 @@ logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO
 
 ticket_id = 'SC-1939'
 
-local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
+local_cache_directory = os.environ['TANTALUS_CACHE_DIR']
 
 ticket_directory = os.path.join(local_cache_directory, ticket_id)
 
@@ -385,7 +391,7 @@ dict_keys(['breakpoint_data', 'breakpoint_count_data'])
 
 The following code will load haplotype allele tables for `SC-1939` from a local cache.  Note that to load from a server storage simply replace `local_cache_directory` with the storage directory (eg `/work/shah/tantalus/`).
 
-> note that loading SNV data can be memory intensive
+> Note that loading SNV data can be memory intensive
 
 ```
 import os
@@ -399,7 +405,7 @@ logging.basicConfig(format=LOGGING_FORMAT, stream=sys.stderr, level=logging.INFO
 
 ticket_id = 'SC-1939'
 
-local_cache_directory = '/Users/mcphera1/Scratch/tantalus_data/'
+local_cache_directory = os.environ['TANTALUS_CACHE_DIR']
 
 ticket_directory = os.path.join(local_cache_directory, ticket_id)
 
