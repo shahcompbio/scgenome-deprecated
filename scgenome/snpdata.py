@@ -239,7 +239,7 @@ def calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size):
     allele_data.rename(columns={0: 'allele_1', 1: 'allele_2'}, inplace=True)
     allele_data.reset_index(inplace=True)
 
-    # Merge clusters and 
+    # Merge clusters and redo categoricals
     scgenome.utils.union_categories(
         [allele_data, clusters],
         cat_cols=['cell_id'])
@@ -256,8 +256,9 @@ def calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size):
 
 
 def calculate_cluster_allele_cn(
-        cn_data, allele_data, clusters, plots_prefix,
+        cn_data, allele_data, clusters,
         total_allele_counts_threshold=6,
+        plots_prefix=None,
     ):
     """ Infer allele and cluster specific copy number from haplotype allele counts
     """
@@ -301,7 +302,8 @@ def calculate_cluster_allele_cn(
         scgenome.snpdata.plot_vaf_cn_profile(
             ax, cluster_allele_data, cluster_allele_cn)
         idx += 1
-    fig.savefig(plots_prefix + 'allele_cn_profiles.png', bbox_inches='tight')
+    if plots_prefix is not None:
+        fig.savefig(plots_prefix + 'allele_cn_profiles.png', bbox_inches='tight')
 
     return allele_cn
 
