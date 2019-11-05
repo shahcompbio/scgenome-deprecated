@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 import wgs_analysis.snvs.mutsig
 import wgs_analysis.plots.snv
+import wgs_analysis.annotation.position
 
 
 def filter_snv_data(
@@ -38,9 +39,9 @@ def filter_snv_data(
         .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True).size().rename('num_cells')
         .reset_index())
 
+    fig = plt.figure(figsize=(4, 4))
+    cell_counts['num_cells'].astype(float).hist(bins=50)
     if figures_prefix is not None:
-        fig = plt.figure(figsize=(4, 4))
-        cell_counts['num_cells'].astype(float).hist(bins=50)
         fig.savefig(figures_prefix + 'snv_cell_counts.pdf', bbox_inches='tight')
 
     snv_data = snv_data.merge(cell_counts, how='left')
@@ -53,9 +54,9 @@ def filter_snv_data(
         .sum().rename('sum_alt_counts')
         .reset_index())
 
+    fig = plt.figure(figsize=(4, 4))
+    sum_alt_counts['sum_alt_counts'].astype(float).hist(bins=50)
     if figures_prefix is not None:
-        fig = plt.figure(figsize=(4, 4))
-        sum_alt_counts['sum_alt_counts'].astype(float).hist(bins=50)
         fig.savefig(figures_prefix + 'snv_alt_counts.pdf', bbox_inches='tight')
 
     # Filter SNVs by num cells in which they are detected
@@ -102,12 +103,14 @@ def plot_mutation_signatures(snv_data, snv_class_col, results_prefix):
 
     fig = wgs_analysis.snvs.mutsig.plot_signature_heatmap(sample_sig)
     seaborn.despine(trim=True)
-    fig.savefig(results_prefix + f'_{snv_class_col}_mutsig.pdf', bbox_inches='tight')
+    if results_prefix is not None:
+        fig.savefig(results_prefix + f'_{snv_class_col}_mutsig.pdf', bbox_inches='tight')
 
     fig = plt.figure(figsize=(4, 4))
     sample_sig.loc['All', :].sort_values().iloc[-10:,].plot(kind='bar')
     seaborn.despine(trim=True)
-    fig.savefig(results_prefix + f'_{snv_class_col}_top10_mutsig.pdf', bbox_inches='tight')
+    if results_prefix is not None:
+        fig.savefig(results_prefix + f'_{snv_class_col}_top10_mutsig.pdf', bbox_inches='tight')
 
 
 def run_mutation_signature_analysis(snv_data, results_prefix):
@@ -131,7 +134,7 @@ def run_mutation_signature_analysis(snv_data, results_prefix):
     plot_mutation_signatures(snv_data, 'adjacent_distance_class', results_prefix)
 
 
-def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_prefix):
+def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_prefix=None):
     # Filter cells
     snv_count_data = snv_count_data.merge(filtered_cell_ids)
     total_alt_counts = snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['alt_counts'].sum().reset_index()
@@ -152,7 +155,10 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
         snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['ref_counts'].sum().reset_index())
     high_impact = high_impact.merge(
         snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['total_counts'].sum().reset_index())
-    high_impact.to_csv(results_prefix + 'snvs_high_impact.csv')
+    if results_prefix is not None:
+        high_impact.to_csv(results_prefix + 'snvs_high_impact.csv')
+    else:
+        print(high_impact)
 
     # Annotate adjacent distance
     snv_data = wgs_analysis.annotation.position.annotate_adjacent_distance(snv_data)
@@ -160,12 +166,14 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
     # Plot adjacent distance of SNVs
     fig = plt.figure(figsize=(10, 3))
     wgs_analysis.plots.snv.snv_adjacent_distance_plot(plt.gca(), snv_data)
-    fig.savefig(results_prefix + 'snv_adjacent_distance.pdf', bbox_inches='tight')
+    if results_prefix is not None:
+        fig.savefig(results_prefix + 'snv_adjacent_distance.pdf', bbox_inches='tight')
 
     # Plot snv count as a histogram across the genome
     fig = plt.figure(figsize=(10, 3))
     wgs_analysis.plots.snv.snv_count_plot(plt.gca(), snv_data)
-    fig.savefig(results_prefix + 'snv_genome_count.pdf', bbox_inches='tight')
+    if results_prefix is not None:
+        fig.savefig(results_prefix + 'snv_genome_count.pdf', bbox_inches='tight')
 
     # Run mutation signature analysis, requires adjacent distance
     run_mutation_signature_analysis(snv_data, results_prefix)
