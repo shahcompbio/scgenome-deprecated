@@ -52,7 +52,7 @@ def find_overlapping_segments(pos, seg, columns):
     return results
 
 
-def snv_hierarchical_clustering_figure(snv_data, allele_cn, clusters):
+def snv_hierarchical_clustering_figure(snv_data, clusters):
     """ Simple hierarhical clustering figure for SNVs
     """
     snv_matrix = snv_data.merge(clusters)
