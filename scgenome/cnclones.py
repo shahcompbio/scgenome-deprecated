@@ -1,62 +1,19 @@
 import logging
 import scipy.stats
 import seaborn
+import umap
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 import scgenome.cncluster
 import scgenome.cnplot
+import scgenome.cnfilter
 
 
-def calc_prop_hom_del(states):
-    cndist = states.value_counts()
-    cndist = cndist / cndist.sum()
-    if 0 not in cndist:
-        return 0
-    return cndist[0]
-
-
-def calculate_clusters(cn_data, metrics_data, results_prefix):
+def calculate_umap_hdbscan_clones(cn_data, metrics_data, results_prefix=None):
     """ Cluster copy number data.
     """
-    metrics_data['filter_quality'] = (metrics_data['quality'] > 0.75)
-    metrics_data['filter_reads'] = (metrics_data['total_mapped_reads_hmmcopy'] > 500000)
-
-    # Calculate proportion homozygous deletion state
-    prop_hom_del = cn_data.groupby('cell_id')['state'].apply(calc_prop_hom_del).rename('prop_hom_del').reset_index()
-    metrics_data = metrics_data.merge(prop_hom_del, how='left')
-    metrics_data['prop_hom_del'] = metrics_data['prop_hom_del'].fillna(0)
-    metrics_data['zscore_prop_hom_del'] = scipy.stats.zscore(metrics_data['prop_hom_del'])
-    metrics_data['filter_prop_hom_del'] = (metrics_data['zscore_prop_hom_del'] < 3.)
-
-    # Calculate separation between predicted and normalized copy number
-    copy_state_diff = cn_data[['cell_id', 'copy', 'state']].copy()
-    copy_state_diff['copy_state_diff'] = np.absolute(copy_state_diff['copy'] - copy_state_diff['state'])
-    copy_state_diff = (copy_state_diff[['cell_id', 'copy_state_diff']]
-        .dropna().groupby('cell_id')['copy_state_diff']
-        .mean().reset_index().dropna())
-    metrics_data = metrics_data.merge(copy_state_diff)
-    metrics_data['filter_copy_state_diff'] = (metrics_data['copy_state_diff'] < 1.)
-
-    # Remove s phase cells
-    # Remove low quality cells
-    # Remove low coverage cells
-    # Remove cells with a large divergence between copy state and norm copy number
-    # Remove cells with outlier proportion of homozygous deletion
-    filtered_cells = metrics_data.loc[
-        metrics_data['is_s_phase == False'] &
-        metrics_data['filter_quality'] &
-        metrics_data['filter_reads'] &
-        metrics_data['filter_copy_state_diff'] &
-        metrics_data['filter_prop_hom_del'],
-        ['cell_id']]
-
-    logging.info('filtering {} of {} cells'.format(
-        len(filtered_cells.index), len(metrics_data.index)))
-    cn_data = cn_data.merge(filtered_cells[['cell_id']].drop_duplicates())
-    assert isinstance(cn_data['cell_id'].dtype, pd.api.types.CategoricalDtype)
-
     logging.info('creating copy number matrix')
     cn = (
         cn_data
@@ -67,40 +24,86 @@ def calculate_clusters(cn_data, metrics_data, results_prefix):
     logging.info('clustering copy number')
     clusters = scgenome.cncluster.umap_hdbscan_cluster(cn)
 
-    fig = plt.figure(figsize=(4, 4))
-    scgenome.cncluster.plot_umap_clusters(plt.gca(), clusters)
-    fig.savefig(results_prefix + 'initial_cn_umap.pdf', bbox_inches='tight')
+    num_clusters = len(clusters['cluster_id'].unique())
 
     fig = plt.figure(figsize=(4, 4))
+    scgenome.cncluster.plot_umap_clusters(plt.gca(), clusters)
+    if results_prefix is not None:
+        fig.savefig(results_prefix + 'cn_umap.pdf', bbox_inches='tight')
+
+    fig = plt.figure(figsize=(num_clusters/4, 4))
     seaborn.barplot(x='cluster_id', y='count', data=clusters.groupby('cluster_id').size().rename('count').reset_index())
-    fig.savefig(results_prefix + 'initial_clone_size.pdf', bbox_inches='tight')
+    if results_prefix is not None:
+        fig.savefig(results_prefix + 'clone_size.pdf', bbox_inches='tight')
 
     plot_data = (clusters
         .merge(metrics_data[['cell_id', 'sample_id']].drop_duplicates())
         .groupby(['cluster_id', 'sample_id']).size().unstack(fill_value=0).T)
-    fig = plt.figure(figsize=(2, 5))
+    fig = plt.figure(figsize=(2, num_clusters/4))
     seaborn.heatmap(plot_data.T, annot=True, fmt="d", linewidths=.5)
-    fig.savefig(results_prefix + 'initial_clone_sample_size.pdf', bbox_inches='tight')
+    if results_prefix is not None:
+        fig.savefig(results_prefix + 'clone_sample_size.pdf', bbox_inches='tight')
 
     logging.info('merging clusters')
     cn_data = cn_data.merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
 
-    logging.info('plotting clusters to {}*'.format(results_prefix + 'initial'))
-    plot_clones(cn_data, 'cluster_id', results_prefix + 'initial_')
+    plot_clones(cn_data, 'cluster_id', plots_prefix=results_prefix)
 
-    filter_metrics = metrics_data[[
-        'cell_id',
-        'is_s_phase',
-        'copy_state_diff',
-        'filter_quality',
-        'filter_reads',
-        'filter_copy_state_diff',
-        'prop_hom_del',
-        'zscore_prop_hom_del',
-        'filter_prop_hom_del',
-    ]]
+    return clusters
 
-    return clusters, filter_metrics
+
+def calculate_kmeans_clones(cn_data, metrics_data, results_prefix=None):
+    """ Cluster copy number data.
+    """
+    logging.info('creating copy number matrix')
+    cn = (
+        cn_data
+            .set_index(['chr', 'start', 'end', 'cell_id'])['copy']
+            .unstack(level='cell_id').fillna(0)
+    )
+
+    logging.info('clustering copy number')
+    clusters = scgenome.cncluster.kmeans_cluster(cn)
+
+    embedding = umap.UMAP(
+        n_neighbors=15,
+        min_dist=0.1,
+        n_components=2,
+        random_state=42,
+        metric='euclidean',
+    ).fit_transform(cn.fillna(0).values.T)
+
+    clusters = clusters.merge(pd.DataFrame({
+        'cell_id': cn.columns,
+        'umap1': embedding[:, 0], 'umap2': embedding[:, 1]
+    }))
+
+    num_clusters = len(clusters['cluster_id'].unique())
+
+    fig = plt.figure(figsize=(4, 4))
+    scgenome.cncluster.plot_umap_clusters(plt.gca(), clusters)
+    if results_prefix is not None:
+        fig.savefig(results_prefix + 'cn_umap.pdf', bbox_inches='tight')
+
+    fig = plt.figure(figsize=(num_clusters/4, 4))
+    seaborn.barplot(x='cluster_id', y='count', data=clusters.groupby('cluster_id').size().rename('count').reset_index())
+    if results_prefix is not None:
+        fig.savefig(results_prefix + 'clone_size.pdf', bbox_inches='tight')
+
+    plot_data = (clusters
+        .merge(metrics_data[['cell_id', 'sample_id']].drop_duplicates())
+        .groupby(['cluster_id', 'sample_id']).size().unstack(fill_value=0).T)
+    fig = plt.figure(figsize=(2, num_clusters/4))
+    seaborn.heatmap(plot_data.T, annot=True, fmt="d", linewidths=.5)
+    if results_prefix is not None:
+        fig.savefig(results_prefix + 'clone_sample_size.pdf', bbox_inches='tight')
+
+    logging.info('merging clusters')
+    cn_data = cn_data.merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
+
+    plot_clones(cn_data, 'cluster_id', plots_prefix=results_prefix)
+
+    return clusters
 
 
 def breakpoint_filter(metrics_data, clusters, max_breakpoints, results_prefix):
@@ -313,27 +316,31 @@ def calculate_cell_clone_distances(cn_data, clusters, results_prefix):
     return clone_cell_distances
 
 
-def plot_clones(cn_data, cluster_col, plots_prefix):
+def plot_clones(cn_data, cluster_col, plots_prefix=None):
     plot_data = cn_data.copy()
     bin_filter = (plot_data['gc'] <= 0) | (plot_data['copy'].isnull())
     plot_data.loc[bin_filter, 'state'] = 0
     plot_data.loc[plot_data['copy'] > 5, 'copy'] = 5.
     plot_data.loc[plot_data['copy'] < 0, 'copy'] = 0.
 
-    fig = plt.figure(figsize=(15, 2))
+    num_clusters = len(cn_data[cluster_col].unique())
+    fig = plt.figure(figsize=(15, num_clusters/8))
     scgenome.cnplot.plot_cluster_cn_matrix(
         fig, plot_data, 'state', cluster_field_name=cluster_col)
-    fig.savefig(plots_prefix + 'clone_cn.pdf', bbox_inches='tight')
+    if plots_prefix is not None:
+        fig.savefig(plots_prefix + 'clone_cn.pdf', bbox_inches='tight')
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
         fig, plot_data, 'copy', cluster_field_name=cluster_col, raw=True)
-    fig.savefig(plots_prefix + 'raw_cn.pdf', bbox_inches='tight')
+    if plots_prefix is not None:
+        fig.savefig(plots_prefix + 'raw_cn.pdf', bbox_inches='tight')
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
         fig, plot_data, 'state', cluster_field_name=cluster_col)
-    fig.savefig(plots_prefix + 'cn_state.pdf', bbox_inches='tight')
+    if plots_prefix is not None:
+        fig.savefig(plots_prefix + 'cn_state.pdf', bbox_inches='tight')
 
     clone_cn_data = (
         cn_data
@@ -341,7 +348,7 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
             .agg({'copy': np.mean, 'state': np.median})
             .reset_index()
     )
-    clone_cn_data['state'] = clone_cn_data['state'].round().astype(int)
+    clone_cn_data['state'] = clone_cn_data['state'].astype(float).round().astype(int)
 
     num_clusters = len(clone_cn_data['cluster_id'].unique())
     fig = plt.figure(figsize=(20, 4 * num_clusters))
@@ -352,7 +359,8 @@ def plot_clones(cn_data, cluster_col, plots_prefix):
             ax, plot_data, 'copy', 'state')
         ax.set_ylabel(f'Clone {cluster_id} Total CN')
         idx += 1
-    fig.savefig(plots_prefix + 'total_cn_profiles.pdf', bbox_inches='tight')
+    if plots_prefix is not None:
+        fig.savefig(plots_prefix + 'total_cn_profiles.pdf', bbox_inches='tight')
 
 
 def calculate_mitotic_errors(
