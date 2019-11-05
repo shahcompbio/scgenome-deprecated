@@ -117,7 +117,7 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13
     ax.scatter(
         plot_data['start'], plot_data[value_field_name],
         c=plot_data[cn_field_name], s=s,
-        cmap=get_cn_cmap(plot_data[cn_field_name].values),
+        cmap=get_cn_cmap(plot_data[cn_field_name].astype(int).values),
     )
 
     if chromosome is not None:
