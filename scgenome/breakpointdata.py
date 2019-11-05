@@ -99,7 +99,7 @@ def filter_breakpoint_data(
     return breakpoint_data, breakpoint_count_data
 
 
-def plot_library_portrait(breakpoint_data, figures_prefix):
+def plot_library_portrait(breakpoint_data, figures_prefix=None):
     """ Plot a library level portrait of breakpoint features.
     """
 
@@ -136,8 +136,10 @@ def plot_library_portrait(breakpoint_data, figures_prefix):
 
     for idx, (col, desc) in enumerate(features):
         ax = fig.add_subplot(len(features) + 1, 1, idx + 2)
+        plot_data = breakpoint_data[['library_id', 'rearrangement_type', col]].dropna()
+        plot_data[col] = plot_data[col].astype(float)
         seaborn.boxplot(
-            ax=ax, data=breakpoint_data[['library_id', 'rearrangement_type', col]].dropna(),
+            ax=ax, data=plot_data,
             x='library_id', y=col, hue='rearrangement_type',
             order=order, hue_order=hue_order)
         ax.set_title(f'Distribution of {desc} across libraries')
@@ -147,7 +149,8 @@ def plot_library_portrait(breakpoint_data, figures_prefix):
         ax.legend().set_visible(False)
 
     plt.tight_layout()
-    fig.savefig(figures_prefix + 'library_features.pdf', bbox_inches='tight')
+    if figures_prefix is not None:
+        fig.savefig(figures_prefix + 'library_features.pdf', bbox_inches='tight')
 
     # Plot rearrangement type distribution across the genome per library
     num_libraries = len(breakpoint_data['library_id'].unique())
@@ -160,7 +163,8 @@ def plot_library_portrait(breakpoint_data, figures_prefix):
             ax, breakends)
         ax.set_title(f'Chromosome types for library {library_id}')
     plt.tight_layout()
-    fig.savefig(figures_prefix + 'chromosome_types.pdf', bbox_inches='tight')
+    if figures_prefix is not None:
+        fig.savefig(figures_prefix + 'chromosome_types.pdf', bbox_inches='tight')
 
     # Plot adjacent density of breakends across the genome per library
     fig = plt.figure(figsize=(10, 3 * num_libraries))
@@ -175,10 +179,11 @@ def plot_library_portrait(breakpoint_data, figures_prefix):
             ax, breakends)
         ax.set_title(f'Breakend adjacent distances for library {library_id}')
     plt.tight_layout()
-    fig.savefig(figures_prefix + 'adjacent_distance.pdf', bbox_inches='tight')
+    if figures_prefix is not None:
+        fig.savefig(figures_prefix + 'adjacent_distance.pdf', bbox_inches='tight')
 
 
-def plot_breakpoint_clustering(breakpoint_data, breakpoint_count_data, clusters, figures_prefix):
+def plot_breakpoint_clustering(breakpoint_data, breakpoint_count_data, clusters, figures_prefix=None):
     """ Plot breakpoint cluster figures.
     """
     plot_data = breakpoint_count_data.merge(clusters)
@@ -187,7 +192,8 @@ def plot_breakpoint_clustering(breakpoint_data, breakpoint_count_data, clusters,
         .sum().unstack(fill_value=None).stack().reset_index())
 
     g = seaborn.factorplot(y='read_count', x='cluster_id', kind='box', data=plot_data, color='0.75', size=4)
-    g.fig.savefig(figures_prefix + 'cluster_id_read_counts.pdf', bbox_inches='tight')
+    if figures_prefix is not None:
+        g.fig.savefig(figures_prefix + 'cluster_id_read_counts.pdf', bbox_inches='tight')
 
     plot_data['is_present'] = (plot_data['read_count'] > 0) * 1
     plot_data = plot_data.set_index(bp_index_cols + ['cluster_id'])['is_present'].unstack(fill_value=None)
@@ -195,5 +201,6 @@ def plot_breakpoint_clustering(breakpoint_data, breakpoint_count_data, clusters,
     plot_data = plot_data.fillna(0)
 
     g = seaborn.clustermap(plot_data, mask=mask, rasterized=True, figsize=(4, 12))
-    g.fig.savefig(figures_prefix + 'cluster_map.pdf', bbox_inches='tight')
+    if figures_prefix is not None:
+        g.fig.savefig(figures_prefix + 'cluster_map.pdf', bbox_inches='tight')
 
