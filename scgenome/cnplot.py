@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as dst
+from sklearn.decomposition import PCA
 from matplotlib.colors import ListedColormap
 
 from scgenome import refgenome
@@ -106,7 +107,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
     return plot_data
 
 
-def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13, chromosome=None, s=5):
+def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_cn=13, chromosome=None, s=5):
     chromosome_info = refgenome.info.chromosome_info[['chr', 'chromosome_start', 'chromosome_end']].copy()
     chromosome_info['chr'] = pd.Categorical(chromosome_info['chr'], categories=cn_data['chr'].cat.categories)
     plot_data = cn_data.merge(chromosome_info)
@@ -114,11 +115,16 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13
     plot_data['start'] = plot_data['start'] + plot_data['chromosome_start']
     plot_data['end'] = plot_data['end'] + plot_data['chromosome_start']
 
-    ax.scatter(
-        plot_data['start'], plot_data[value_field_name],
-        c=plot_data[cn_field_name], s=s,
-        cmap=get_cn_cmap(plot_data[cn_field_name].astype(int).values),
-    )
+    if cn_field_name is not None:
+        ax.scatter(
+            plot_data['start'], plot_data[value_field_name],
+            c=plot_data[cn_field_name], s=s,
+            cmap=get_cn_cmap(plot_data[cn_field_name].astype(int).values),
+        )
+    else:
+        ax.scatter(
+            plot_data['start'], plot_data[value_field_name], s=s,
+        )
 
     if chromosome is not None:
         chromosome_length = refgenome.info.chromosome_info.set_index('chr').loc[chromosome, 'chromosome_length']
@@ -144,8 +150,9 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name, max_cn=13
         ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_mid))
         ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.chromosomes))
 
-    ax.set_ylim((-0.5, max_cn))
-    ax.set_yticks(np.arange(0, max_cn, 2))
+    if cn_field_name is not None:
+        ax.set_ylim((-0.5, max_cn))
+        ax.set_yticks(np.arange(0, max_cn, 2))
     
     if chromosome is not None:
         seaborn.despine(ax=ax, offset=10, trim=False)
@@ -195,4 +202,35 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='clus
 
     return plot_data.columns.values
 
+
+def plot_pca_components(cn_data, n_components=4, plots_prefix=None):
+    """ Plot the first n components of a PCA
+    """
+    cn_matrix = (
+        cn_data
+        .set_index(['cell_id', 'chr', 'start', 'end'])['copy']
+        .unstack(level=[1, 2, 3]))
+    cn_matrix.shape
+
+    num_null = cn_matrix.isnull().sum(axis=1)
+    cn_matrix = cn_matrix[num_null <= 800]
+    cn_matrix = cn_matrix.dropna(axis='columns')
+
+    pca = PCA()
+    pca.fit(cn_matrix.values)
+
+    components = pd.DataFrame(
+        pca.components_,
+        columns=cn_matrix.columns)
+
+    fig = plt.figure(figsize=(20, 4 * n_components))
+    for idx in range(4):
+        ax = fig.add_subplot(n_components, 1, idx + 1)
+        plot_data = components.iloc[idx].T.rename('component').reset_index()
+        plot_cell_cn_profile(
+            ax, plot_data, 'component')
+        ax.set_ylabel(f'PCA {idx+1}')
+
+    if plots_prefix is not None:
+        fig.savefig(plots_prefix + 'pca_components.pdf', bbox_inches='tight')
 
