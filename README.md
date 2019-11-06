@@ -230,31 +230,47 @@ For additional filtering and annotation see `scgenome.analyses.infer_clones.retr
 
 ```
 (venv) -bash-4.2$ bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_qc.py test-cached-single-ticket SC-2140 --local_storage_name juno
-Job <23793165> is submitted to default queue <general>.
+Job <24029827> is submitted to default queue <general>.
 <<Waiting for dispatch ...>>
-<<Starting on ja10>>
-2019-11-01 14:27:36,999 - INFO - table align_metrics has size 782
-2019-11-01 14:27:37,000 - INFO - table hmmcopy_reads has size 4853092
-2019-11-01 14:27:37,002 - INFO - table hmmcopy_segs has size 413918
-2019-11-01 14:27:37,003 - INFO - table hmmcopy_metrics has size 782
-2019-11-01 14:27:37,004 - INFO - table annotation_metrics has size 775
-2019-11-01 14:27:37,009 - WARNING - fastqscreen_grch37_multihit not in table annotation_metrics
-2019-11-01 14:27:37,010 - WARNING - fastqscreen_grch37 not in table annotation_metrics
-2019-11-01 14:27:37,011 - WARNING - fastqscreen_mm10_multihit not in table annotation_metrics
-2019-11-01 14:27:37,011 - WARNING - fastqscreen_mm10 not in table annotation_metrics
-2019-11-01 14:27:37,012 - WARNING - fastqscreen_nohit not in table annotation_metrics
-2019-11-01 14:27:37,013 - WARNING - fastqscreen_salmon_multihit not in table annotation_metrics
-2019-11-01 14:27:37,014 - WARNING - fastqscreen_salmon not in table annotation_metrics
-2019-11-01 14:27:37,014 - WARNING - grch37_multihit not in table annotation_metrics
-2019-11-01 14:27:37,015 - WARNING - grch37 not in table annotation_metrics
-2019-11-01 14:27:37,018 - WARNING - is_contaminated not in table annotation_metrics
-2019-11-01 14:27:37,020 - WARNING - mm10_multihit not in table annotation_metrics
-2019-11-01 14:27:37,021 - WARNING - mm10 not in table annotation_metrics
-2019-11-01 14:27:37,022 - WARNING - nohit not in table annotation_metrics
-2019-11-01 14:27:37,023 - WARNING - order_corrupt_tree not in table annotation_metrics
-2019-11-01 14:27:37,026 - WARNING - salmon_multihit not in table annotation_metrics
-2019-11-01 14:27:37,026 - WARNING - salmon not in table annotation_metrics
-2019-11-01 14:27:37,030 - INFO - successfully loaded results from /juno/work/shah/tantalus/SC-2140
+<<Starting on ju09>>
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:24: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  manifest = yaml.load(open(manifest_filename))
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/align.py:65: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  manifest = yaml.load(open(manifest_filename))
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/align.py:91: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  dtypes_override = yaml.load(open(dtypes_filename))
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/hmmcopy.py:88: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  manifest = yaml.load(open(manifest_filename))
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/hmmcopy.py:123: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  dtypes_override = yaml.load(open(dtypes_filename))
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/hmmcopy.py:128: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  dtypes_override = yaml.load(open(dtypes_filename))
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/hmmcopy.py:118: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  dtypes_override = yaml.load(open(dtypes_filename))
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/qc.py:50: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  manifest = yaml.load(open(manifest_filename))
+2019-11-06 13:50:03,618 - INFO - table align_metrics has size 782
+2019-11-06 13:50:03,619 - INFO - table hmmcopy_reads has size 4853092
+2019-11-06 13:50:03,620 - INFO - table hmmcopy_segs has size 413918
+2019-11-06 13:50:03,620 - INFO - table hmmcopy_metrics has size 782
+2019-11-06 13:50:03,621 - INFO - table annotation_metrics has size 775
+2019-11-06 13:50:03,624 - WARNING - fastqscreen_grch37_multihit not in table annotation_metrics
+2019-11-06 13:50:03,625 - WARNING - fastqscreen_grch37 not in table annotation_metrics
+2019-11-06 13:50:03,625 - WARNING - fastqscreen_mm10_multihit not in table annotation_metrics
+2019-11-06 13:50:03,626 - WARNING - fastqscreen_mm10 not in table annotation_metrics
+2019-11-06 13:50:03,626 - WARNING - fastqscreen_nohit not in table annotation_metrics
+2019-11-06 13:50:03,627 - WARNING - fastqscreen_salmon_multihit not in table annotation_metrics
+2019-11-06 13:50:03,627 - WARNING - fastqscreen_salmon not in table annotation_metrics
+2019-11-06 13:50:03,628 - WARNING - grch37_multihit not in table annotation_metrics
+2019-11-06 13:50:03,628 - WARNING - grch37 not in table annotation_metrics
+2019-11-06 13:50:03,630 - WARNING - is_contaminated not in table annotation_metrics
+2019-11-06 13:50:03,632 - WARNING - mm10_multihit not in table annotation_metrics
+2019-11-06 13:50:03,632 - WARNING - mm10 not in table annotation_metrics
+2019-11-06 13:50:03,633 - WARNING - nohit not in table annotation_metrics
+2019-11-06 13:50:03,633 - WARNING - order_corrupt_tree not in table annotation_metrics
+2019-11-06 13:50:03,635 - WARNING - salmon_multihit not in table annotation_metrics
+2019-11-06 13:50:03,636 - WARNING - salmon not in table annotation_metrics
+2019-11-06 13:50:03,638 - INFO - successfully loaded results from /juno/work/shah/tantalus/SC-2140
 ```
 
 ```
