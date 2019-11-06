@@ -20,8 +20,8 @@ dtypes_check = {
         'coord': 'int64',
         'ref': 'category',
         'alt': 'category',
-        'alt_counts_sum': 'int64',
-        'ref_counts_sum': 'int64',
+        'alt_counts_sum': 'float64',
+        'ref_counts_sum': 'float64',
         'mappability': 'float64',
         'is_cosmic': 'object',
         'gene_name': 'category',
@@ -29,7 +29,7 @@ dtypes_check = {
         'effect_impact': 'category',
         'amino_acid_change': 'category',
         'tri_nucleotide_context': 'category',
-        'max_strelka_score': 'float64',
+        'max_strelka_score': 'int64',
         'max_museq_score': 'float64',
     },
     'snv_count_data': {
@@ -79,8 +79,11 @@ def test_pseudobulk_data(snv_results_tables, breakpoint_results_tables, haplotyp
             logging.info(f'table {table_name} has size {len(table_data)}')
             for column_name, dtype_name in dtypes_check[table_name].items():
                 column_dtype = str(results_tables[table_name][column_name].dtype)
-                if not column_dtype == dtype_name:
-                    raise Exception(f'{column_name} has dtype {column_dtype} not {dtype_name}')
+                expected_dtype_names = (dtype_name,)
+                if dtype_name == 'int64':
+                    expected_dtype_names = ('int64', 'Int64')
+                if not column_dtype in expected_dtype_names:
+                    raise Exception(f'{column_name} has dtype {column_dtype} not any of {expected_dtype_names}')
 
 
 def test_load_local_pseudobulk_data(results_dir):
@@ -101,6 +104,8 @@ def test_load_local_pseudobulk_data(results_dir):
         breakpoint_results_tables,
         haplotype_results_tables,
     )
+
+    logging.info(f'successfully loaded results from {results_dir}')
 
 
 def test_load_stored_pseudobulk_data(tantalus_api, ticket_id, local_cache_directory=None, local_storage_name=None):
