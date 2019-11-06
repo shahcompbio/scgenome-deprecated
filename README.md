@@ -258,6 +258,81 @@ Job <23793165> is submitted to default queue <general>.
 ```
 
 ```
+(venv) -bash-4.2$ bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_pseudobulk.py test-cached-single-ticket SC-2373 --local_storage_name juno
+Job <24023060> is submitted to default queue <general>.
+<<Waiting for dispatch ...>>
+<<Starting on jx19>>
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:24: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  manifest = yaml.load(open(manifest_filename))
+2019-11-06 11:52:24,953 - INFO - starting load
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:72: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  manifest = yaml.load(open(manifest_filename))
+2019-11-06 11:52:24,973 - INFO - Loading snv mappability annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_mappability.csv.gz
+2019-11-06 11:52:25,100 - INFO - Loading snv mappability annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_mappability.csv.gz
+2019-11-06 11:52:25,325 - INFO - Loading snv strelka annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_strelka.csv.gz
+2019-11-06 11:52:25,390 - INFO - Loading snv strelka annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_strelka.csv.gz
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:72: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  manifest = yaml.load(open(manifest_filename))
+2019-11-06 11:52:25,520 - INFO - Loading snv museq annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_museq.csv.gz
+2019-11-06 11:52:25,648 - INFO - Loading snv museq annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_museq.csv.gz
+2019-11-06 11:52:26,057 - INFO - Loading snv cosmic_status annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_cosmic_status.csv.gz
+2019-11-06 11:52:26,089 - INFO - Loading snv cosmic_status annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_cosmic_status.csv.gz
+2019-11-06 11:52:26,140 - INFO - cosmic table with shape (5319, 7), memory 245890
+2019-11-06 11:52:26,186 - INFO - Loading snv snpeff annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_snpeff.csv.gz
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/snv.py:274: DtypeWarning: Columns (0) have mixed types. Specify dtype option on import or set low_memory=False.
+  strelka_filter=strelka_filter)
+2019-11-06 11:52:28,176 - INFO - Loading snv snpeff annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_snpeff.csv.gz
+2019-11-06 11:52:30,913 - INFO - snpeff table with shape (91961, 8), memory 2544450
+2019-11-06 11:52:30,932 - INFO - Loading snv trinuc annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_trinuc.csv.gz
+2019-11-06 11:52:31,025 - INFO - Loading snv trinuc annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_trinuc.csv.gz
+2019-11-06 11:52:31,176 - INFO - Loading snv allele_counts annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_allele_counts.csv.gz
+2019-11-06 11:52:36,124 - INFO - Loading snv allele_counts annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_allele_counts.csv.gz
+2019-11-06 11:52:40,164 - INFO - initial snv table with shape (2883810, 7), memory 115450784
+2019-11-06 11:52:40,165 - INFO - summing snv counts
+2019-11-06 11:53:53,469 - INFO - total snv count 91765
+2019-11-06 11:53:53,472 - INFO - snv table with shape (91898, 6), memory 2482542
+2019-11-06 11:53:53,533 - INFO - post mappability with snv count 40825
+2019-11-06 11:53:53,536 - INFO - snv table with shape (40864, 7), memory 2043584
+2019-11-06 11:53:53,575 - INFO - post cosmic with snv count 40825
+2019-11-06 11:53:53,578 - INFO - snv table with shape (40864, 8), memory 2370496
+2019-11-06 11:53:53,651 - INFO - post snpeff with snv count 40825
+2019-11-06 11:53:53,656 - INFO - snv table with shape (40864, 12), memory 3544392
+2019-11-06 11:53:53,716 - INFO - snv table with shape (40864, 13), memory 3871304
+2019-11-06 11:53:53,791 - INFO - post strelka with snv count 40825
+2019-11-06 11:53:53,795 - INFO - snv table with shape (40864, 14), memory 4810792
+2019-11-06 11:53:53,891 - INFO - post museq with snv count 40825
+2019-11-06 11:53:53,895 - INFO - snv table with shape (40864, 15), memory 5137704
+2019-11-06 11:53:53,904 - INFO - post museq filter with snv count 2897
+2019-11-06 11:53:53,908 - INFO - snv table with shape (2897, 15), memory 1189136
+2019-11-06 11:53:53,915 - INFO - post strelka filter with snv count 1575
+2019-11-06 11:53:53,919 - INFO - snv table with shape (1575, 15), memory 1051648
+2019-11-06 11:53:53,923 - INFO - finishing load with snv count 1575
+2019-11-06 11:53:53,926 - INFO - snv table with shape (1575, 15), memory 1051648
+2019-11-06 11:53:53,988 - INFO - final snv table with shape (1575, 15), memory 1011828
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:72: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  manifest = yaml.load(open(manifest_filename))
+2019-11-06 11:53:54,018 - INFO - Loading snv counts from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_union_counts.csv.gz
+2019-11-06 11:53:58,302 - INFO - Loaded snv counts table with shape (2958003, 7), memory 94708408
+2019-11-06 11:53:59,426 - INFO - Filtered snv counts table to shape (37852, 7), memory 1566312
+2019-11-06 11:53:59,427 - INFO - Loading snv counts from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_union_counts.csv.gz
+2019-11-06 11:54:00,835 - INFO - Loaded snv counts table with shape (771323, 7), memory 24709592
+2019-11-06 11:54:01,126 - INFO - Filtered snv counts table to shape (10609, 7), memory 451536
+2019-11-06 11:54:01,159 - INFO - Loaded all snv counts tables with shape (48461, 7), memory 1647584
+/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:24: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  manifest = yaml.load(open(manifest_filename))
+2019-11-06 11:54:01,469 - INFO - Loading haplotype allele counts from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_allele_counts.csv
+2019-11-06 11:54:32,756 - INFO - Loaded haplotype allele counts table with shape (19170149, 7), memory 920219080
+2019-11-06 11:54:32,757 - INFO - Loading haplotype allele counts from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_allele_counts.csv
+2019-11-06 11:54:44,599 - INFO - Loaded haplotype allele counts table with shape (6733804, 7), memory 323249832
+2019-11-06 11:54:48,030 - INFO - Loaded all haplotype allele counts table with shape (25903953, 7), memory 1243488488
+2019-11-06 11:54:48,032 - INFO - table snv_data has size 1575
+2019-11-06 11:54:48,033 - INFO - table snv_count_data has size 48461
+2019-11-06 11:54:48,035 - INFO - table breakpoint_data has size 130
+2019-11-06 11:54:48,036 - INFO - table breakpoint_count_data has size 1620
+2019-11-06 11:54:48,037 - INFO - table allele_counts has size 25903953
+```
+
+```
 (venv) -bash-4.2$ bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_pseudobulk.py test-cached-single-ticket SC-2658 --local_storage_name juno
 Job <23795221> is submitted to default queue <general>.
 <<Waiting for dispatch ...>>
