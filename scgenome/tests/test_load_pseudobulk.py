@@ -20,8 +20,8 @@ dtypes_check = {
         'coord': 'int64',
         'ref': 'category',
         'alt': 'category',
-        'alt_counts_sum': 'int64',
-        'ref_counts_sum': 'int64',
+        'alt_counts_sum': 'float64',
+        'ref_counts_sum': 'float64',
         'mappability': 'float64',
         'is_cosmic': 'object',
         'gene_name': 'category',
@@ -29,46 +29,46 @@ dtypes_check = {
         'effect_impact': 'category',
         'amino_acid_change': 'category',
         'tri_nucleotide_context': 'category',
-        'max_strelka_score': 'float64',
+        'max_strelka_score': 'Int64',
         'max_museq_score': 'float64',
     },
     'snv_count_data': {
         'chrom': 'category',
-        'coord': 'int64',
+        'coord': {'int64', 'Int64'},
         'ref': 'category',
         'alt': 'category',
-        'ref_counts': 'int64',
-        'alt_counts': 'int64',
+        'ref_counts': 'Int64',
+        'alt_counts': 'Int64',
         'cell_id': 'category',
-        'total_counts': 'int64',
+        'total_counts': 'Int64',
         'sample_id': 'category',
     },
     'breakpoint_data': {
-        'prediction_id': 'int64',
+        'prediction_id': 'Int64',
         'chromosome_1': 'object',
         'strand_1': 'object',
-        'position_1': 'int64',
+        'position_1': 'Int64',
         'chromosome_2': 'object',
         'strand_2': 'object',
-        'position_2': 'int64',
+        'position_2': 'Int64',
         'library_id': 'object', 
         'sample_id': 'object',
     },
     'breakpoint_count_data': {
-        'prediction_id': 'int64',
+        'prediction_id': 'Int64',
         'cell_id': 'object',
-        'read_count': 'int64',
+        'read_count': 'Int64',
         'library_id': 'object',
         'sample_id': 'object',
     },
     'allele_counts': {
-        'allele_id': 'int64',
+        'allele_id': 'Int64',
         'cell_id': 'category',
         'chromosome': 'category',
-        'end': 'int64',
-        'hap_label': 'int64',
-        'readcount': 'int64',
-        'start': 'int64',
+        'end': 'Int64',
+        'hap_label': 'Int64',
+        'readcount': 'Int64',
+        'start': 'Int64',
     },
 }
 
@@ -77,10 +77,10 @@ def test_pseudobulk_data(snv_results_tables, breakpoint_results_tables, haplotyp
     for results_tables in (snv_results_tables, breakpoint_results_tables, haplotype_results_tables):
         for table_name, table_data in results_tables.items():
             logging.info(f'table {table_name} has size {len(table_data)}')
-            for column_name, dtype_name in dtypes_check[table_name].items():
+            for column_name, dtype_names in dtypes_check[table_name].items():
                 column_dtype = str(results_tables[table_name][column_name].dtype)
-                if not column_dtype == dtype_name:
-                    raise Exception(f'{column_name} has dtype {column_dtype} not {dtype_name}')
+                if not column_dtype in dtype_names:
+                    raise Exception(f'{column_name} has dtype {column_dtype} not {dtype_names}')
 
 
 def test_load_local_pseudobulk_data(results_dir):
