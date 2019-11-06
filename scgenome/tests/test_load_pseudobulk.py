@@ -105,6 +105,8 @@ def test_load_local_pseudobulk_data(results_dir):
         haplotype_results_tables,
     )
 
+    logging.info(f'successfully loaded results from {results_dir}')
+
 
 def test_load_stored_pseudobulk_data(tantalus_api, ticket_id, local_cache_directory=None, local_storage_name=None):
     if local_cache_directory is not None and local_storage_name is not None:
