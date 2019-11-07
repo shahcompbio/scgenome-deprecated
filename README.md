@@ -14,6 +14,22 @@ python setup.py develop
 
 Note that you will have to install numpy and cython prior to other requirements.
 
+The list of credentials below are also required in your environment at runtime:
+```
+TANTALUS_API_PASSWORD
+TANTALUS_API_USERNAME
+CLIENT_ID
+TENANT_ID
+SECRET_KEY
+COLOSSUS_API_PASSWORD
+COLOSSUS_API_USERNAME
+AZURE_KEYVAULT_ACCOUNT
+```
+
+For access to Colossus and Tantalus, please contact [Diljot Grewal](mailto:dgrewal@bccrc.ca).
+
+For information on the other environment variables, please see [here](https://shahcompbio.atlassian.net/wiki/spaces/SOFT/pages/26378254/Scgenome+and+Tantalus+credentials+for+blob+access).
+
 ## Analyses
 
 ### Cell cycle
@@ -100,16 +116,7 @@ You should set up an environment with the requirements from `requirements.txt` i
 
 #### Accounts
 
-You must have accounts for colossus and tantalus, as well as access to azure blob storage. The list of credentials below are required in your environment:
-```
-TANTALUS_API_PASSWORD
-TANTALUS_API_USERNAME
-CLIENT_ID
-TENANT_ID
-SECRET_KEY
-COLOSSUS_API_PASSWORD
-COLOSSUS_API_USERNAME
-```
+You must have accounts for colossus and tantalus, as well as access to azure blob storage.
 
 ### HMMCopy Data
 
@@ -228,158 +235,16 @@ For additional filtering and annotation see `scgenome.analyses.infer_clones.retr
 
 ### Testing on ceto/juno
 
+Run at the root of your repo directory, in your virtual environment with all required credentials available.
+
+For more information on using the Juno High Performance Computing cluster, please see [here](https://shahcompbio.atlassian.net/wiki/spaces/SOFT/pages/28475398/Juno).
+
+>test_load_qc
 ```
-(venv) -bash-4.2$ bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_qc.py test-cached-single-ticket SC-2140 --local_storage_name juno
-Job <24029827> is submitted to default queue <general>.
-<<Waiting for dispatch ...>>
-<<Starting on ju09>>
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:24: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  manifest = yaml.load(open(manifest_filename))
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/align.py:65: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  manifest = yaml.load(open(manifest_filename))
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/align.py:91: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  dtypes_override = yaml.load(open(dtypes_filename))
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/hmmcopy.py:88: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  manifest = yaml.load(open(manifest_filename))
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/hmmcopy.py:123: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  dtypes_override = yaml.load(open(dtypes_filename))
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/hmmcopy.py:128: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  dtypes_override = yaml.load(open(dtypes_filename))
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/hmmcopy.py:118: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  dtypes_override = yaml.load(open(dtypes_filename))
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/qc.py:50: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  manifest = yaml.load(open(manifest_filename))
-2019-11-06 13:50:03,618 - INFO - table align_metrics has size 782
-2019-11-06 13:50:03,619 - INFO - table hmmcopy_reads has size 4853092
-2019-11-06 13:50:03,620 - INFO - table hmmcopy_segs has size 413918
-2019-11-06 13:50:03,620 - INFO - table hmmcopy_metrics has size 782
-2019-11-06 13:50:03,621 - INFO - table annotation_metrics has size 775
-2019-11-06 13:50:03,624 - WARNING - fastqscreen_grch37_multihit not in table annotation_metrics
-2019-11-06 13:50:03,625 - WARNING - fastqscreen_grch37 not in table annotation_metrics
-2019-11-06 13:50:03,625 - WARNING - fastqscreen_mm10_multihit not in table annotation_metrics
-2019-11-06 13:50:03,626 - WARNING - fastqscreen_mm10 not in table annotation_metrics
-2019-11-06 13:50:03,626 - WARNING - fastqscreen_nohit not in table annotation_metrics
-2019-11-06 13:50:03,627 - WARNING - fastqscreen_salmon_multihit not in table annotation_metrics
-2019-11-06 13:50:03,627 - WARNING - fastqscreen_salmon not in table annotation_metrics
-2019-11-06 13:50:03,628 - WARNING - grch37_multihit not in table annotation_metrics
-2019-11-06 13:50:03,628 - WARNING - grch37 not in table annotation_metrics
-2019-11-06 13:50:03,630 - WARNING - is_contaminated not in table annotation_metrics
-2019-11-06 13:50:03,632 - WARNING - mm10_multihit not in table annotation_metrics
-2019-11-06 13:50:03,632 - WARNING - mm10 not in table annotation_metrics
-2019-11-06 13:50:03,633 - WARNING - nohit not in table annotation_metrics
-2019-11-06 13:50:03,633 - WARNING - order_corrupt_tree not in table annotation_metrics
-2019-11-06 13:50:03,635 - WARNING - salmon_multihit not in table annotation_metrics
-2019-11-06 13:50:03,636 - WARNING - salmon not in table annotation_metrics
-2019-11-06 13:50:03,638 - INFO - successfully loaded results from /juno/work/shah/tantalus/SC-2140
+bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_qc.py test-cached-single-ticket SC-2140 --local_storage_name juno
 ```
 
+>test_load_pseudobulk
 ```
-(venv) -bash-4.2$ bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_pseudobulk.py test-cached-single-ticket SC-2373 --local_storage_name juno
-Job <24023060> is submitted to default queue <general>.
-<<Waiting for dispatch ...>>
-<<Starting on jx19>>
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:24: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  manifest = yaml.load(open(manifest_filename))
-2019-11-06 11:52:24,953 - INFO - starting load
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:72: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  manifest = yaml.load(open(manifest_filename))
-2019-11-06 11:52:24,973 - INFO - Loading snv mappability annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_mappability.csv.gz
-2019-11-06 11:52:25,100 - INFO - Loading snv mappability annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_mappability.csv.gz
-2019-11-06 11:52:25,325 - INFO - Loading snv strelka annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_strelka.csv.gz
-2019-11-06 11:52:25,390 - INFO - Loading snv strelka annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_strelka.csv.gz
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:72: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  manifest = yaml.load(open(manifest_filename))
-2019-11-06 11:52:25,520 - INFO - Loading snv museq annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_museq.csv.gz
-2019-11-06 11:52:25,648 - INFO - Loading snv museq annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_museq.csv.gz
-2019-11-06 11:52:26,057 - INFO - Loading snv cosmic_status annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_cosmic_status.csv.gz
-2019-11-06 11:52:26,089 - INFO - Loading snv cosmic_status annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_cosmic_status.csv.gz
-2019-11-06 11:52:26,140 - INFO - cosmic table with shape (5319, 7), memory 245890
-2019-11-06 11:52:26,186 - INFO - Loading snv snpeff annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_snpeff.csv.gz
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/snv.py:274: DtypeWarning: Columns (0) have mixed types. Specify dtype option on import or set low_memory=False.
-  strelka_filter=strelka_filter)
-2019-11-06 11:52:28,176 - INFO - Loading snv snpeff annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_snpeff.csv.gz
-2019-11-06 11:52:30,913 - INFO - snpeff table with shape (91961, 8), memory 2544450
-2019-11-06 11:52:30,932 - INFO - Loading snv trinuc annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_trinuc.csv.gz
-2019-11-06 11:52:31,025 - INFO - Loading snv trinuc annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_trinuc.csv.gz
-2019-11-06 11:52:31,176 - INFO - Loading snv allele_counts annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_allele_counts.csv.gz
-2019-11-06 11:52:36,124 - INFO - Loading snv allele_counts annotations from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_allele_counts.csv.gz
-2019-11-06 11:52:40,164 - INFO - initial snv table with shape (2883810, 7), memory 115450784
-2019-11-06 11:52:40,165 - INFO - summing snv counts
-2019-11-06 11:53:53,469 - INFO - total snv count 91765
-2019-11-06 11:53:53,472 - INFO - snv table with shape (91898, 6), memory 2482542
-2019-11-06 11:53:53,533 - INFO - post mappability with snv count 40825
-2019-11-06 11:53:53,536 - INFO - snv table with shape (40864, 7), memory 2043584
-2019-11-06 11:53:53,575 - INFO - post cosmic with snv count 40825
-2019-11-06 11:53:53,578 - INFO - snv table with shape (40864, 8), memory 2370496
-2019-11-06 11:53:53,651 - INFO - post snpeff with snv count 40825
-2019-11-06 11:53:53,656 - INFO - snv table with shape (40864, 12), memory 3544392
-2019-11-06 11:53:53,716 - INFO - snv table with shape (40864, 13), memory 3871304
-2019-11-06 11:53:53,791 - INFO - post strelka with snv count 40825
-2019-11-06 11:53:53,795 - INFO - snv table with shape (40864, 14), memory 4810792
-2019-11-06 11:53:53,891 - INFO - post museq with snv count 40825
-2019-11-06 11:53:53,895 - INFO - snv table with shape (40864, 15), memory 5137704
-2019-11-06 11:53:53,904 - INFO - post museq filter with snv count 2897
-2019-11-06 11:53:53,908 - INFO - snv table with shape (2897, 15), memory 1189136
-2019-11-06 11:53:53,915 - INFO - post strelka filter with snv count 1575
-2019-11-06 11:53:53,919 - INFO - snv table with shape (1575, 15), memory 1051648
-2019-11-06 11:53:53,923 - INFO - finishing load with snv count 1575
-2019-11-06 11:53:53,926 - INFO - snv table with shape (1575, 15), memory 1051648
-2019-11-06 11:53:53,988 - INFO - final snv table with shape (1575, 15), memory 1011828
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:72: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  manifest = yaml.load(open(manifest_filename))
-2019-11-06 11:53:54,018 - INFO - Loading snv counts from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_snv_union_counts.csv.gz
-2019-11-06 11:53:58,302 - INFO - Loaded snv counts table with shape (2958003, 7), memory 94708408
-2019-11-06 11:53:59,426 - INFO - Filtered snv counts table to shape (37852, 7), memory 1566312
-2019-11-06 11:53:59,427 - INFO - Loading snv counts from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_snv_union_counts.csv.gz
-2019-11-06 11:54:00,835 - INFO - Loaded snv counts table with shape (771323, 7), memory 24709592
-2019-11-06 11:54:01,126 - INFO - Filtered snv counts table to shape (10609, 7), memory 451536
-2019-11-06 11:54:01,159 - INFO - Loaded all snv counts tables with shape (48461, 7), memory 1647584
-/home/vatrtwaa/scgenome/venv/src/scgenome/scgenome/loaders/utils.py:24: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
-  manifest = yaml.load(open(manifest_filename))
-2019-11-06 11:54:01,469 - INFO - Loading haplotype allele counts from /juno/work/shah/tantalus/SC-2373/results/SA1202LA_A96253B_allele_counts.csv
-2019-11-06 11:54:32,756 - INFO - Loaded haplotype allele counts table with shape (19170149, 7), memory 920219080
-2019-11-06 11:54:32,757 - INFO - Loading haplotype allele counts from /juno/work/shah/tantalus/SC-2373/results/SA1202RA_A96167A_allele_counts.csv
-2019-11-06 11:54:44,599 - INFO - Loaded haplotype allele counts table with shape (6733804, 7), memory 323249832
-2019-11-06 11:54:48,030 - INFO - Loaded all haplotype allele counts table with shape (25903953, 7), memory 1243488488
-2019-11-06 11:54:48,032 - INFO - table snv_data has size 1575
-2019-11-06 11:54:48,033 - INFO - table snv_count_data has size 48461
-2019-11-06 11:54:48,035 - INFO - table breakpoint_data has size 130
-2019-11-06 11:54:48,036 - INFO - table breakpoint_count_data has size 1620
-2019-11-06 11:54:48,037 - INFO - table allele_counts has size 25903953
-```
-
-```
-(venv) -bash-4.2$ bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_pseudobulk.py test-cached-single-ticket SC-2658 --local_storage_name juno
-Job <23795221> is submitted to default queue <general>.
-<<Waiting for dispatch ...>>
-<<Starting on ja10>>
-2019-11-01 15:19:29,456 - INFO - starting load
-Traceback (most recent call last):
-  File "scgenome/tests/test_load_pseudobulk.py", line 189, in <module>
-    cli()
-  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 764, in __call__
-    return self.main(*args, **kwargs)
-  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 717, in main
-    rv = self.invoke(ctx)
-  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 1137, in invoke
-    return _process_result(sub_ctx.command.invoke(sub_ctx))
-  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 956, in invoke
-    return ctx.invoke(self.callback, **ctx.params)
-  File "/home/vatrtwaa/scgenome/venv/lib/python3.7/site-packages/click/core.py", line 555, in invoke
-    return callback(*args, **kwargs)
-  File "scgenome/tests/test_load_pseudobulk.py", line 151, in test_cached_single_ticket
-    local_storage_name=local_storage_name,
-  File "scgenome/tests/test_load_pseudobulk.py", line 132, in test_load_stored_pseudobulk_data
-    test_load_local_pseudobulk_data(ticket_directory)
-  File "scgenome/tests/test_load_pseudobulk.py", line 88, in test_load_local_pseudobulk_data
-    results_dir,
-  File "/home/vatrtwaa/scgenome/scgenome/loaders/snv.py", line 274, in load_snv_data
-    strelka_filter=strelka_filter)
-  File "/home/vatrtwaa/scgenome/scgenome/loaders/snv.py", line 158, in load_snv_annotation_results
-    mappability = load_snv_annotation_table(pseudobulk_dir, 'mappability')
-  File "/home/vatrtwaa/scgenome/scgenome/loaders/snv.py", line 82, in load_snv_annotation_table
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, f'snv_{table_name}.csv.gz'):
-  File "/home/vatrtwaa/scgenome/scgenome/loaders/utils.py", line 85, in get_pseudobulk_files
-    raise ValueError(f'found {len(sample_lib_filenames)} {suffix} files for {sample_id}, {library_id}, {results_dir}')
-ValueError: found 0 snv_mappability.csv.gz files for SA1090, A96213A, /juno/work/shah/tantalus/SC-2658/results/variants
+bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_pseudobulk.py test-cached-single-ticket SC-2373 --local_storage_name juno
 ```
