@@ -113,8 +113,12 @@ def load_snv_annotation_table(pseudobulk_dir, table_name):
     return snv_data
 
 
-def get_highest_snpeff_effect(snpeff_data):
-    """ Select the highest ranked effect from snpeff data.
+def get_highest_snpeff_effect(snpeff_data, override_coding=False):
+    """ Select the highest ranked effect from snpeff data. 
+    
+    If overrid_coding is set to True then any coding mutation will be returned 
+    overriding the highest impact mutation. ie this will always return the amino 
+    acid change where one is present.
     """
     ordered_effect_impacts = ['HIGH', 'MODERATE', 'LOW', 'MODIFIER']
 
@@ -125,7 +129,10 @@ def get_highest_snpeff_effect(snpeff_data):
         ordered_effect_impacts['effect_impact'].astype(snpeff_data['effect_impact'].dtype))
 
     snpeff_data = snpeff_data.merge(ordered_effect_impacts)
-
+    
+    if override_coding == True:
+        snpeff_data.loc[snpeff_data.effect == "NON_SYNONYMOUS_CODING", "effect_impact_rank"] = -1
+    
     index_cols = ['chrom', 'coord', 'ref', 'alt']
     value_cols = ['gene_name', 'effect', 'effect_impact', 'amino_acid_change']
 
@@ -144,7 +151,7 @@ def get_highest_snpeff_effect(snpeff_data):
     return snpeff_data
 
 
-def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filter=None):
+def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filter=None, override_coding=False):
     """ Collate snv results into a single table.
     """
 
@@ -183,7 +190,7 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     snpeff = load_snv_annotation_table(pseudobulk_dir, 'snpeff')
     snpeff["chrom"] = list(map(str, snpeff["chrom"]))
     snpeff["chrom"] = snpeff["chrom"].astype("category")
-    snpeff = get_highest_snpeff_effect(snpeff)
+    snpeff = get_highest_snpeff_effect(snpeff, override_coding=override_coding)
     logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
     logging.info(f'snpeff: number of unique mutations: {snpeff[["chrom", "ref", "alt", "coord"]].drop_duplicates().shape[0]}')
 
@@ -250,6 +257,7 @@ def load_snv_data(
         results_dir,
         museq_filter=None,
         strelka_filter=None,
+        override_coding=False
     ):
     """ Load filtered SNV annotation and count data
     
@@ -257,6 +265,8 @@ def load_snv_data(
         results_dir (str): results directory to load from.
         museq_score_threshold (float, optional): mutationseq score threshold. Defaults to None.
         strelka_score_threshold (float, optional): strelka score threshold. Defaults to None.
+        override_coding (Bool, optional): If you want to make sure any coding change is returned
+        set this to True. (Highest impact mutation from snpeff is not necessarily the one annotated as coding).
     
     Returns:
         pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
@@ -276,7 +286,8 @@ def load_snv_data(
     snv_data = load_snv_annotation_results(
         pseudobulk_dir,
         museq_filter=museq_filter,
-        strelka_filter=strelka_filter)
+        strelka_filter=strelka_filter,
+        override_coding=override_coding)
 
     assert not snv_data['coord'].isnull().any()
 
