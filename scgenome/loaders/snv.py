@@ -181,13 +181,17 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
 
     snpeff = load_snv_annotation_table(pseudobulk_dir, 'snpeff')
+    snpeff["chrom"] = list(map(str, snpeff["chrom"]))
+    snpeff["chrom"] = snpeff["chrom"].astype("category")
     snpeff = get_highest_snpeff_effect(snpeff)
     logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
+    logging.info(f'snpeff: number of unique mutations: {snpeff[["chrom", "ref", "alt", "coord"]].drop_duplicates().shape[0]}')
 
     tnc = load_snv_annotation_table(pseudobulk_dir, 'trinuc')
 
     data = load_snv_annotation_table(pseudobulk_dir, 'allele_counts')
     logging.info(f'initial snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
+    logging.info(f'initial snv table, number of unique mutations: {data[["chrom", "ref", "alt", "coord"]].drop_duplicates().shape[0]}')
 
     logging.info('summing snv counts')
     data = (
@@ -205,7 +209,7 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     logging.info('post cosmic with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
-    data = data.merge(snpeff, how='left')
+    data = data.merge(snpeff, how='left', on=['chrom', 'coord', 'ref', 'alt'])
     logging.info('post snpeff with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
@@ -235,6 +239,7 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
 
     for column in categorical_columns:
         data[column] = data[column].astype('category')
+
 
     logging.info(f'final snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
