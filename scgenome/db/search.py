@@ -7,7 +7,7 @@ import datamanagement.transfer_files
 from dbclients.basicclient import NotFoundError
 
 
-def _get_analysis_lanes(tantalus_api, analysis):
+def get_analysis_lanes(tantalus_api, analysis):
     bam_datasets = list(tantalus_api.list('sequencedataset', analysis__jira_ticket=analysis['jira_ticket'], dataset_type='BAM'))
     lane_set = set()
     for dataset in bam_datasets:
@@ -16,7 +16,7 @@ def _get_analysis_lanes(tantalus_api, analysis):
     return lane_set
 
 
-def _get_analysis_inputs_info(tantalus_api, analysis):
+def get_analysis_inputs_info(tantalus_api, analysis):
     assert analysis['analysis_type'] in ('qc', 'hmmcopy')
 
     if analysis['analysis_type'] == 'qc':
@@ -93,7 +93,7 @@ def search_hmmcopy_analysis(
 
         results_analysis[results['id']] = analysis
 
-        info = _get_analysis_inputs_info(tantalus_api, analysis)
+        info = get_analysis_inputs_info(tantalus_api, analysis)
 
         if info is None:
             continue
