@@ -197,15 +197,26 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     data = load_snv_annotation_table(pseudobulk_dir, 'allele_counts')
     logging.info(f'initial snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
     logging.info(f'initial snv table, number of unique mutations: {data[["chrom", "ref", "alt", "coord"]].drop_duplicates().shape[0]}')
-
-    logging.info('summing snv counts')
+    
+    logging.info('Adding binary columns for presence/absence of mutation')
+    data['mutation'] = 0
+    data.loc[data.alt_counts > 0, "mutation"] = 1
+    data['nomutation'] = 0
+    data.loc[data.alt_counts == 0, 'nomutation'] = 1
+    
+    logging.info('summing snv counts and calculating number of cells that have each mutation')
     data = (
         data
-        .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)[['alt_counts', 'ref_counts']]
-        .sum().rename(columns={'alt_counts': 'alt_counts_sum', 'ref_counts': 'ref_counts_sum'}).reset_index())
+        .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)[['alt_counts', 'ref_counts', 'mutation', 'nomutation']]
+        .sum()
+        .rename(columns={'alt_counts': 'alt_counts_sum', 'ref_counts': 'ref_counts_sum', 'mutation': 'cells_withmutation', 'nomutation': 'cells_nomutation'})
+        .reset_index())
     logging.info('total snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
-
+    
+    logging.info('Add column for frequency of mutation across cells')
+    data["cellfrequency"] = data['cells_withmutation'] / (data['cells_withmutation'] + data['cells_nomutation'])
+    
     data = data.merge(mappability)
     logging.info('post mappability with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
