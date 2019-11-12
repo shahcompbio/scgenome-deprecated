@@ -43,7 +43,7 @@ def load_snv_count_data(pseudobulk_dir, positions):
         csv_input = scgenome.csvutils.CsvInput(filepath)
         data = csv_input.read_csv(
             dtypes_override={
-                'chrom': 'category',
+                'chrom': 'str',
                 'ref': 'category',
                 'alt': 'category',
                 'cell_id': 'category',
@@ -85,7 +85,7 @@ def load_snv_annotation_table(pseudobulk_dir, table_name):
         csv_input = scgenome.csvutils.CsvInput(filepath)
         data = csv_input.read_csv(
             dtypes_override={
-                'chrom': 'category',
+                'chrom': 'str',
                 'ref': 'category',
                 'alt': 'category',
                 'cell_id': 'category',
@@ -188,8 +188,6 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
 
     snpeff = load_snv_annotation_table(pseudobulk_dir, 'snpeff')
-    snpeff["chrom"] = list(map(str, snpeff["chrom"]))
-    snpeff["chrom"] = snpeff["chrom"].astype("category")
     snpeff = get_highest_snpeff_effect(snpeff, override_coding=override_coding)
     logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
     logging.info(f'snpeff: number of unique mutations: {snpeff[["chrom", "ref", "alt", "coord"]].drop_duplicates().shape[0]}')
