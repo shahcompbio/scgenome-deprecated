@@ -229,7 +229,7 @@ class CsvInput(object):
         try:
             data = pd.read_csv(
                 self.filepath, compression=self.compression, chunksize=chunksize,
-                sep=self.sep, header=header, names=names, usecols=usecols)
+                sep=self.sep, header=header, names=names, usecols=usecols, dtype='str')
         except pd.errors.EmptyDataError:
             data = pd.DataFrame(columns=self.columns)
 
