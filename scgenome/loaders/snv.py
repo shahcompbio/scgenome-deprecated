@@ -125,13 +125,14 @@ def get_highest_snpeff_effect(snpeff_data):
         ordered_effect_impacts['effect_impact'].astype(snpeff_data['effect_impact'].dtype))
 
     snpeff_data = snpeff_data.merge(ordered_effect_impacts)
+    snpeff_data['coding_rank'] = (snpeff_data['amino_acid_change'].isnull() * 1)
 
     index_cols = ['chrom', 'coord', 'ref', 'alt']
     value_cols = ['gene_name', 'effect', 'effect_impact', 'amino_acid_change']
 
     snpeff_data = (
-        snpeff_data[index_cols + value_cols + ['effect_impact_rank']]
-        .sort_values(index_cols + ['effect_impact_rank'], ascending=True)
+        snpeff_data[index_cols + value_cols + ['coding_rank', 'effect_impact_rank']]
+        .sort_values(index_cols + ['coding_rank', 'effect_impact_rank'], ascending=True)
         .groupby(index_cols, sort=False, observed=True)
         .nth(0)
         .reset_index())
