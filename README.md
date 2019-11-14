@@ -14,6 +14,20 @@ python setup.py develop
 
 Note that you will have to install numpy and cython prior to other requirements.
 
+The list of credentials below are also required in your environment at runtime:
+```
+TANTALUS_API_PASSWORD
+TANTALUS_API_USERNAME
+CLIENT_ID
+TENANT_ID
+SECRET_KEY
+AZURE_KEYVAULT_ACCOUNT
+```
+
+For access to Colossus and Tantalus, please contact [Diljot Grewal](mailto:dgrewal@bccrc.ca).
+
+For information on the other environment variables, please see [here](https://shahcompbio.atlassian.net/wiki/spaces/SOFT/pages/26378254/Scgenome+and+Tantalus+credentials+for+blob+access).
+
 ## Analyses
 
 ### Cell cycle
@@ -432,5 +446,17 @@ dict_keys(['allele_counts'])
 3  4000000  
 4  6500000  
 ```
+### Testing on ceto/juno
 
+Run at the root of your repo directory, in your virtual environment with all required credentials available.
 
+For more information on using the Juno High Performance Computing cluster, please see [here](https://shahcompbio.atlassian.net/wiki/spaces/SOFT/pages/28475398/Juno).
+
+>test_load_qc
+```
+bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_qc.py test-cached-single-ticket SC-2140 --local_storage_name juno
+```
+>test_load_pseudobulk
+```
+bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_pseudobulk.py test-cached-single-ticket SC-2373 --local_storage_name juno
+```
