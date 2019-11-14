@@ -24,7 +24,7 @@ SECRET_KEY
 AZURE_KEYVAULT_ACCOUNT
 ```
 
-For access to Colossus and Tantalus, please contact [Diljot Grewal](mailto:dgrewal@bccrc.ca).
+For access to Tantalus, please contact [Diljot Grewal](mailto:dgrewal@bccrc.ca).
 
 For information on the other environment variables, please see [here](https://shahcompbio.atlassian.net/wiki/spaces/SOFT/pages/26378254/Scgenome+and+Tantalus+credentials+for+blob+access).
 
