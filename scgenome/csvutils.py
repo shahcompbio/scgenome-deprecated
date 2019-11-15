@@ -206,6 +206,28 @@ class CsvInput(object):
             raise CsvParseError("metadata mismatch in {}".format(self.filepath))
 
     def read_csv(self, chunksize=None, dtypes_override=None, usecols=None):
+        """Reads a comma-separated values (csv) file into a DataFrame.
+
+        Reads usecols (or all columns) from a csv file into a pandas Dataframe,
+        and returns it. Loads all data at once, or in chunksize chunks. Infers
+        dtypes from CsvInput initialization, also accepts dtypes_override.  
+
+        Args:
+            chunksize: Optional, number of pieces to break the csv into during
+                loading (for large files)
+            dtypes_override: Optional dictionary of key-value column name and
+                dtype pairs to modify dtypes before load occurs.
+            usecols: The optional subset of columns be loaded into the
+                DataFrame.
+
+        Returns:
+            A pandas DataFrame.
+
+        Raises:
+            ValueError: Non-bool values were found in a bool-only column.
+            TypeError: An error occurred attempting to convert the column to
+                the specified data type.
+        """
         def return_gen(df_iterator):
             for df in df_iterator:
                 self.__verify_data(df, usecols)
