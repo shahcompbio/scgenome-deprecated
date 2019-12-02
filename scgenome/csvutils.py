@@ -240,6 +240,8 @@ class CsvInput(object):
                 if dtype == 'int':
                     data[column_name] = data[column_name].astype(float).astype('Int64')
                 elif dtype == 'bool':
+                    data.loc[data[column_name] == 'True', column_name] = True
+                    data.loc[data[column_name] == 'False', column_name] = False
                     values = set(data[column_name].unique())
                     if len(values - {False, True, np.nan}) != 0:
                         raise ValueError(f'{column_name} is expected to be bool, has values {values}')
