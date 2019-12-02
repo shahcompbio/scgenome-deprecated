@@ -138,6 +138,8 @@ def run_analysis(results_dir):
     with open(metadata_filepath, 'w') as f:
         yaml.dump(metadata, f, default_flow_style=False)
 
+    return output_cellcycle_dir
+
 
 def run_tantalus_analysis(
         tantalus_api, hmmcopy_results, jira_ticket,
@@ -154,9 +156,9 @@ def run_tantalus_analysis(
 
     ticket_directory = os.path.join(results_storage['storage_directory'], jira_ticket)
 
-    run_analysis(ticket_directory)
+    cellcycle_dir = run_analysis(ticket_directory)
 
-    metadata = yaml.load(open(os.path.join(results_dir, 'metadata.yaml')))
+    metadata = yaml.load(open(os.path.join(cellcycle_dir, 'metadata.yaml')))
 
     logging.info('registering results with tantalus')
 
@@ -183,7 +185,7 @@ def run_tantalus_analysis(
 
     file_resources = []
     for filename in metadata['filenames']:
-        filepath = os.path.join(results_dir, filename)
+        filepath = os.path.join(cellcycle_dir, filename)
         file_resource, _ = tantalus_api.add_file(
             results_storage_name, filepath, update=rerun)
         file_resources.append(file_resource['id'])
