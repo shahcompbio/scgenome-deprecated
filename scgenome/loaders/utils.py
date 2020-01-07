@@ -1,5 +1,6 @@
 import os
 import yaml
+import packaging.version
 
 
 def find_filenames(filenames, suffix):
@@ -71,6 +72,22 @@ def get_pseudobulk_files(results_dir, suffix):
     manifest_filename = os.path.join(results_dir, 'metadata.yaml')
     manifest = yaml.load(open(manifest_filename))
 
+    if packaging.version.parse(manifest['meta']['version']) < packaging.version.parse('v0.5.0'):
+        _get_pseudobulk_files_v_lt_050(results_dir, suffix)
+
+    filenames = list(filter(lambda a: a.endswith(suffix), manifest['filenames']))
+
+    if len(filenames) != 1:
+        raise ValueError(f'found {len(filenames)} {suffix} files for {results_dir}: {filenames}')
+
+    filename = filenames[0]
+    filepath = os.path.join(results_dir, filename)
+
+    yield None, None, filepath
+    
+
+
+def _get_pseudobulk_files_v_lt_050(results_dir, suffix):
     tumour_samples = manifest['meta']['tumour_samples']
     filenames = manifest['filenames']
 

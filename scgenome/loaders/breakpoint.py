@@ -17,7 +17,7 @@ def load_breakpoint_annotation_data(
     Args:
         pseudobulk_dir (str): results directory
     """
-    suffix = 'destruct.csv.gz'
+    suffix = 'breakpoints.csv.gz'
 
     breakpoint_data = []
 
@@ -77,8 +77,8 @@ def load_breakpoint_data(results_dir):
     if 'pseudobulk' in analysis_dirs:
         pseudobulk_dir = analysis_dirs['pseudobulk']
 
-    elif 'destruct' in analysis_dirs:
-        pseudobulk_dir = analysis_dirs['destruct']
+    elif 'breakpoint_calling' in analysis_dirs:
+        pseudobulk_dir = analysis_dirs['breakpoint_calling']
 
     else:
         raise ValueError(f'no breakpoints found for directory {results_dir}')
