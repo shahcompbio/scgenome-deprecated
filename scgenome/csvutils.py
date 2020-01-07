@@ -229,27 +229,9 @@ class CsvInput(object):
         try:
             data = pd.read_csv(
                 self.filepath, compression=self.compression, chunksize=chunksize,
-                sep=self.sep, header=header, names=names, usecols=usecols, dtype='str')
+                sep=self.sep, header=header, names=names, usecols=usecols, dtype=dtypes)
         except pd.errors.EmptyDataError:
             data = pd.DataFrame(columns=self.columns)
-
-        for column_name, dtype in dtypes.items():
-            if usecols is not None and column_name not in usecols:
-                continue
-            try:
-                if dtype == 'int':
-                    data[column_name] = data[column_name].astype(float).astype('Int64')
-                elif dtype == 'bool':
-                    data.loc[data[column_name] == 'True', column_name] = True
-                    data.loc[data[column_name] == 'False', column_name] = False
-                    values = set(data[column_name].unique())
-                    if len(values - {False, True, np.nan}) != 0:
-                        raise ValueError(f'{column_name} is expected to be bool, has values {values}')
-                else:
-                    data[column_name] = data[column_name].astype(dtype)
-            except TypeError:
-                logging.exception(f'unable to convert {column_name} to {dtype}')
-                raise
 
         if chunksize:
             return return_gen(data)

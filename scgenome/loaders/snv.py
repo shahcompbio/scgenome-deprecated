@@ -25,29 +25,73 @@ categorical_columns = [
 ]
 
 
-def load_snv_count_data(pseudobulk_dir, positions):
+def load_snv_count_data(pseudobulk_dir, suffix, positions, filter_sample_id=None, filter_library_id=None):
     """ Load per cell SNV count data
     
     Args:
         pseudobulk_dir (str): pseudobulk results directory
+        suffix (str): suffix of snv count tables
         positions (pandas.DataFrame): restrict to the specified positions
+
+    Kwargs:
+        filter_sample_id (str): restrict to specific sample id
+        filter_library_id (str): restrict to specific library id
     
     Returns:
         pandas.DataFrame: SNV alt and ref counts per cell
     """
     snv_count_data = []
 
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, 'snv_union_counts.csv.gz'):
+    files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, suffix)
+
+    for sample_id, library_id, filepath in files:
         logging.info('Loading snv counts from {}'.format(filepath))
 
+        if sample_id is not None and filter_sample_id is not None and sample_id != filter_sample_id:
+            logging.info('skipping {sample_id}', sample_id, filter_sample_id)
+            continue
+
+        if library_id is not None and filter_sample_id is not None and library_id != filter_library_id:
+            logging.info('skipping', library_id, filter_library_id)
+            continue
+
+        data = []
         csv_input = scgenome.csvutils.CsvInput(filepath)
-        data = csv_input.read_csv(
+
+        chunk_iter = csv_input.read_csv(
+            chunksize=10**6,
             dtypes_override={
                 'chrom': 'category',
                 'ref': 'category',
                 'alt': 'category',
                 'cell_id': 'category',
-            })
+                'sample_id': 'category',
+                'library_id': 'category',
+            },
+        )
+
+        for chunk in chunk_iter:
+            scgenome.utils.union_categories(
+                [chunk, positions],
+                cat_cols=['chrom', 'ref', 'alt'])
+            chunk = chunk.merge(positions)
+
+            if filter_sample_id is not None and 'sample_id' in chunk:
+                chunk = chunk[chunk['sample_id'] == filter_sample_id]
+
+            if filter_library_id is not None and 'library_id' in chunk:
+                chunk = chunk[chunk['library_id'] == filter_library_id]
+
+            data.append(chunk)
+
+        data = scgenome.utils.concat_with_categories(data, ignore_index=True)
+
+        if library_id is not None:
+            data['library_id'] = pd.Series([library_id], dtype="category")
+
+        if sample_id is not None:
+            data['sample_id'] = pd.Series([sample_id], dtype="category")
 
         logging.info(f'Loaded snv counts table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
@@ -70,16 +114,20 @@ def load_snv_count_data(pseudobulk_dir, positions):
 
 def load_snv_annotation_table(pseudobulk_dir, table_name):
     """ Load SNV annotation data
-    
+
     Args:
         pseudobulk_dir (str): pseudobulk results directory
         table_name (str): name of annotation table to load.
-    
+
     Returns:
         pandas.DataFrame: SNVs annotation data per sample / library
     """
     snv_data = []
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, f'snv_{table_name}.csv.gz'):
+
+    files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, f'snv_{table_name}.csv.gz')
+
+    for sample_id, library_id, filepath in files:
         logging.info(f'Loading snv {table_name} annotations from {filepath}')
 
         csv_input = scgenome.csvutils.CsvInput(filepath)
@@ -100,6 +148,12 @@ def load_snv_annotation_table(pseudobulk_dir, table_name):
                 'transcript_id': 'category',
                 'genotype': 'category',
             })
+
+        if library_id is not None:
+            data['library_id'] = pd.Series([library_id], dtype="category")
+
+        if sample_id is not None:
+            data['sample_id'] = pd.Series([sample_id], dtype="category")
 
         snv_data.append(data)
 
@@ -158,23 +212,19 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     logging.info('starting load')
     mappability = load_snv_annotation_table(pseudobulk_dir, 'mappability')
     mappability = mappability[mappability['mappability'] > 0.99]
-    mappability['chrom'] = mappability['chrom'].astype(str)
 
     strelka_results = load_snv_annotation_table(pseudobulk_dir, 'strelka')
+
     strelka_results = (
         strelka_results
         .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
         .max().rename('max_strelka_score').reset_index())
-    for col in ('chrom', 'ref', 'alt'):
-        strelka_results[col] = strelka_results[col].astype(str)
 
     museq_results = load_snv_annotation_table(pseudobulk_dir, 'museq')
     museq_results = (
         museq_results
         .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
         .max().rename('max_museq_score').reset_index())
-    for col in ('chrom', 'ref', 'alt'):
-        museq_results[col] = museq_results[col].astype(str)
 
     cosmic = load_snv_annotation_table(pseudobulk_dir, 'cosmic_status')
     logging.info(f'cosmic table with shape {cosmic.shape}, memory {cosmic.memory_usage().sum()}')
@@ -187,18 +237,22 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
 
     tnc = load_snv_annotation_table(pseudobulk_dir, 'trinuc')
 
-    data = load_snv_annotation_table(pseudobulk_dir, 'allele_counts')
-    logging.info(f'initial snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
+    scgenome.utils.union_categories([
+        mappability,
+        cosmic,
+        snpeff,
+        tnc,
+        strelka_results,
+        museq_results,
+    ])
 
-    logging.info('summing snv counts')
-    data = (
-        data
-        .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)[['alt_counts', 'ref_counts']]
-        .sum().rename(columns={'alt_counts': 'alt_counts_sum', 'ref_counts': 'ref_counts_sum'}).reset_index())
-    logging.info('total snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
+    data = pd.concat([
+        strelka_results.set_index(['chrom', 'coord', 'ref', 'alt']),
+        museq_results.set_index(['chrom', 'coord', 'ref', 'alt']),
+    ], axis=1).sort_index().reset_index()
+    logging.info(f'merged snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
-    data = data.merge(mappability)
+    data = data.merge(mappability, how='left')
     logging.info('post mappability with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
@@ -211,14 +265,6 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(tnc, how='left')
-    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
-
-    data = data.merge(strelka_results, how='left')
-    logging.info('post strelka with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
-    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
-
-    data = data.merge(museq_results, how='left')
-    logging.info('post museq with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     if museq_filter != -np.inf:
@@ -246,6 +292,9 @@ def load_snv_data(
         results_dir,
         museq_filter=None,
         strelka_filter=None,
+        positions=None,
+        filter_sample_id=None,
+        filter_library_id=None,
     ):
     """ Load filtered SNV annotation and count data
     
@@ -253,7 +302,11 @@ def load_snv_data(
         results_dir (str): results directory to load from.
         museq_score_threshold (float, optional): mutationseq score threshold. Defaults to None.
         strelka_score_threshold (float, optional): strelka score threshold. Defaults to None.
-    
+
+    Kwargs:
+        filter_sample_id (str): restrict to specific sample id
+        filter_library_id (str): restrict to specific library id
+
     Returns:
         pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
     """
@@ -263,27 +316,54 @@ def load_snv_data(
     if 'pseudobulk' in analysis_dirs:
         pseudobulk_dir = analysis_dirs['pseudobulk']
 
-    elif 'variant_calling' in analysis_dirs:
-        pseudobulk_dir = analysis_dirs['variant_calling']
+        snv_data = load_snv_annotation_results(
+            pseudobulk_dir,
+            museq_filter=museq_filter,
+            strelka_filter=strelka_filter)
+
+        assert not snv_data['coord'].isnull().any()
+
+        positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
+
+        snv_count_data = load_snv_count_data(pseudobulk_dir, 'snv_union_counts.csv.gz', positions)
+        snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
+
+        return {
+            'snv_data': snv_data,
+            'snv_count_data': snv_count_data,
+        }
+
+    if 'variant_calling' in analysis_dirs:
+        variant_calling_dir = analysis_dirs['variant_calling']
+
+        snv_data = load_snv_annotation_results(
+            variant_calling_dir,
+            museq_filter=museq_filter,
+            strelka_filter=strelka_filter)
+
+        assert not snv_data['coord'].isnull().any()
+
+        return {
+            'snv_data': snv_data,
+        }
+
+    if 'snv_genotyping' in analysis_dirs:
+        variant_counting_dir = analysis_dirs['snv_genotyping']
+
+        assert positions is not None
+
+        snv_count_data = load_snv_count_data(
+            variant_counting_dir, positions, 'counts.csv.gz',
+            filter_sample_id=filter_sample_id,
+            filter_library_id=filter_library_id)
+
+        snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
+        snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
+
+        return {
+            'snv_count_data': snv_count_data,
+        }
 
     else:
-        raise ValueError(f'no pseudobulk found for directory {results_dir}')
-
-    snv_data = load_snv_annotation_results(
-        pseudobulk_dir,
-        museq_filter=museq_filter,
-        strelka_filter=strelka_filter)
-
-    assert not snv_data['coord'].isnull().any()
-
-    positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
-
-    snv_count_data = load_snv_count_data(pseudobulk_dir, positions)
-    snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
-    snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
-
-    return {
-        'snv_data': snv_data,
-        'snv_count_data': snv_count_data,
-    }
+        raise ValueError(f'no variant calling found for directory {results_dir}')
 

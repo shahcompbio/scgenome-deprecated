@@ -8,12 +8,14 @@ import scgenome.loaders.utils
 import scgenome.csvutils
 
 
-def load_haplotype_allele_data(results_dir):
+def load_haplotype_allele_data(
+        results_dir,
+    ):
     """ Load the haplotype allele count data from the pseudobulk results paths
     
     Args:
-        results_dir (str): results directory to load from.
-    
+        pseudobulk_dir (str): results directory
+
     Returns:
         dict of pandas.DataFrame: Haplotype allele data
     """
@@ -23,16 +25,21 @@ def load_haplotype_allele_data(results_dir):
 
     if 'pseudobulk' in analysis_dirs:
         pseudobulk_dir = analysis_dirs['pseudobulk']
+        suffix = 'allele_counts.csv'
 
-    elif 'haplotype_calling' in analysis_dirs:
-        pseudobulk_dir = analysis_dirs['haplotype_calling']
+    elif 'count_haps' in analysis_dirs:
+        pseudobulk_dir = analysis_dirs['count_haps']
+        suffix = 'allele_counts.tsv'
 
     else:
         raise ValueError(f'no pseudobulk found for directory {results_dir}')
 
     allele_counts = []
 
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, 'allele_counts.csv'):
+    files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, suffix)
+
+    for sample_id, library_id, filepath in files:
         logging.info('Loading haplotype allele counts from {}'.format(filepath))
 
         csv_input = scgenome.csvutils.CsvInput(filepath)
@@ -41,6 +48,12 @@ def load_haplotype_allele_data(results_dir):
                 'chromosome': 'category',
                 'cell_id': 'category',
         })
+
+        if library_id is not None:
+            data['library_id'] = pd.Series([library_id], dtype="category")
+
+        if sample_id is not None:
+            data['sample_id'] = pd.Series([sample_id], dtype="category")
 
         logging.info(f'Loaded haplotype allele counts table with shape {data.shape}, memory {data.memory_usage().sum()}')
 

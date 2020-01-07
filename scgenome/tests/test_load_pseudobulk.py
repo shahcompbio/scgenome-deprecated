@@ -20,8 +20,6 @@ dtypes_check = {
         'coord': 'int64',
         'ref': 'category',
         'alt': 'category',
-        'alt_counts_sum': 'float64',
-        'ref_counts_sum': 'float64',
         'mappability': 'float64',
         'is_cosmic': 'object',
         'gene_name': 'category',
@@ -29,7 +27,7 @@ dtypes_check = {
         'effect_impact': 'category',
         'amino_acid_change': 'category',
         'tri_nucleotide_context': 'category',
-        'max_strelka_score': 'int64',
+        'max_strelka_score': 'float64',
         'max_museq_score': 'float64',
     },
     'snv_count_data': {
@@ -41,7 +39,6 @@ dtypes_check = {
         'alt_counts': 'int64',
         'cell_id': 'category',
         'total_counts': 'int64',
-        'sample_id': 'category',
     },
     'breakpoint_data': {
         'prediction_id': 'int64',
@@ -51,15 +48,11 @@ dtypes_check = {
         'chromosome_2': 'object',
         'strand_2': 'object',
         'position_2': 'int64',
-        'library_id': 'object', 
-        'sample_id': 'object',
     },
     'breakpoint_count_data': {
         'prediction_id': 'int64',
         'cell_id': 'object',
         'read_count': 'int64',
-        'library_id': 'object',
-        'sample_id': 'object',
     },
     'allele_counts': {
         'allele_id': 'int64',
@@ -74,6 +67,7 @@ dtypes_check = {
 
 
 def test_pseudobulk_data(snv_results_tables, breakpoint_results_tables, haplotype_results_tables):
+    failed = False
     for results_tables in (snv_results_tables, breakpoint_results_tables, haplotype_results_tables):
         for table_name, table_data in results_tables.items():
             logging.info(f'table {table_name} has size {len(table_data)}')
@@ -83,7 +77,10 @@ def test_pseudobulk_data(snv_results_tables, breakpoint_results_tables, haplotyp
                 if dtype_name == 'int64':
                     expected_dtype_names = ('int64', 'Int64')
                 if not column_dtype in expected_dtype_names:
-                    raise Exception(f'{column_name} has dtype {column_dtype} not any of {expected_dtype_names}')
+                    logging.error(f'{column_name} has dtype {column_dtype} not any of {expected_dtype_names}')
+                    failed = True
+    if failed:
+        raise Exception('failed dtype check')
 
 
 def test_load_local_pseudobulk_data(results_dir):
