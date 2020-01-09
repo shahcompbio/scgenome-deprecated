@@ -32,7 +32,8 @@ def get_analysis_inputs_info(tantalus_api, analysis):
             bam_datasets.append(tantalus_api.get('sequencedataset', id=dataset_id))
 
     if len(bam_datasets) == 0:
-        raise ValueError(f'no datasets for analysis {analysis["id"]}')
+        logging.error(f'no datasets for analysis {analysis["id"]}')
+        return
 
     field_names = [
         'is_complete',
