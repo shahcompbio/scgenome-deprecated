@@ -17,7 +17,7 @@ def load_breakpoint_annotation_data(
     Args:
         pseudobulk_dir (str): results directory
     """
-    suffix = 'breakpoints.csv.gz'
+    suffix = 'destruct_breakpoints.csv.gz'
 
     breakpoint_data = []
 
@@ -44,7 +44,7 @@ def load_breakpoint_count_data(
     Args:
         pseudobulk_dir (str): results directory
     """
-    suffix = 'cell_counts_destruct.csv.gz'
+    suffix = 'destruct_cell_counts.csv.gz'
 
     breakpoint_count_data = []
 
@@ -85,6 +85,12 @@ def load_breakpoint_data(results_dir):
 
     breakpoint_data = load_breakpoint_annotation_data(pseudobulk_dir)
     breakpoint_count_data = load_breakpoint_count_data(pseudobulk_dir)
+
+    # TODO: fix upstream
+    for col in ('prediction_id', 'position_1', 'position_2', 'read_count'):
+        for df in (breakpoint_data, breakpoint_count_data):
+            if col in df:
+                df[col] = df[col].astype(int)
 
     return {
         'breakpoint_data': breakpoint_data,

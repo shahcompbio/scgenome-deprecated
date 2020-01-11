@@ -24,15 +24,15 @@ def load_haplotype_allele_data(results_dir):
     if 'pseudobulk' in analysis_dirs:
         pseudobulk_dir = analysis_dirs['pseudobulk']
 
-    elif 'haplotype_calling' in analysis_dirs:
-        pseudobulk_dir = analysis_dirs['haplotype_calling']
+    elif 'count_haps' in analysis_dirs:
+        pseudobulk_dir = analysis_dirs['count_haps']
 
     else:
         raise ValueError(f'no pseudobulk found for directory {results_dir}')
 
     allele_counts = []
 
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, 'allele_counts.csv'):
+    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, 'allele_counts.tsv'):
         logging.info('Loading haplotype allele counts from {}'.format(filepath))
 
         csv_input = scgenome.csvutils.CsvInput(filepath)

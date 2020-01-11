@@ -37,7 +37,7 @@ def load_snv_count_data(pseudobulk_dir, positions):
     """
     snv_count_data = []
 
-    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, 'snv_union_counts.csv.gz'):
+    for sample_id, library_id, filepath in scgenome.loaders.utils.get_pseudobulk_files(pseudobulk_dir, 'counts.csv.gz'):
         logging.info('Loading snv counts from {}'.format(filepath))
 
         csv_input = scgenome.csvutils.CsvInput(filepath)
@@ -238,6 +238,7 @@ def load_snv_data(
         results_dir,
         museq_filter=None,
         strelka_filter=None,
+        positions=None,
     ):
     """ Load filtered SNV annotation and count data
     
@@ -252,43 +253,54 @@ def load_snv_data(
     analysis_dirs = scgenome.loaders.utils.find_results_directories(
         results_dir)
 
-    variant_calling_dir = None
-    variant_counting_dir = None
-
     if 'pseudobulk' in analysis_dirs:
-        variant_calling_dir = analysis_dirs['pseudobulk']
-        variant_counting_dir = analysis_dirs['pseudobulk']
+        pseudobulk_dir = analysis_dirs['pseudobulk']
 
-    else:
-        if 'variant_calling' in analysis_dirs:
-            variant_calling_dir = analysis_dirs['variant_calling']
+        snv_data = load_snv_annotation_results(
+            pseudobulk_dir,
+            museq_filter=museq_filter,
+            strelka_filter=strelka_filter)
 
-        if 'variant_counting' in analysis_dirs:
-            variant_counting_dir = analysis_dirs['variant_counting']
+        assert not snv_data['coord'].isnull().any()
 
-    if variant_calling_dir is None:
-        raise ValueError(f'no variant calling found for directory {results_dir}')
-
-    snv_data = load_snv_annotation_results(
-        variant_calling_dir,
-        museq_filter=museq_filter,
-        strelka_filter=strelka_filter)
-
-    assert not snv_data['coord'].isnull().any()
-
-    if variant_counting_dir is not None:
         positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
+
+        snv_count_data = load_snv_count_data(pseudobulk_dir, positions)
+        snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
+        snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
+
+        return {
+            'snv_data': snv_data,
+            'snv_count_data': snv_count_data,
+        }
+
+    elif 'variant_calling' in analysis_dirs:
+        variant_calling_dir = analysis_dirs['variant_calling']
+
+        snv_data = load_snv_annotation_results(
+            variant_calling_dir,
+            museq_filter=museq_filter,
+            strelka_filter=strelka_filter)
+
+        assert not snv_data['coord'].isnull().any()
+
+        return {
+            'snv_data': snv_data,
+        }
+
+    elif 'snv_genotyping' in analysis_dirs:
+        variant_counting_dir = analysis_dirs['snv_genotyping']
+
+        assert positions is not None
 
         snv_count_data = load_snv_count_data(variant_counting_dir, positions)
         snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
         snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
 
-    else:
-        logging.warning(f'no variant counting results for directory {results_dir}')
-        snv_count_data = None
+        return {
+            'snv_count_data': snv_count_data,
+        }
 
-    return {
-        'snv_data': snv_data,
-        'snv_count_data': snv_count_data,
-    }
+    else:
+        raise ValueError(f'no variant calling found for directory {results_dir}')
 

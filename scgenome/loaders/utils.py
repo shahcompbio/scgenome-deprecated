@@ -84,7 +84,6 @@ def get_pseudobulk_files(results_dir, suffix):
     filepath = os.path.join(results_dir, filename)
 
     yield None, None, filepath
-    
 
 
 def _get_pseudobulk_files_v_lt_050(results_dir, suffix):

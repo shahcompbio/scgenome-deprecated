@@ -20,8 +20,6 @@ dtypes_check = {
         'coord': 'int64',
         'ref': 'category',
         'alt': 'category',
-        'alt_counts_sum': 'float64',
-        'ref_counts_sum': 'float64',
         'mappability': 'float64',
         'is_cosmic': 'object',
         'gene_name': 'category',
