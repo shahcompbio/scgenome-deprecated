@@ -353,7 +353,9 @@ def load_snv_data(
         assert positions is not None
 
         snv_count_data = load_snv_count_data(
-            variant_counting_dir, positions, 'counts.csv.gz',
+            variant_counting_dir,
+            'counts.csv.gz',
+            positions,
             filter_sample_id=filter_sample_id,
             filter_library_id=filter_library_id)
 
