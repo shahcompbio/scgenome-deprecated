@@ -1,4 +1,5 @@
 import os
+import logging
 from collections import defaultdict
 
 import pandas as pd
@@ -109,26 +110,10 @@ def load_hmmcopy_data(
         if table_name == 'hmmcopy_reads':
             usecols = hmmcopy_reads_cols
 
+        logging.info(f'loading from {filepath}')
         csv_input = scgenome.csvutils.CsvInput(filepath)
 
-        dtypes_override = None
-        if table_name == 'hmmcopy_metrics':
-            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-            dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
-            dtypes_override = yaml.load(open(dtypes_filename))
-            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-        elif table_name == 'hmmcopy_reads':
-            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-            dtypes_filename = os.path.join(dtypes_directory, 'hmmcopy_reads_defs.yaml')
-            dtypes_override = yaml.load(open(dtypes_filename))
-            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-        elif table_name == 'hmmcopy_segs':
-            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-            dtypes_filename = os.path.join(dtypes_directory, 'hmmcopy_segments_defs.yaml')
-            dtypes_override = yaml.load(open(dtypes_filename))
-            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-
-        data = csv_input.read_csv(usecols=usecols, dtypes_override=dtypes_override)
+        data = csv_input.read_csv(usecols=usecols)
 
         data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
         data['library_id'] = [a.split('-')[1] for a in data['cell_id']]

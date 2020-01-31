@@ -1,4 +1,5 @@
 import os
+import logging
 from collections import defaultdict
 
 import pandas as pd
@@ -82,21 +83,10 @@ def load_align_data(
 
         filepath = os.path.join(align_results_dir, filename)
 
+        logging.info(f'loading from {filepath}')
         csv_input = scgenome.csvutils.CsvInput(filepath)
 
-        dtypes_override = None
-        if table_name == 'align_metrics':
-            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-            dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
-            dtypes_override = yaml.load(open(dtypes_filename))
-            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-        elif table_name == 'gc_metrics':
-            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-            dtypes_filename = os.path.join(dtypes_directory, 'alignment_gc_metrics_defs.yaml')
-            dtypes_override = yaml.load(open(dtypes_filename))
-            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-
-        data = csv_input.read_csv(dtypes_override=dtypes_override)
+        data = csv_input.read_csv()
 
         data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
         data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
