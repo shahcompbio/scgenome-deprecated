@@ -67,7 +67,7 @@ def get_analysis_inputs_info(tantalus_api, analysis):
 
 def search_hmmcopy_analysis(
         library_id,
-        aligner_name='BWA_ALN_0_5_7',
+        aligner_name='BWA_ALN',
         reference_genome='HG19',
     ):
     """ Search for hmmcopy results and analyses for a specific library.
@@ -108,7 +108,7 @@ def search_hmmcopy_analysis(
     results_info = pd.DataFrame(results_info)
 
     if aligner_name is not None:
-        results_info = results_info.query(f'aligner == "{aligner_name}"')
+        results_info = results_info[results_info['aligner'].str.startswith(aligner_name)]
 
     if len(results_info) == 0:
         raise ValueError(f'no results for library {library_id} with aligner {aligner_name}')
