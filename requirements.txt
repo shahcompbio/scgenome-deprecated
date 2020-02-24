@@ -90,7 +90,7 @@ backports-abc==0.5
 backports.functools-lru-cache==1.5
 backports.shutil-get-terminal-size==1.0.0
 bcrypt==3.1.6
-bleach==3.0.2
+bleach==3.1.1
 brewer2mpl==1.4.1
 certifi==2019.3.9
 cffi==1.11.5
