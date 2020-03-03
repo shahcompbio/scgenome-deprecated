@@ -259,7 +259,7 @@ class CsvInput(object):
 
         def return_gen(df_iterator):
             for df in df_iterator:
-                __verify_data(df, usecols)
+                __verify_data(df)
                 yield df
 
         if chunksize:
