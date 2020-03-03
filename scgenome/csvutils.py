@@ -192,25 +192,7 @@ class CsvInput(object):
             dtypes = self.__generate_dtypes(sep=sep)
             return header, sep, dtypes, columns
 
-    def __verify_data(self, df, usecols):
-        cols = self.columns
-        if usecols is not None:
-            cols = []
-            for col in usecols:
-                if col not in self.columns:
-                    raise ValueError(f'requested column {col} not in columns')
-            for col in self.columns:
-                if col in usecols:
-                    cols.append(col)
-        if not list(df.columns.values) == cols:
-            raise CsvParseError("metadata mismatch in {}".format(self.filepath))
-
     def read_csv(self, chunksize=None, dtypes_override=None, usecols=None):
-        def return_gen(df_iterator):
-            for df in df_iterator:
-                self.__verify_data(df, usecols)
-                yield df
-
         dtypes = {k: v for k, v in self.dtypes.items() if v != "NA"}
 
         if dtypes_override is not None:
@@ -244,26 +226,43 @@ class CsvInput(object):
                f'loading failed for {self.filepath} with columns {names} and dtypes {dtypes}')
            raise
 
-        for column in dtypes:
-            if usecols is not None and column not in usecols:
-                continue
-            try:
-                if dtypes[column] == 'int':
-                    data[column] = data[column].astype(int)
-                elif dtypes[column] == 'bool':
-                    data.loc[data[column] == 'True', column] = True
-                    data.loc[data[column] == 'False', column] = False
-                    values = set(data[column].unique())
-                    if len(values - {False, True, np.nan}) != 0:
-                        raise ValueError(f'{column} is expected to be bool, has values {values}')
-            except ValueError:
-                logging.getLogger("single_cell.utils.csv").error(
-                    f'unable to convert column {column} to {dtypes[column]}')
+        def __verify_data(df):
+            # Check columns
+            cols = self.columns
+            if usecols is not None:
+                cols = []
+                for col in usecols:
+                    if col not in self.columns:
+                        raise ValueError(f'requested column {col} not in columns')
+                for col in self.columns:
+                    if col in usecols:
+                        cols.append(col)
+            if not list(df.columns.values) == cols:
+                raise CsvParseError("metadata mismatch in {}".format(self.filepath))
+
+            # recast column data types
+            for column in dtypes:
+                if usecols is not None and column not in usecols:
+                    continue
+                try:
+                    if dtypes[column] == 'int':
+                        df[column] = df[column].astype(int)
+                    elif dtypes[column] == 'bool':
+                        df.loc[df[column] == 'True', column] = True
+                        df.loc[df[column] == 'False', column] = False
+                        values = set(df[column].unique())
+                        if len(values - {False, True, np.nan}) != 0:
+                            raise ValueError(f'{column} is expected to be bool, has values {values}')
+                except ValueError:
+                    logging.getLogger("single_cell.utils.csv").error(
+                        f'unable to convert column {column} to {dtypes[column]}')
 
         if chunksize:
-            return return_gen(data)
+            for df in data:
+                __verify_data(df)
+                yield df
         else:
-            self.__verify_data(data, usecols)
+            __verify_data(data)
             return data
 
 
