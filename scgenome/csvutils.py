@@ -257,10 +257,13 @@ class CsvInput(object):
                     logging.getLogger("single_cell.utils.csv").error(
                         f'unable to convert column {column} to {dtypes[column]}')
 
-        if chunksize:
-            for df in data:
-                __verify_data(df)
+        def return_gen(df_iterator):
+            for df in df_iterator:
+                __verify_data(df, usecols)
                 yield df
+
+        if chunksize:
+            return return_gen(data)
         else:
             __verify_data(data)
             return data
