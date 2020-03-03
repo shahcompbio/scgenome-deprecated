@@ -226,12 +226,39 @@ class CsvInput(object):
             header = None
             names = self.columns
 
+        dtypes_read = dtypes.copy()
+        for column in dtypes_read:
+            if dtypes_read[column] == 'int':
+                dtypes_read[column] = 'float'
+            if dtypes_read[column] == 'bool':
+                dtypes_read[column] = 'object'
+
         try:
             data = pd.read_csv(
                 self.filepath, compression=self.compression, chunksize=chunksize,
-                sep=self.sep, header=header, names=names, usecols=usecols, dtype=dtypes)
+                sep=self.sep, header=header, names=names, usecols=usecols, dtype=dtypes_read)
         except pd.errors.EmptyDataError:
             data = pd.DataFrame(columns=self.columns)
+        except Exception:
+           logging.getLogger("single_cell.utils.csv").exception(
+               f'loading failed for {self.filepath} with columns {names} and dtypes {dtypes}')
+           raise
+
+        for column in dtypes:
+            if usecols is not None and column not in usecols:
+                continue
+            try:
+                if dtypes[column] == 'int':
+                    data[column] = data[column].astype(int)
+                elif dtypes[column] == 'bool':
+                    data.loc[data[column] == 'True', column] = True
+                    data.loc[data[column] == 'False', column] = False
+                    values = set(data[column].unique())
+                    if len(values - {False, True, np.nan}) != 0:
+                        raise ValueError(f'{column} is expected to be bool, has values {values}')
+            except ValueError:
+                logging.getLogger("single_cell.utils.csv").error(
+                    f'unable to convert column {column} to {dtypes[column]}')
 
         if chunksize:
             return return_gen(data)
