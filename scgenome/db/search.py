@@ -90,6 +90,8 @@ def search_hmmcopy_analysis(
     results_info = []
 
     for results in library_results:
+        logging.info('found hmmcopy data {}'.format(results['name']))
+
         analysis = tantalus_api.get('analysis', id=results['analysis'])
 
         results_analysis[results['id']] = analysis
