@@ -18,14 +18,14 @@ def filter_snv_data(
         figures_prefix=None,
     ):
     """ Load filtered SNV annotation and count data
-    
+
     Args:
         snv_data (pandas.DataFrame): snv annotation data table
         snv_count_data (pandas.DataFrame): snv count data table
         num_cells_threshold (int, optional): minimum number of cells threshold. Defaults to None.
         sum_alt_threshold (int, optional): minimum total alt count threshold. Defaults to None.
         figures_prefix (str, optional): filename prefix for figures. Defaults to None.
-    
+
     Returns:
         pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
     """
@@ -45,7 +45,10 @@ def filter_snv_data(
         fig.savefig(figures_prefix + 'snv_cell_counts.pdf', bbox_inches='tight')
 
     snv_data = snv_data.merge(cell_counts, how='left')
-    assert not snv_data['num_cells'].isnull().any()
+    if snv_data['num_cells'].isnull().any():
+        num_no_count_snvs = snv_data['num_cells'].isnull().sum()
+        logging.warning(f'found {num_no_count_snvs} with no counts in genotyping results')
+        snv_data['num_cells'] = snv_data['num_cells'].fillna(0).astype(int)
 
     # Calculate total alt counts for each SNV
     sum_alt_counts = (
@@ -177,5 +180,3 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
 
     # Run mutation signature analysis, requires adjacent distance
     run_mutation_signature_analysis(snv_data, results_prefix)
-
-
