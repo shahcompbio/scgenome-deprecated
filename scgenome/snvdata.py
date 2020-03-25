@@ -110,7 +110,8 @@ def plot_mutation_signatures(snv_data, snv_class_col, results_prefix):
         fig.savefig(results_prefix + f'_{snv_class_col}_mutsig.pdf', bbox_inches='tight')
 
     fig = plt.figure(figsize=(4, 4))
-    sample_sig.loc['All', :].sort_values().iloc[-10:,].plot(kind='bar')
+    if len(sample_sig.index) > 0:
+        sample_sig.loc['All', :].sort_values().iloc[-10:,].plot(kind='bar')
     seaborn.despine(trim=True)
     if results_prefix is not None:
         fig.savefig(results_prefix + f'_{snv_class_col}_top10_mutsig.pdf', bbox_inches='tight')
