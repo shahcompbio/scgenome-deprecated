@@ -8,7 +8,7 @@ import numpy as np
 import wgs_analysis.plots.rearrangement
 
 
-index_cols = ['sample_id', 'library_id', 'prediction_id']
+index_cols = ['prediction_id']
 
 bp_index_cols = [
     'chromosome_1', 'strand_1', 'position_1',
@@ -21,15 +21,19 @@ def annotate_breakpoint_data(breakpoint_data, breakpoint_count_data):
     """
 
     # Calculate cell counts
-    cell_counts = (
-        breakpoint_count_data
-        .query('read_count > 0')
-        .drop_duplicates(index_cols + ['cell_id'])
-        .groupby(index_cols).size().rename('num_cells')
-        .reset_index())
+    if len(breakpoint_count_data.index) > 0:
+        cell_counts = (
+            breakpoint_count_data
+            .query('read_count > 0')
+            .drop_duplicates(index_cols + ['cell_id'])
+            .groupby(index_cols).size().rename('num_cells')
+            .reset_index())
 
-    breakpoint_data = breakpoint_data.merge(cell_counts, how='left')
-    assert not breakpoint_data['num_cells'].isnull().any()
+        breakpoint_data = breakpoint_data.merge(cell_counts, how='left')
+        assert not breakpoint_data['num_cells'].isnull().any()
+
+    else:
+        breakpoint_data['num_cells'] = 0
 
     return breakpoint_data, breakpoint_count_data
 

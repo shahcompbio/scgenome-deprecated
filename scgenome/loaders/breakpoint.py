@@ -28,6 +28,9 @@ def load_breakpoint_annotation_data(
         csv_input = scgenome.csvutils.CsvInput(filepath)
         data = csv_input.read_csv()
 
+        data['chromosome_1'] = data['chromosome_1'].astype(str)
+        data['chromosome_2'] = data['chromosome_2'].astype(str)
+
         if library_id is not None:
             data['library_id'] = library_id
 
@@ -75,8 +78,8 @@ def load_breakpoint_count_data(
     breakpoint_count_data = breakpoint_count_data.rename(columns={'cluster_id': 'prediction_id'})
 
     # KLUDGE: normal reads are not filtered properly, filter by their prefix, and having '-' in cell id
-    breakpoint_count_data = breakpoint_count_data[~breakpoint_count_data['cell_id'].str.startswith('HS')]
-    breakpoint_count_data = breakpoint_count_data[breakpoint_count_data['cell_id'].apply(lambda a: '-' in a)]
+    breakpoint_count_data = breakpoint_count_data.loc[~breakpoint_count_data['cell_id'].str.startswith('HS'), :]
+    breakpoint_count_data = breakpoint_count_data.loc[breakpoint_count_data['cell_id'].apply(lambda a: '-' in a), :]
 
     return breakpoint_count_data
 
