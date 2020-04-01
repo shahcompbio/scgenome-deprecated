@@ -1,4 +1,5 @@
 import os
+import logging
 import dbclients.tantalus
 import datamanagement.transfer_files
 
@@ -18,11 +19,13 @@ def cache_qc_results(
     ticket_results = tantalus_api.list('results', analysis__jira_ticket=ticket_id)
 
     for results in ticket_results:
+        logging.info(f'found results {results["id"]} with type {results["results_type"]} for ticket {ticket_id}')
+
         if full_dataset:
             csv_suffixes = ((None,None),)
         
         else:
-            if results['results_type'] == 'align':
+            if results['results_type'] == 'alignment':
                 csv_suffixes = scgenome.loaders.align.table_suffixes[results['results_version']] + ((None, 'metadata.yaml'),)
 
             elif results['results_type'] == 'hmmcopy':
