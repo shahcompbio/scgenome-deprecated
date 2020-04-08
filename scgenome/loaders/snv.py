@@ -228,12 +228,16 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
 
     cosmic = load_snv_annotation_table(pseudobulk_dir, 'cosmic_status')
     logging.info(f'cosmic table with shape {cosmic.shape}, memory {cosmic.memory_usage().sum()}')
-    cosmic['is_cosmic'] = True
+    cosmic['is_cosmic'] = 1
     cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
 
     snpeff = load_snv_annotation_table(pseudobulk_dir, 'snpeff')
     snpeff = get_highest_snpeff_effect(snpeff)
     logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
+
+    dbsnp = load_snv_annotation_table(pseudobulk_dir, 'dbsnp_status')
+    dbsnp = dbsnp[['chrom', 'coord', 'ref', 'alt', 'exact_match']].rename(columns={'exact_match': 'is_dbsnp'})
+    logging.info(f'dbsnp table with shape {dbsnp.shape}, memory {dbsnp.memory_usage().sum()}')
 
     tnc = load_snv_annotation_table(pseudobulk_dir, 'trinuc')
 
@@ -241,6 +245,7 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
         mappability,
         cosmic,
         snpeff,
+        dbsnp,
         tnc,
         strelka_results,
         museq_results,
@@ -257,11 +262,17 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(cosmic, how='left')
+    data['is_cosmic'] = data['is_cosmic'].fillna(0).astype(int)
     logging.info('post cosmic with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(snpeff, how='left')
     logging.info('post snpeff with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
+    logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
+
+    data = data.merge(dbsnp, how='left')
+    data['is_dbsnp'] = data['is_dbsnp'].fillna(0).astype(int)
+    logging.info('post dbsnp with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     data = data.merge(tnc, how='left')
