@@ -58,6 +58,7 @@ def get_qc_data(
         ticket_ids,
         local_directory,
         sample_ids=None,
+        additional_hmmcopy_reads_cols=None,
         do_caching=False,
     ):
 
@@ -68,7 +69,9 @@ def get_qc_data(
             cache_qc_results(ticket_id, local_directory)
 
         ticket_directory = os.path.join(local_directory, ticket_id)
-        ticket_results = scgenome.loaders.qc.load_qc_data(ticket_directory, sample_ids=sample_ids)
+        ticket_results = scgenome.loaders.qc.load_qc_data(
+            ticket_directory, sample_ids=sample_ids,
+            additional_hmmcopy_reads_cols=additional_hmmcopy_reads_cols)
 
         for table_name, table_data in ticket_results.items():
             if table_name not in results_tables:
