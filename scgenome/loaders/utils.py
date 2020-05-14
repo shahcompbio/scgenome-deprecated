@@ -1,5 +1,6 @@
 import os
 import yaml
+import collections
 import packaging.version
 
 
@@ -19,7 +20,7 @@ def _find_manifest_filenames(results_dir):
 
 
 def find_results_directories(results_dir):
-    results_directories = {}
+    results_directories = collections.defaultdict(list)
 
     for manifest_filename in _find_manifest_filenames(results_dir):
         manifest = yaml.load(open(manifest_filename))
@@ -34,13 +35,7 @@ def find_results_directories(results_dir):
         if not manifest['meta']['version'].startswith('v'):
             manifest['meta']['version'] = 'v' + manifest['meta']['version']
 
-        if results_type in results_directories:
-            raise Exception('found {} and {} with results type {}'.format(
-                results_directories[results_type],
-                os.path.dirname(manifest_filename),
-                results_type))
-
-        results_directories[results_type] = os.path.dirname(manifest_filename)
+        results_directories[results_type].append(os.path.dirname(manifest_filename))
 
     return results_directories
 
@@ -69,6 +64,7 @@ def get_pseudobulk_files(results_dir, suffix):
     Yields:
         (str, str, str): sample id, library id, filename
     """
+
     manifest_filename = os.path.join(results_dir, 'metadata.yaml')
     manifest = yaml.load(open(manifest_filename))
 

@@ -79,16 +79,27 @@ def load_qc_data(
     ticket_results_dirs = scgenome.loaders.utils.find_results_directories(
         results_dir)
 
-    results_tables = load_align_data(ticket_results_dirs['align'])
+    if len(ticket_results_dirs['align']) != 1:
+        raise ValueError(f"found {len(ticket_results_dirs['align'])} directories with align results")
+
+    results_tables = load_align_data(ticket_results_dirs['align'][0])
+
+    if len(ticket_results_dirs['hmmcopy']) != 1:
+        raise ValueError(f"found {len(ticket_results_dirs['hmmcopy'])} directories with hmmcopy results")
+
     hmmcopy_results_tables = load_hmmcopy_data(
-        ticket_results_dirs['hmmcopy'],
+        ticket_results_dirs['hmmcopy'][0],
         additional_reads_cols=additional_hmmcopy_reads_cols)
 
     results_tables.update(hmmcopy_results_tables)
 
     # Load annotation tables if they exist otherwise create merge of hmmcopy/align
     if 'annotation' in ticket_results_dirs:
-        annotation_results_tables = load_annotation_data(ticket_results_dirs['annotation'])
+        if len(ticket_results_dirs['annotation']) != 1:
+            raise ValueError(f"found {len(ticket_results_dirs['annotation'])} directories with annotation results")
+
+        annotation_results_tables = load_annotation_data(ticket_results_dirs['annotation'][0])
+
         results_tables['annotation_metrics'] = annotation_results_tables['annotation_metrics']
 
     else:

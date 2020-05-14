@@ -1,6 +1,7 @@
 import logging
 import yaml
 import os
+import packaging
 import pandas as pd
 import numpy as np
 
@@ -321,6 +322,7 @@ def load_snv_data(
     Returns:
         pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
     """
+
     analysis_dirs = scgenome.loaders.utils.find_results_directories(
         results_dir)
 
@@ -347,8 +349,22 @@ def load_snv_data(
     if 'variant_calling' in analysis_dirs:
         variant_calling_dir = analysis_dirs['variant_calling']
 
+        if len(variant_calling_dir) == 0:
+            raise ValueError(f'found {len(variant_calling_dir)} dirs for variant_calling')
+
+        elif len(variant_calling_dir) > 1:
+            if filter_sample_id is None:
+                raise ValueError(f'found {len(variant_calling_dir)} without filter_sample_id')
+
+            filtered_variant_calling_dir = filter(lambda a: f'sample_{filter_sample_id}' in a, variant_calling_dir)
+
+            if len(variant_calling_dir) != 1:
+                raise ValueError(f'found {len(filtered_variant_calling_dir)} in {variant_calling_dir} matching filter_sample_id')
+
+            variant_calling_dir = filtered_variant_calling_dir
+
         snv_data = load_snv_annotation_results(
-            variant_calling_dir,
+            variant_calling_dir[0],
             museq_filter=museq_filter,
             strelka_filter=strelka_filter)
 
@@ -359,13 +375,26 @@ def load_snv_data(
         }
 
     if 'snv_genotyping' in analysis_dirs:
+        assert positions is not None
+
         variant_counting_dir = analysis_dirs['snv_genotyping']
 
-        assert positions is not None
+        if len(variant_counting_dir) != 1:
+            raise ValueError(f'found {len(variant_counting_dir)} dirs for snv_genotyping')
+        variant_counting_dir = variant_counting_dir[0]
+
+        manifest_filename = os.path.join(variant_counting_dir, 'metadata.yaml')
+        manifest = yaml.load(open(manifest_filename))
+
+        suffix = 'counts.csv.gz'
+        if packaging.version.parse(manifest['meta']['version']) > packaging.version.parse('v0.6.0'):
+            if filter_sample_id is None or filter_library_id is None:
+                raise ValueError('both filter_sample_id and filter_library_id must be specified')
+            suffix = f'{filter_sample_id}_{filter_library_id}_counts.csv.gz'
 
         snv_count_data = load_snv_count_data(
             variant_counting_dir,
-            'counts.csv.gz',
+            suffix,
             positions,
             filter_sample_id=filter_sample_id,
             filter_library_id=filter_library_id)

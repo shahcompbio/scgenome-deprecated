@@ -60,6 +60,8 @@ def load_align_data(
         raise ValueError(f'no align found for directory {results_dir}')
 
     align_results_dir = analysis_dirs['align']
+    assert len(align_results_dir) == 1
+    align_results_dir = align_results_dir[0]
 
     manifest_filename = os.path.join(align_results_dir, 'metadata.yaml')
     manifest = yaml.load(open(manifest_filename))

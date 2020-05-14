@@ -46,6 +46,8 @@ def load_annotation_data(
         raise ValueError(f'no annotation found for directory {results_dir}')
 
     annotation_results_dir = analysis_dirs['annotation']
+    assert len(annotation_results_dir) == 1
+    annotation_results_dir = annotation_results_dir[0]
 
     manifest_filename = os.path.join(annotation_results_dir, 'metadata.yaml')
     manifest = yaml.load(open(manifest_filename))

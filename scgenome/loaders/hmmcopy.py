@@ -79,6 +79,8 @@ def load_hmmcopy_data(
         raise ValueError(f'no hmmcopy found for directory {results_dir}')
 
     hmmcopy_results_dir = analysis_dirs['hmmcopy']
+    assert len(hmmcopy_results_dir) == 1
+    hmmcopy_results_dir = hmmcopy_results_dir[0]
 
     hmmcopy_reads_cols = standard_hmmcopy_reads_cols.copy()
     if additional_reads_cols is not None:
