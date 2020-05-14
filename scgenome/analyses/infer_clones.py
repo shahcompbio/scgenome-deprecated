@@ -142,7 +142,7 @@ def retrieve_cn_data(tantalus_api, library_id, local_storage_directory, download
 
     logging.info(f'library {library_id}')
 
-    analysis = scgenome.db.search.search_hmmcopy_analysis(tantalus_api, library_id, aligner_name='BWA_MEM_0_7_6A')
+    analysis = scgenome.db.search.search_hmmcopy_analysis(library_id, aligner_name='BWA_MEM_0_7_6A')
     jira_ticket = analysis['jira_ticket']
 
     if download_to_cache:
