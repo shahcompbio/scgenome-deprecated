@@ -356,9 +356,9 @@ def load_snv_data(
             if filter_sample_id is None:
                 raise ValueError(f'found {len(variant_calling_dir)} without filter_sample_id')
 
-            filtered_variant_calling_dir = filter(lambda a: f'sample_{filter_sample_id}' in a, variant_calling_dir)
+            filtered_variant_calling_dir = list(filter(lambda a: f'sample_{filter_sample_id}' in a, variant_calling_dir))
 
-            if len(variant_calling_dir) != 1:
+            if len(filtered_variant_calling_dir) != 1:
                 raise ValueError(f'found {len(filtered_variant_calling_dir)} in {variant_calling_dir} matching filter_sample_id')
 
             variant_calling_dir = filtered_variant_calling_dir
