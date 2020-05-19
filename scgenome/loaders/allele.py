@@ -10,11 +10,15 @@ import scgenome.csvutils
 
 def load_haplotype_allele_data(
         results_dir,
+        filter_sample_id=None,
     ):
     """ Load the haplotype allele count data from the pseudobulk results paths
     
     Args:
         pseudobulk_dir (str): results directory
+
+    KwArgs:
+        filter_sample_id (str): specific sample for which to obtain results
 
     Returns:
         dict of pandas.DataFrame: Haplotype allele data
@@ -34,10 +38,24 @@ def load_haplotype_allele_data(
     else:
         raise ValueError(f'no pseudobulk found for directory {results_dir}')
 
+    if len(pseudobulk_dir) == 0:
+        raise ValueError(f'found {len(pseudobulk_dir)} dirs for pseudobulk_dir')
+
+    elif len(pseudobulk_dir) > 1:
+        if filter_sample_id is None:
+            raise ValueError(f'found {len(pseudobulk_dir)} without filter_sample_id')
+
+        filtered_pseudobulk_dir = list(filter(lambda a: f'sample_{filter_sample_id}' in a, pseudobulk_dir))
+
+        if len(filtered_pseudobulk_dir) != 1:
+            raise ValueError(f'found {len(filtered_pseudobulk_dir)} in {pseudobulk_dir} matching filter_sample_id')
+
+        pseudobulk_dir = filtered_pseudobulk_dir
+
     allele_counts = []
 
     files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, suffix)
+        pseudobulk_dir[0], suffix)
 
     for sample_id, library_id, filepath in files:
         logging.info('Loading haplotype allele counts from {}'.format(filepath))
