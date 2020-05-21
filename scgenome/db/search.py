@@ -181,3 +181,21 @@ def search_image_feature_results(
 
     return features
 
+
+def search_image_results(
+        tantalus_api,
+        library_id,
+        version='v1',
+        results_storage_name='singlecellresults',
+):
+    """ Import image features for a list of libraries
+    """
+    features = tantalus_api.get(
+        'results',
+        results_type='CELLENONE_IMAGES',
+        results_version=version,
+        libraries__library_id=library_id,
+    )
+
+    return features
+
