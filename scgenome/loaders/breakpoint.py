@@ -97,20 +97,36 @@ def load_breakpoint_data(
         results_dir)
 
     if 'pseudobulk' in analysis_dirs:
-        pseudobulk_dir = analysis_dirs['pseudobulk']
+        breakpoint_calling_dir = analysis_dirs['pseudobulk']
         annotation_suffix = 'destruct.csv.gz'
         count_suffix = 'cell_counts_destruct.csv.gz'
 
     elif 'breakpoint_calling' in analysis_dirs:
-        pseudobulk_dir = analysis_dirs['breakpoint_calling']
+        breakpoint_calling_dir = analysis_dirs['breakpoint_calling']
+
+        if len(breakpoint_calling_dir) == 0:
+            raise ValueError(f'found {len(breakpoint_calling_dir)} dirs for breakpoint_calling')
+
+        elif len(breakpoint_calling_dir) > 1:
+            if filter_sample_id is None:
+                raise ValueError(f'found {len(breakpoint_calling_dir)} without filter_sample_id')
+
+            filtered_breakpoint_calling_dir = list(filter(lambda a: f'sample_{filter_sample_id}' in a, breakpoint_calling_dir))
+
+            if len(filtered_breakpoint_calling_dir) != 1:
+                raise ValueError(f'found {len(filtered_breakpoint_calling_dir)} in {breakpoint_calling_dir} matching filter_sample_id')
+
+            breakpoint_calling_dir = filtered_breakpoint_calling_dir
+
+        breakpoint_calling_dir = breakpoint_calling_dir[0]
         annotation_suffix = 'destruct_breakpoints.csv.gz'
         count_suffix = 'destruct_cell_counts.csv.gz'
 
     else:
         raise ValueError(f'no breakpoints found for directory {results_dir}')
 
-    breakpoint_data = load_breakpoint_annotation_data(pseudobulk_dir, annotation_suffix)
-    breakpoint_count_data = load_breakpoint_count_data(pseudobulk_dir, count_suffix)
+    breakpoint_data = load_breakpoint_annotation_data(breakpoint_calling_dir, annotation_suffix)
+    breakpoint_count_data = load_breakpoint_count_data(breakpoint_calling_dir, count_suffix)
 
     # TODO: fix upstream
     for col in ('prediction_id', 'position_1', 'position_2', 'read_count'):
