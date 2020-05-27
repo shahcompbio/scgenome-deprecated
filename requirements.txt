@@ -170,7 +170,6 @@ ptyprocess==0.6.0
 pyasn1==0.4.5
 pycparser==2.19
 pydocumentdb==2.3.5
--e git+https://bitbucket.org/dranew/dollo.git@b169b2a8f6ea00c2522881afe0a7dc58a1755504#egg=PyDollo
 Pygments==2.4.2
 PyJWT==1.7.1
 pylint==2.3.1
