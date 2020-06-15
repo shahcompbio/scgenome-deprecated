@@ -210,7 +210,7 @@ def plot_umap_clusters(ax, df):
         for c in list(labels.keys()) if c >= 0
     ]
     adjust_text(
-        text_labels, ax=ax, x=df['umap1'], y=df['umap2'],
+        text_labels, ax=ax,
         force_points=(0.1, 0.1)
     )
 
