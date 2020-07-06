@@ -88,13 +88,14 @@ def compute_bic(kmeans, X):
 
 def kmeans_cluster(
         cn,
+        min_k=2,
         max_k=100,
     ):
     """ Cluster using kmeans and bic.
     """
 
     X = cn.T.values
-    ks = range(1, max_k + 1)
+    ks = range(min_k, max_k + 1)
 
     logging.info(f'trying with max k={max_k}')
 
