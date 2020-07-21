@@ -46,9 +46,9 @@ def load_cell_state_prediction(results_dir):
 
     cell_state_results_dir = analysis_dirs['cell_state_prediction']
 
-    if len(cell_state_results_dir['cell_state_prediction']) != 1:
-        raise ValueError(f"found {len(cell_state_results_dir['cell_state_prediction'])} directories with cell_state_prediction results")
-    cell_state_results_dir = analysis_dirs['cell_state_prediction'][0]
+    if len(cell_state_results_dir) != 1:
+        raise ValueError(f"found {len(cell_state_results_dir)} directories with cell_state_prediction results")
+    cell_state_results_dir = cell_state_results_dir[0]
 
     manifest_filename = os.path.join(cell_state_results_dir, 'metadata.yaml')
     manifest = yaml.load(open(manifest_filename))
