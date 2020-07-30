@@ -52,10 +52,18 @@ def load_haplotype_allele_data(
 
         pseudobulk_dir = filtered_pseudobulk_dir
 
-    allele_counts = []
-
     files = scgenome.loaders.utils.get_pseudobulk_files(
         pseudobulk_dir[0], suffix)
+
+    return process_allele_data(files)
+
+
+def load_haplotype_allele_data_from_file(files):
+    return process_allele_data(scgenome.loaders.utils._prep_filenames_for_loading(files))
+
+
+def process_allele_data(files):
+    allele_counts = []
 
     for sample_id, library_id, filepath in files:
         logging.info('Loading haplotype allele counts from {}'.format(filepath))

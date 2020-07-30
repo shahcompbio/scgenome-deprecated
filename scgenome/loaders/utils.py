@@ -53,6 +53,9 @@ def get_version(results_dir):
     manifest = yaml.load(open(manifest_filename))
     return manifest['meta']['version']
 
+def _prep_filenames_for_loading(files):
+    for f in files:
+        yield None, None, f
 
 def get_pseudobulk_files(results_dir, suffix):
     """ Get files for libraries and samples by suffix

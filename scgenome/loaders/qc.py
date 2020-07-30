@@ -4,8 +4,13 @@ import pandas as pd
 
 import scgenome.loaders.utils
 from scgenome.loaders.align import load_align_data
+from scgenome.loaders.align import load_align_data_from_files
+
 from scgenome.loaders.hmmcopy import load_hmmcopy_data
+from scgenome.loaders.hmmcopy import load_hmmcopy_data_from_filename
+
 from scgenome.loaders.annotation import load_annotation_data
+from scgenome.loaders.annotation import load_annotation_data_from_file
 
 
 def _calculate_annotation_metrics(results_tables):
@@ -67,6 +72,36 @@ def load_cell_state_prediction(results_dir):
     return data
 
 
+def load_qc_data_from_files(hmmcopy_reads, hmmcopy_segs, 
+    hmmcopy_metrics, alignment_metrics, gc_metrics, annotation_metrics=None, 
+    sample_id=None, additional_hmmcopy_reads_cols=None,
+):
+
+    results_tables = load_align_data_from_files(alignment_metrics, 
+        gc_metrics=gc_metrics
+    )
+
+    hmmcopy_results_tables = load_hmmcopy_data_from_filename(hmmcopy_reads, 
+        hmmcopy_segs, hmmcopy_metrics,
+        additional_reads_cols=additional_hmmcopy_reads_cols
+    )
+    results_tables.update(hmmcopy_results_tables)
+
+    if annotation_metrics:
+        annotation_results_tables = load_annotation_data_from_file(annotation_metrics)
+    else:
+        annotation_results_tables = _calculate_annotation_metrics(results_tables)
+    results_tables.update(annotation_results_tables)
+
+  
+
+    if sample_id is not None:
+        results_tables = _sample_id_filter(results_tables, sample_id)
+
+    
+    scgenome.utils.union_categories(results_tables.values())
+    return results_tables
+
 def load_qc_data(
         results_dir,
         sample_ids=None,
@@ -79,7 +114,7 @@ def load_qc_data(
         sample_ids (list of str, optional): Set of sample ids to filter for. Defaults to None.
         additional_hmmcopy_reads_cols (list of str, optional): Additional columns to obtain from the reads table. Defaults to None.
     """
-
+    
     ticket_results_dirs = scgenome.loaders.utils.find_results_directories(
         results_dir)
 
@@ -119,12 +154,20 @@ def load_qc_data(
         results_tables['annotation_metrics'] = results_tables['annotation_metrics'].merge(
             cell_state[['cell_id', 'is_s_phase', 'is_s_phase_prob']].drop_duplicates())
 
-    # Optionally select specific samples
+
     if sample_ids is not None:
-        for table_name, table_data in results_tables.items():
-            results_tables[table_name] = table_data[table_data['sample_id'].isin(sample_ids)]
+        results_tables = _sample_id_filter(results_tables, sample_ids)
+
 
     scgenome.utils.union_categories(results_tables.values())
+
+    return results_tables
+
+
+def _sample_id_filter(results_tables, sample_ids):
+    # Optionally select specific samples
+    for table_name, table_data in results_tables.items():
+        results_tables[table_name] = table_data[table_data['sample_id'].isin(sample_ids)]
 
     return results_tables
 

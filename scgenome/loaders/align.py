@@ -41,6 +41,21 @@ table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
 })
 
 
+def load_align_data_from_files(align_metrics, gc_metrics=None):
+
+    results_tables = {}
+    
+    results_tables["align_metrics"] = process_alignment_data(align_metrics, "align_metrics")
+    
+    if gc_metrics:
+        results_tables["gc_metrics"] = process_alignment_data(gc_metrics, "gc_metrics")
+
+    scgenome.utils.union_categories(results_tables.values())
+
+    return results_tables
+
+
+
 def load_align_data(
         results_dir,
 ):
@@ -84,6 +99,15 @@ def load_align_data(
 
         filepath = os.path.join(align_results_dir, filename)
 
+        results_tables[table_name] = process_alignment_data(filepath, table_name)
+
+    scgenome.utils.union_categories(results_tables.values())
+
+    return results_tables
+
+
+def process_alignment_data(filepath, table_name):
+
         csv_input = scgenome.csvutils.CsvInput(filepath)
 
         dtypes_override = None
@@ -107,8 +131,4 @@ def load_align_data(
             if col in data:
                 data[col] = pd.Categorical(data[col])
 
-        results_tables[table_name] = data
-
-    scgenome.utils.union_categories(results_tables.values())
-
-    return results_tables
+        return data
