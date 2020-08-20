@@ -134,8 +134,6 @@ def load_hmmcopy_data(
         usecols = None
         if table_name == 'hmmcopy_reads':
             usecols = hmmcopy_reads_cols
-
-    
         
         results_tables[table_name] = process_hmmcopy_data(filepath, table_name, usecols=usecols)
 

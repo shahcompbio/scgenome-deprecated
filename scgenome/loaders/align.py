@@ -55,7 +55,6 @@ def load_align_data_from_files(align_metrics, gc_metrics=None):
     return results_tables
 
 
-
 def load_align_data(
         results_dir,
 ):

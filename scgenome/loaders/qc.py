@@ -154,10 +154,8 @@ def load_qc_data(
         results_tables['annotation_metrics'] = results_tables['annotation_metrics'].merge(
             cell_state[['cell_id', 'is_s_phase', 'is_s_phase_prob']].drop_duplicates())
 
-
     if sample_ids is not None:
         results_tables = _sample_id_filter(results_tables, sample_ids)
-
 
     scgenome.utils.union_categories(results_tables.values())
 
@@ -170,5 +168,3 @@ def _sample_id_filter(results_tables, sample_ids):
         results_tables[table_name] = table_data[table_data['sample_id'].isin(sample_ids)]
 
     return results_tables
-
-

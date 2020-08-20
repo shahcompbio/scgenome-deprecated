@@ -8,29 +8,45 @@ import numpy as np
 import wgs_analysis.plots.rearrangement
 
 
-index_cols = ['prediction_id']
-
-bp_index_cols = [
-    'chromosome_1', 'strand_1', 'position_1',
-    'chromosome_2', 'strand_2', 'position_2',
-]
+def get_index_cols(is_lumpy=False):
+    if is_lumpy:
+        return ['breakpoint_id']
+    return ['prediction_id']
 
 
-def annotate_breakpoint_data(breakpoint_data, breakpoint_count_data):
+def get_bp_index_cols(is_lumpy=False):
+    if is_lumpy:
+        return ['chrom1', 'strand1', 'start1',
+            'chrom2', 'strand2', 'start2'
+        ]      
+    return ['chromosome_1', 'strand_1', 'position_1',
+        'chromosome_2', 'strand_2', 'position_2'
+    ]
+
+
+def annotate_breakpoint_data(breakpoint_data, breakpoint_count_data, is_lumpy=False):
     """ Load breakpoints and add annotations.
     """
+
+    index_cols = get_index_cols(is_lumpy=is_lumpy)
+    
+    evidence_count_colname = "read_count"
+    if is_lumpy:
+        evidence_count_colname = "count"
 
     # Calculate cell counts
     if len(breakpoint_count_data.index) > 0:
         cell_counts = (
             breakpoint_count_data
-            .query('read_count > 0')
+            .query('{} > 0'.format(evidence_count_colname))
             .drop_duplicates(index_cols + ['cell_id'])
             .groupby(index_cols).size().rename('num_cells')
             .reset_index())
-
+        
         breakpoint_data = breakpoint_data.merge(cell_counts, how='left')
-        assert not breakpoint_data['num_cells'].isnull().any()
+        #TODO: figure out why there are extra brkps in lumpy not in evidence
+        if not is_lumpy:
+            assert not breakpoint_data['num_cells'].isnull().any()
 
     else:
         breakpoint_data['num_cells'] = 0
@@ -45,9 +61,12 @@ def filter_breakpoint_data(
         template_length_min_threshold=250,
         num_cells_threshold=2,
         num_unique_reads_threshold=2,
+        lumpy=False
     ):
     """ Filter breakpoint data and breakpoint counts
     """
+    index_cols = get_index_cols(is_lumpy=lumpy)
+    bp_index_cols = get_bp_index_cols(is_lumpy=lumpy)
 
     num_initial_breakpoints = len(breakpoint_data.index)
 
@@ -190,6 +209,8 @@ def plot_library_portrait(breakpoint_data, figures_prefix=None):
 def plot_breakpoint_clustering(breakpoint_data, breakpoint_count_data, clusters, figures_prefix=None):
     """ Plot breakpoint cluster figures.
     """
+    bp_index_cols = get_bp_index_cols(is_lumpy=lumpy)
+
     plot_data = breakpoint_count_data.merge(clusters)
     plot_data = (
         plot_data.groupby(bp_index_cols + ['cluster_id'])[['read_count']]

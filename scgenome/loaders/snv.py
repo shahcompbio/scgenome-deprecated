@@ -25,11 +25,15 @@ categorical_columns = [
     'tri_nucleotide_context',
 ]
 
-def load_snv_count_data_from_filenames(files, positions, filter_sample_id=None, filter_library_id=None):
-    return _process_snv_count_data(scgenome.loaders.utils._prep_filenames_for_loading(files), positions, filter_sample_id=filter_sample_id, filter_library_id=filter_library_id)
+def load_snv_count_data_from_filenames(files, positions, filter_sample_id=None, 
+    filter_library_id=None):
+    return _process_snv_count_data(scgenome.loaders.utils._prep_filenames_for_loading(files),
+        positions, filter_sample_id=filter_sample_id, filter_library_id=filter_library_id
+    )
 
 
-def load_snv_count_data(pseudobulk_dir, suffix, positions, filter_sample_id=None, filter_library_id=None):
+def load_snv_count_data(pseudobulk_dir, suffix, positions, filter_sample_id=None, 
+    filter_library_id=None):
     """ Load per cell SNV count data
     
     Args:
@@ -48,8 +52,9 @@ def load_snv_count_data(pseudobulk_dir, suffix, positions, filter_sample_id=None
     files = scgenome.loaders.utils.get_pseudobulk_files(
         pseudobulk_dir, suffix)
 
-    return _process_snv_count_data(files, positions, filter_sample_id=filter_sample_id, filter_library_id=filter_library_id)
-
+    return _process_snv_count_data(files, positions, filter_sample_id=filter_sample_id, 
+        filter_library_id=filter_library_id
+    )
 
 
 def _process_snv_count_data(files, positions, filter_sample_id=None, filter_library_id=None):
@@ -117,10 +122,10 @@ def _process_snv_count_data(files, positions, filter_sample_id=None, filter_libr
 
     snv_count_data = scgenome.utils.concat_with_categories(snv_count_data, ignore_index=True)
 
-    logging.info(f'Loaded all snv counts tables with shape {snv_count_data.shape}, memory {snv_count_data.memory_usage().sum()}')
+    logging.info(f'Loaded all snv counts tables with shape {snv_count_data.shape}, memory \
+        {snv_count_data.memory_usage().sum()}')
 
     return snv_count_data
-
 
 
 def load_snv_annotation_table(files):
@@ -222,17 +227,20 @@ def load_snv_annotation_results_from_filenames(mappability_path, strelka_path, m
     logging.info('starting load')
 
 
-    mappability = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(mappability_path))
+    mappability = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
+            mappability_path))
     mappability = mappability[mappability['mappability'] > 0.99]
 
-    strelka_results = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(strelka_path))
+    strelka_results = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
+            strelka_path))
 
     strelka_results = (
         strelka_results
         .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
         .max().rename('max_strelka_score').reset_index())
 
-    museq_results = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(museq_path))
+    museq_results = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
+            museq_path))
     museq_results = (
         museq_results
         .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
@@ -254,8 +262,8 @@ def load_snv_annotation_results_from_filenames(mappability_path, strelka_path, m
 
     tnc = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(trinuc_path))
 
-    return _concat_annotation_results(mappability, cosmic, snpeff, dbsnp, tnc, strelka_results, museq_results, 
-        museq_filter=museq_filter, strelka_filter=strelka_filter
+    return _concat_annotation_results(mappability, cosmic, snpeff, dbsnp, tnc, strelka_results, 
+        museq_results, museq_filter=museq_filter, strelka_filter=strelka_filter
     )
 
 
@@ -395,7 +403,6 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     )
 
 
-
 def load_snv_data_from_files(        
     mappability_path, 
     strelka_path, 
@@ -415,9 +422,7 @@ def load_snv_data_from_files(
 ):
 
     """ Load filtered SNV annotation and count data
-
     """
-
 
     outputs = {}
 

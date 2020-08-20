@@ -9,21 +9,29 @@ import scgenome.loaders.utils
 import scgenome.csvutils
 
 
-def load_breakpoint_annotation_data(files):
+def load_breakpoint_annotation_data(files, is_lumpy=False):
     """ Load breakpoint data from a pseudobulk run.
 
     Args:
         pseudobulk_dir (str): results directory
         suffix (str): suffix of breakpoint annotation tables
     """
+
+    chrom_1_colname = "chromosome_1"
+    chrom_2_colname = "chromosome_2"
+    
+    if is_lumpy:
+        chrom_1_colname = "chrom1"
+        chrom_2_colname = "chrom2"      
+
     breakpoint_data = []
 
     for sample_id, library_id, filepath in files:
         csv_input = scgenome.csvutils.CsvInput(filepath)
         data = csv_input.read_csv()
 
-        data['chromosome_1'] = data['chromosome_1'].astype(str)
-        data['chromosome_2'] = data['chromosome_2'].astype(str)
+        data[chrom_1_colname] = data[chrom_1_colname].astype(str)
+        data[chrom_2_colname] = data[chrom_2_colname].astype(str)
 
         if library_id is not None:
             data['library_id'] = library_id
@@ -72,11 +80,11 @@ def load_breakpoint_count_data(files):
     return breakpoint_count_data
 
 
-def load_breakpoint_data_from_files(annotation_file, counts_file):
+def load_breakpoint_data_from_files(annotation_file, counts_file, lumpy=False):
 
     annotation_files  = scgenome.loaders.utils._prep_filenames_for_loading(annotation_file)
 
-    breakpoint_data = load_breakpoint_annotation_data(annotation_files)
+    breakpoint_data = load_breakpoint_annotation_data(annotation_files, is_lumpy=lumpy)
 
     count_files = scgenome.loaders.utils._prep_filenames_for_loading(counts_file)
 
