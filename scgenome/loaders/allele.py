@@ -1,17 +1,15 @@
 import logging
-import yaml
-import os
-import pandas as pd
 
-import scgenome.utils
-import scgenome.loaders.utils
+import pandas as pd
 import scgenome.csvutils
+import scgenome.loaders.utils
+import scgenome.utils
 
 
 def load_haplotype_allele_data(
         results_dir,
         filter_sample_id=None,
-    ):
+):
     """ Load the haplotype allele count data from the pseudobulk results paths
     
     Args:
@@ -52,10 +50,18 @@ def load_haplotype_allele_data(
 
         pseudobulk_dir = filtered_pseudobulk_dir
 
-    allele_counts = []
-
     files = scgenome.loaders.utils.get_pseudobulk_files(
         pseudobulk_dir[0], suffix)
+
+    return process_allele_data(files)
+
+
+def load_haplotype_allele_data_from_file(files):
+    return process_allele_data(scgenome.loaders.utils._prep_filenames_for_loading(files))
+
+
+def process_allele_data(files):
+    allele_counts = []
 
     for sample_id, library_id, filepath in files:
         logging.info('Loading haplotype allele counts from {}'.format(filepath))
@@ -65,7 +71,7 @@ def load_haplotype_allele_data(
             dtypes_override={
                 'chromosome': 'category',
                 'cell_id': 'category',
-        })
+            })
 
         if library_id is not None:
             data['library_id'] = pd.Series([library_id], dtype="category")
@@ -73,15 +79,17 @@ def load_haplotype_allele_data(
         if sample_id is not None:
             data['sample_id'] = pd.Series([sample_id], dtype="category")
 
-        logging.info(f'Loaded haplotype allele counts table with shape {data.shape}, memory {data.memory_usage().sum()}')
+        logging.info(
+            f'Loaded haplotype allele counts table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
         allele_counts.append(data)
 
     allele_counts = scgenome.utils.concat_with_categories(allele_counts, ignore_index=True)
 
-    logging.info(f'Loaded all haplotype allele counts table with shape {allele_counts.shape}, memory {allele_counts.memory_usage().sum()}')
+    logging.info(
+        f'Loaded all haplotype allele counts table with shape {allele_counts.shape}, memory {allele_counts.memory_usage().sum()}'
+    )
 
     return {
         'allele_counts': allele_counts,
     }
-

@@ -1,35 +1,32 @@
-import logging
-import yaml
-import os
 import pandas as pd
-import numpy as np
-
-import scgenome.utils
-import scgenome.loaders.utils
 import scgenome.csvutils
+import scgenome.loaders.utils
+import scgenome.utils
 
 
-def load_breakpoint_annotation_data(
-        pseudobulk_dir,
-        suffix,
-    ):
+def load_breakpoint_annotation_data(files, is_lumpy=False):
     """ Load breakpoint data from a pseudobulk run.
 
     Args:
-        pseudobulk_dir (str): results directory
+        files (str): results directory
         suffix (str): suffix of breakpoint annotation tables
     """
-    breakpoint_data = []
 
-    files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, suffix)
+    chrom_1_colname = "chromosome_1"
+    chrom_2_colname = "chromosome_2"
+
+    if is_lumpy:
+        chrom_1_colname = "chrom1"
+        chrom_2_colname = "chrom2"
+
+    breakpoint_data = []
 
     for sample_id, library_id, filepath in files:
         csv_input = scgenome.csvutils.CsvInput(filepath)
         data = csv_input.read_csv()
 
-        data['chromosome_1'] = data['chromosome_1'].astype(str)
-        data['chromosome_2'] = data['chromosome_2'].astype(str)
+        data[chrom_1_colname] = data[chrom_1_colname].astype(str)
+        data[chrom_2_colname] = data[chrom_2_colname].astype(str)
 
         if library_id is not None:
             data['library_id'] = library_id
@@ -47,10 +44,7 @@ def load_breakpoint_annotation_data(
     return breakpoint_data
 
 
-def load_breakpoint_count_data(
-        pseudobulk_dir,
-        suffix,
-    ):
+def load_breakpoint_count_data(files):
     """ Load breakpoint count data from a pseudobulk run.
 
     Args:
@@ -58,9 +52,6 @@ def load_breakpoint_count_data(
         suffix (str): suffix of breakpoint count tables
     """
     breakpoint_count_data = []
-
-    files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, suffix)
 
     for sample_id, library_id, filepath in files:
         csv_input = scgenome.csvutils.CsvInput(filepath)
@@ -84,9 +75,21 @@ def load_breakpoint_count_data(
     return breakpoint_count_data
 
 
+def load_breakpoint_data_from_files(annotation_file, counts_file, lumpy=False):
+    annotation_files = scgenome.loaders.utils._prep_filenames_for_loading(annotation_file)
+
+    breakpoint_data = load_breakpoint_annotation_data(annotation_files, is_lumpy=lumpy)
+
+    count_files = scgenome.loaders.utils._prep_filenames_for_loading(counts_file)
+
+    breakpoint_count_data = load_breakpoint_count_data(count_files)
+
+    return _process_breakpoint_data(breakpoint_data, breakpoint_count_data)
+
+
 def load_breakpoint_data(
         results_dir,
-    ):
+):
     """ Load breakpoint count data from a pseudobulk run.
 
     Args:
@@ -111,10 +114,12 @@ def load_breakpoint_data(
             if filter_sample_id is None:
                 raise ValueError(f'found {len(breakpoint_calling_dir)} without filter_sample_id')
 
-            filtered_breakpoint_calling_dir = list(filter(lambda a: f'sample_{filter_sample_id}' in a, breakpoint_calling_dir))
+            filtered_breakpoint_calling_dir = list(
+                filter(lambda a: f'sample_{filter_sample_id}' in a, breakpoint_calling_dir))
 
             if len(filtered_breakpoint_calling_dir) != 1:
-                raise ValueError(f'found {len(filtered_breakpoint_calling_dir)} in {breakpoint_calling_dir} matching filter_sample_id')
+                raise ValueError(
+                    f'found {len(filtered_breakpoint_calling_dir)} in {breakpoint_calling_dir} matching filter_sample_id')
 
             breakpoint_calling_dir = filtered_breakpoint_calling_dir
 
@@ -125,9 +130,20 @@ def load_breakpoint_data(
     else:
         raise ValueError(f'no breakpoints found for directory {results_dir}')
 
-    breakpoint_data = load_breakpoint_annotation_data(breakpoint_calling_dir, annotation_suffix)
-    breakpoint_count_data = load_breakpoint_count_data(breakpoint_calling_dir, count_suffix)
+    annotation_files = scgenome.loaders.utils.get_pseudobulk_files(
+        breakpoint_calling_dir, annotation_suffix)
 
+    breakpoint_data = load_breakpoint_annotation_data(annotation_files)
+
+    count_files = scgenome.loaders.utils.get_pseudobulk_files(
+        breakpoint_calling_dir, count_suffix)
+
+    breakpoint_count_data = load_breakpoint_count_data(count_files)
+
+    return _process_breakpoint_data(breakpoint_data, breakpoint_count_data)
+
+
+def _process_breakpoint_data(breakpoint_data, breakpoint_count_data):
     # TODO: fix upstream
     for col in ('prediction_id', 'position_1', 'position_2', 'read_count'):
         for df in (breakpoint_data, breakpoint_count_data):
@@ -138,5 +154,3 @@ def load_breakpoint_data(
         'breakpoint_data': breakpoint_data,
         'breakpoint_count_data': breakpoint_count_data,
     }
-
-

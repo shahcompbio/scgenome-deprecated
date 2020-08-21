@@ -1,18 +1,16 @@
 import logging
-import yaml
 import os
+
+import numpy as np
 import packaging
 import pandas as pd
-import numpy as np
-
-import scgenome.utils
-import scgenome.loaders.utils
 import scgenome.csvutils
-
+import scgenome.loaders.utils
+import scgenome.utils
+import yaml
 
 default_museq_filter = 0.9
 default_strelka_filter = 20.
-
 
 categorical_columns = [
     'chrom',
@@ -26,7 +24,19 @@ categorical_columns = [
 ]
 
 
-def load_snv_count_data(pseudobulk_dir, suffix, positions, filter_sample_id=None, filter_library_id=None):
+def load_snv_count_data_from_filenames(
+        files, positions, filter_sample_id=None, filter_library_id=None
+):
+    return _process_snv_count_data(
+        scgenome.loaders.utils._prep_filenames_for_loading(files),
+        positions, filter_sample_id=filter_sample_id, filter_library_id=filter_library_id
+    )
+
+
+def load_snv_count_data(
+        pseudobulk_dir, suffix, positions,
+        filter_sample_id=None, filter_library_id=None
+):
     """ Load per cell SNV count data
     
     Args:
@@ -37,14 +47,21 @@ def load_snv_count_data(pseudobulk_dir, suffix, positions, filter_sample_id=None
     Kwargs:
         filter_sample_id (str): restrict to specific sample id
         filter_library_id (str): restrict to specific library id
-    
     Returns:
         pandas.DataFrame: SNV alt and ref counts per cell
     """
-    snv_count_data = []
 
     files = scgenome.loaders.utils.get_pseudobulk_files(
         pseudobulk_dir, suffix)
+
+    return _process_snv_count_data(
+        files, positions, filter_sample_id=filter_sample_id,
+        filter_library_id=filter_library_id
+    )
+
+
+def _process_snv_count_data(files, positions, filter_sample_id=None, filter_library_id=None):
+    snv_count_data = []
 
     for sample_id, library_id, filepath in files:
         logging.info('Loading snv counts from {}'.format(filepath))
@@ -61,7 +78,7 @@ def load_snv_count_data(pseudobulk_dir, suffix, positions, filter_sample_id=None
         csv_input = scgenome.csvutils.CsvInput(filepath)
 
         chunk_iter = csv_input.read_csv(
-            chunksize=10**6,
+            chunksize=10 ** 6,
             dtypes_override={
                 'chrom': 'category',
                 'ref': 'category',
@@ -107,13 +124,14 @@ def load_snv_count_data(pseudobulk_dir, suffix, positions, filter_sample_id=None
 
     snv_count_data = scgenome.utils.concat_with_categories(snv_count_data, ignore_index=True)
 
-    logging.info(f'Loaded all snv counts tables with shape {snv_count_data.shape}, memory {snv_count_data.memory_usage().sum()}')
+    shape = snv_count_data.shape
+    memory = snv_count_data.memory_usage().sum()
+    logging.info(f'Loaded all snv counts tables with shape {shape}, memory {memory}')
 
     return snv_count_data
 
 
-
-def load_snv_annotation_table(pseudobulk_dir, table_name):
+def load_snv_annotation_table(files):
     """ Load SNV annotation data
 
     Args:
@@ -125,11 +143,8 @@ def load_snv_annotation_table(pseudobulk_dir, table_name):
     """
     snv_data = []
 
-    files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, f'snv_{table_name}.csv.gz')
-
     for sample_id, library_id, filepath in files:
-        logging.info(f'Loading snv {table_name} annotations from {filepath}')
+        logging.info(f'Loading from {filepath}')
 
         csv_input = scgenome.csvutils.CsvInput(filepath)
         data = csv_input.read_csv(
@@ -174,8 +189,8 @@ def get_highest_snpeff_effect(snpeff_data):
     ordered_effect_impacts = ['HIGH', 'MODERATE', 'LOW', 'MODIFIER']
 
     ordered_effect_impacts = pd.DataFrame({
-            'effect_impact': ordered_effect_impacts,
-            'effect_impact_rank': range(len(ordered_effect_impacts))})
+        'effect_impact': ordered_effect_impacts,
+        'effect_impact_rank': range(len(ordered_effect_impacts))})
     ordered_effect_impacts['effect_impact'] = (
         ordered_effect_impacts['effect_impact'].astype(snpeff_data['effect_impact'].dtype))
 
@@ -185,12 +200,12 @@ def get_highest_snpeff_effect(snpeff_data):
     index_cols = ['chrom', 'coord', 'ref', 'alt']
     value_cols = ['gene_name', 'effect', 'effect_impact', 'amino_acid_change']
 
-    snpeff_data = (
-        snpeff_data[index_cols + value_cols + ['coding_rank', 'effect_impact_rank']]
-        .sort_values(index_cols + ['coding_rank', 'effect_impact_rank'], ascending=True)
-        .groupby(index_cols, sort=False, observed=True)
-        .nth(0)
-        .reset_index())
+    snpeff_data = (snpeff_data[index_cols + value_cols + ['coding_rank', 'effect_impact_rank']]
+                   .sort_values(index_cols + ['coding_rank', 'effect_impact_rank'], ascending=True)
+                   .groupby(index_cols, sort=False, observed=True)
+                   .nth(0)
+                   .reset_index()
+                   )
 
     snpeff_data = snpeff_data[[
         'chrom', 'coord', 'ref', 'alt',
@@ -200,8 +215,12 @@ def get_highest_snpeff_effect(snpeff_data):
     return snpeff_data
 
 
-def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filter=None):
-    """ Collate snv results into a single table.
+def load_snv_annotation_results_from_filenames(
+        mappability_path, strelka_path, museq_path, cosmic_path,
+        snpeff_path, dbsnp_path, trinuc_path, museq_filter=None,
+        strelka_filter=None
+):
+    """ Collate snv results into a single table from input filenames. path inputs must be lists of file strings. 
     """
 
     if museq_filter is None:
@@ -211,36 +230,52 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
         strelka_filter = default_strelka_filter
 
     logging.info('starting load')
-    mappability = load_snv_annotation_table(pseudobulk_dir, 'mappability')
+
+    mappability = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
+        mappability_path))
     mappability = mappability[mappability['mappability'] > 0.99]
 
-    strelka_results = load_snv_annotation_table(pseudobulk_dir, 'strelka')
+    strelka_results = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
+        strelka_path))
+    strelka_results = strelka_results.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)
+    strelka_results = strelka_results['score'].max().rename('max_strelka_score')
+    strelka_results = strelka_results.reset_index()
 
-    strelka_results = (
-        strelka_results
-        .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
-        .max().rename('max_strelka_score').reset_index())
+    museq_results = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
+        museq_path))
+    museq_results = museq_results.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)
+    museq_results = museq_results['score'].max().rename('max_museq_score')
+    museq_results = museq_results.reset_index()
 
-    museq_results = load_snv_annotation_table(pseudobulk_dir, 'museq')
-    museq_results = (
-        museq_results
-        .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
-        .max().rename('max_museq_score').reset_index())
-
-    cosmic = load_snv_annotation_table(pseudobulk_dir, 'cosmic_status')
+    cosmic = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(cosmic_path))
     logging.info(f'cosmic table with shape {cosmic.shape}, memory {cosmic.memory_usage().sum()}')
     cosmic['is_cosmic'] = 1
     cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
 
-    snpeff = load_snv_annotation_table(pseudobulk_dir, 'snpeff')
+    snpeff = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(snpeff_path))
+
     snpeff = get_highest_snpeff_effect(snpeff)
     logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
 
-    dbsnp = load_snv_annotation_table(pseudobulk_dir, 'dbsnp_status')
+    dbsnp = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(dbsnp_path))
     dbsnp = dbsnp[['chrom', 'coord', 'ref', 'alt', 'exact_match']].rename(columns={'exact_match': 'is_dbsnp'})
     logging.info(f'dbsnp table with shape {dbsnp.shape}, memory {dbsnp.memory_usage().sum()}')
 
-    tnc = load_snv_annotation_table(pseudobulk_dir, 'trinuc')
+    tnc = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(trinuc_path))
+
+    return _concat_annotation_results(
+        mappability, cosmic, snpeff, dbsnp, tnc, strelka_results,
+        museq_results, museq_filter=museq_filter, strelka_filter=strelka_filter
+    )
+
+
+def _concat_annotation_results(
+        mappability, cosmic, snpeff, dbsnp, tnc, strelka_results, museq_results,
+        museq_filter=None, strelka_filter=None
+):
+    '''
+    private function to concatenate and filter snv annotation data
+    '''
 
     scgenome.utils.union_categories([
         mappability,
@@ -286,7 +321,8 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
 
     if strelka_filter != -np.inf:
         data = data[data['max_strelka_score'] > strelka_filter]
-        logging.info('post strelka filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
+        logging.info(
+            'post strelka filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
         logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
     logging.info('finishing load with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
@@ -300,6 +336,126 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     return data
 
 
+def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filter=None):
+    """ Collate snv results into a single table.
+    """
+
+    if museq_filter is None:
+        museq_filter = default_museq_filter
+
+    if strelka_filter is None:
+        strelka_filter = default_strelka_filter
+
+    logging.info('starting load')
+
+    mappability_files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, 'snv_mappability.csv.gz'
+    )
+    mappability = load_snv_annotation_table(mappability_files)
+    mappability = mappability[mappability['mappability'] > 0.99]
+
+    strelka_files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, 'snv_strelka.csv.gz'
+    )
+    strelka_results = load_snv_annotation_table(strelka_files)
+
+    strelka_results = (
+        strelka_results
+            .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
+            .max().rename('max_strelka_score').reset_index())
+
+    museq_files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, 'snv_museq.csv.gz'
+    )
+    museq_results = load_snv_annotation_table(museq_files)
+    museq_results = (
+        museq_results
+            .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
+            .max().rename('max_museq_score').reset_index())
+
+    cosmic_files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, 'snv_cosmic_status.csv.gz'
+    )
+    cosmic = load_snv_annotation_table(cosmic_files)
+    logging.info(f'cosmic table with shape {cosmic.shape}, memory {cosmic.memory_usage().sum()}')
+    cosmic['is_cosmic'] = 1
+    cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
+
+    snpeff_files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, 'snv_snpeff.csv.gz'
+    )
+
+    snpeff = load_snv_annotation_table(snpeff_files)
+
+    snpeff = get_highest_snpeff_effect(snpeff)
+    logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
+
+    dbsnp_files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, 'snv_dbsnp_status.csv.gz'
+    )
+    dbsnp = load_snv_annotation_table(dbsnp_files)
+    dbsnp = dbsnp[['chrom', 'coord', 'ref', 'alt', 'exact_match']].rename(columns={'exact_match': 'is_dbsnp'})
+    logging.info(f'dbsnp table with shape {dbsnp.shape}, memory {dbsnp.memory_usage().sum()}')
+
+    trinuc_files = scgenome.loaders.utils.get_pseudobulk_files(
+        pseudobulk_dir, 'snv_trinuc.csv.gz'
+    )
+    tnc = load_snv_annotation_table(trinuc_files)
+
+    return _concat_annotation_results(mappability, cosmic, snpeff, dbsnp, tnc, strelka_results, museq_results,
+                                      museq_filter=museq_filter, strelka_filter=strelka_filter
+                                      )
+
+
+def load_snv_data_from_files(
+        mappability_path,
+        strelka_path,
+        museq_path,
+        cosmic_path,
+        snpeff_path,
+        dbsnp_path,
+        trinuc_path,
+        counts_path,
+        museq_filter=None,
+        strelka_filter=None,
+        positions=None,
+        filter_sample_id=None,
+        filter_library_id=None,
+        snv_annotation=False,
+        snv_counts=False
+):
+    """ Load filtered SNV annotation and count data
+    """
+
+    outputs = {}
+
+    if snv_annotation:
+        snv_data = load_snv_annotation_results_from_filenames(
+            mappability_path, strelka_path, museq_path, cosmic_path, snpeff_path, dbsnp_path, trinuc_path,
+            museq_filter=museq_filter, strelka_filter=strelka_filter
+        )
+
+        assert not snv_data['coord'].isnull().any()
+
+        outputs["snv_data"] = snv_data
+
+    if snv_counts:
+        assert positions is not None
+
+        snv_count_data = load_snv_count_data_from_filenames(
+            counts_path,
+            positions,
+            filter_sample_id=filter_sample_id,
+            filter_library_id=filter_library_id)
+
+        snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
+        snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
+
+        outputs["snv_count_data"] = snv_count_data
+
+    return outputs
+
+
 def load_snv_data(
         results_dir,
         museq_filter=None,
@@ -307,18 +463,19 @@ def load_snv_data(
         positions=None,
         filter_sample_id=None,
         filter_library_id=None,
-    ):
+):
     """ Load filtered SNV annotation and count data
     
     Args:
         results_dir (str): results directory to load from.
-        museq_score_threshold (float, optional): mutationseq score threshold. Defaults to None.
-        strelka_score_threshold (float, optional): strelka score threshold. Defaults to None.
 
     Kwargs:
         filter_sample_id (str): restrict to specific sample id
         filter_library_id (str): restrict to specific library id
-
+        museq_filter (float, optional): mutationseq score threshold. Defaults to None.
+        strelka_filter (float, optional): strelka score threshold. Defaults to None.
+        positions:  #TODO 
+        
     Returns:
         pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
     """
@@ -356,10 +513,12 @@ def load_snv_data(
             if filter_sample_id is None:
                 raise ValueError(f'found {len(variant_calling_dir)} without filter_sample_id')
 
-            filtered_variant_calling_dir = list(filter(lambda a: f'sample_{filter_sample_id}' in a, variant_calling_dir))
+            filtered_variant_calling_dir = list(
+                filter(lambda a: f'sample_{filter_sample_id}' in a, variant_calling_dir))
 
             if len(filtered_variant_calling_dir) != 1:
-                raise ValueError(f'found {len(filtered_variant_calling_dir)} in {variant_calling_dir} matching filter_sample_id')
+                raise ValueError(
+                    f'found {len(filtered_variant_calling_dir)} in {variant_calling_dir} matching filter_sample_id')
 
             variant_calling_dir = filtered_variant_calling_dir
 
@@ -408,4 +567,3 @@ def load_snv_data(
 
     else:
         raise ValueError(f'no variant calling found for directory {results_dir}')
-
