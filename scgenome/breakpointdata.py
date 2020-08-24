@@ -40,8 +40,7 @@ def annotate_breakpoint_data(breakpoint_data, breakpoint_count_data, is_lumpy=Fa
             .query('{} > 0'.format(evidence_count_colname))
             .drop_duplicates(index_cols + ['cell_id'])
             .groupby(index_cols).size().rename('num_cells')
-            .reset_index()
-        )
+            .reset_index())
 
         breakpoint_data = breakpoint_data.merge(cell_counts, how='left')
         # TODO: figure out why there are extra brkps in lumpy not in evidence
@@ -147,8 +146,7 @@ def plot_library_portrait(breakpoint_data, figures_prefix=None):
     plot_data = (
         breakpoint_data
         .groupby(['library_id', 'rearrangement_type'])
-        .size().rename('count').reset_index()
-    )
+        .size().rename('count').reset_index())
     seaborn.barplot(
         ax=ax, data=plot_data,
         x='library_id', y='count', hue='rearrangement_type',
@@ -215,7 +213,7 @@ def plot_breakpoint_clustering(breakpoint_data, breakpoint_count_data, clusters,
     plot_data = breakpoint_count_data.merge(clusters)
     plot_data = (
         plot_data.groupby(bp_index_cols + ['cluster_id'])[['read_count']]
-            .sum().unstack(fill_value=None).stack().reset_index())
+        .sum().unstack(fill_value=None).stack().reset_index())
 
     g = seaborn.factorplot(y='read_count', x='cluster_id', kind='box', data=plot_data, color='0.75', size=4)
     if figures_prefix is not None:
