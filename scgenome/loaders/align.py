@@ -2,9 +2,9 @@ import os
 from collections import defaultdict
 
 import pandas as pd
+import scgenome.csvutils
 import scgenome.loaders.utils
 import scgenome.utils
-import scgenome.csvutils
 import yaml
 
 _categorical_cols = [
@@ -39,6 +39,19 @@ table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
     'v0.3.0': _table_suffixes_v0_2_25,
     'v0.3.1': _table_suffixes_v0_2_25,
 })
+
+
+def load_align_data_from_files(align_metrics, gc_metrics=None):
+    results_tables = dict()
+
+    results_tables["align_metrics"] = process_alignment_data(align_metrics, "align_metrics")
+
+    if gc_metrics:
+        results_tables["gc_metrics"] = process_alignment_data(gc_metrics, "gc_metrics")
+
+    scgenome.utils.union_categories(results_tables.values())
+
+    return results_tables
 
 
 def load_align_data(
@@ -84,31 +97,35 @@ def load_align_data(
 
         filepath = os.path.join(align_results_dir, filename)
 
-        csv_input = scgenome.csvutils.CsvInput(filepath)
-
-        dtypes_override = None
-        if table_name == 'align_metrics':
-            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-            dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
-            dtypes_override = yaml.load(open(dtypes_filename))
-            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-        elif table_name == 'gc_metrics':
-            dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-            dtypes_filename = os.path.join(dtypes_directory, 'alignment_gc_metrics_defs.yaml')
-            dtypes_override = yaml.load(open(dtypes_filename))
-            dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-
-        data = csv_input.read_csv(dtypes_override=dtypes_override)
-
-        data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
-        data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
-
-        for col in _categorical_cols:
-            if col in data:
-                data[col] = pd.Categorical(data[col])
-
-        results_tables[table_name] = data
+        results_tables[table_name] = process_alignment_data(filepath, table_name)
 
     scgenome.utils.union_categories(results_tables.values())
 
     return results_tables
+
+
+def process_alignment_data(filepath, table_name):
+    csv_input = scgenome.csvutils.CsvInput(filepath)
+
+    dtypes_override = None
+    if table_name == 'align_metrics':
+        dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
+        dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
+        dtypes_override = yaml.load(open(dtypes_filename))
+        dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
+    elif table_name == 'gc_metrics':
+        dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
+        dtypes_filename = os.path.join(dtypes_directory, 'alignment_gc_metrics_defs.yaml')
+        dtypes_override = yaml.load(open(dtypes_filename))
+        dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
+
+    data = csv_input.read_csv(dtypes_override=dtypes_override)
+
+    data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
+    data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
+
+    for col in _categorical_cols:
+        if col in data:
+            data[col] = pd.Categorical(data[col])
+
+    return data

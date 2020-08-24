@@ -1,11 +1,14 @@
 import os
-import yaml
-import pandas as pd
 
+import pandas as pd
 import scgenome.loaders.utils
+import yaml
 from scgenome.loaders.align import load_align_data
-from scgenome.loaders.hmmcopy import load_hmmcopy_data
+from scgenome.loaders.align import load_align_data_from_files
 from scgenome.loaders.annotation import load_annotation_data
+from scgenome.loaders.annotation import load_annotation_data_from_file
+from scgenome.loaders.hmmcopy import load_hmmcopy_data
+from scgenome.loaders.hmmcopy import load_hmmcopy_data_from_filename
 
 
 def _calculate_annotation_metrics(results_tables):
@@ -67,11 +70,42 @@ def load_cell_state_prediction(results_dir):
     return data
 
 
+def load_qc_data_from_files(
+        hmmcopy_reads, hmmcopy_segs,
+        hmmcopy_metrics, alignment_metrics, gc_metrics,
+        annotation_metrics=None, sample_id=None,
+        additional_hmmcopy_reads_cols=None,
+):
+    results_tables = load_align_data_from_files(
+        alignment_metrics,
+        gc_metrics=gc_metrics
+    )
+
+    hmmcopy_results_tables = load_hmmcopy_data_from_filename(
+        hmmcopy_reads,
+        hmmcopy_segs, hmmcopy_metrics,
+        additional_reads_cols=additional_hmmcopy_reads_cols
+    )
+    results_tables.update(hmmcopy_results_tables)
+
+    if annotation_metrics:
+        annotation_results_tables = load_annotation_data_from_file(annotation_metrics)
+    else:
+        annotation_results_tables = _calculate_annotation_metrics(results_tables)
+    results_tables.update(annotation_results_tables)
+
+    if sample_id is not None:
+        results_tables = _sample_id_filter(results_tables, sample_id)
+
+    scgenome.utils.union_categories(results_tables.values())
+    return results_tables
+
+
 def load_qc_data(
         results_dir,
         sample_ids=None,
         additional_hmmcopy_reads_cols=None,
-    ):
+):
     """ Load qc data (align, hmmcopy, annotation)
     
     Args:
@@ -114,18 +148,23 @@ def load_qc_data(
         if 'cell_state_prediction' not in ticket_results_dirs:
             raise ValueError(f'no cell state predictions found in {results_dir}')
         if len(ticket_results_dirs['cell_state_prediction']) != 1:
-            raise ValueError(f"found {len(ticket_results_dirs['cell_state_prediction'])} directories with cell_state_prediction results")
+            num_dirs = len(ticket_results_dirs['cell_state_prediction'])
+            raise ValueError(f"found {num_dirs} directories with cell_state_prediction results")
         cell_state = load_cell_state_prediction(ticket_results_dirs['cell_state_prediction'][0])
         results_tables['annotation_metrics'] = results_tables['annotation_metrics'].merge(
             cell_state[['cell_id', 'is_s_phase', 'is_s_phase_prob']].drop_duplicates())
 
-    # Optionally select specific samples
     if sample_ids is not None:
-        for table_name, table_data in results_tables.items():
-            results_tables[table_name] = table_data[table_data['sample_id'].isin(sample_ids)]
+        results_tables = _sample_id_filter(results_tables, sample_ids)
 
     scgenome.utils.union_categories(results_tables.values())
 
     return results_tables
 
 
+def _sample_id_filter(results_tables, sample_ids):
+    # Optionally select specific samples
+    for table_name, table_data in results_tables.items():
+        results_tables[table_name] = table_data[table_data['sample_id'].isin(sample_ids)]
+
+    return results_tables

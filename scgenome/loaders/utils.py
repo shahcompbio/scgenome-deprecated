@@ -1,7 +1,8 @@
-import os
-import yaml
 import collections
+import os
+
 import packaging.version
+import yaml
 
 
 def find_filenames(filenames, suffix):
@@ -54,6 +55,11 @@ def get_version(results_dir):
     return manifest['meta']['version']
 
 
+def _prep_filenames_for_loading(files):
+    for f in files:
+        yield None, None, f
+
+
 def get_pseudobulk_files(results_dir, suffix):
     """ Get files for libraries and samples by suffix
     
@@ -99,11 +105,10 @@ def _get_pseudobulk_files_v_lt_050(results_dir, suffix):
         sample_lib_filenames = list(filter(lambda a: a.endswith(sample_lib_suffix), filenames))
 
         if len(sample_lib_filenames) != 1:
-            raise ValueError(f'found {len(sample_lib_filenames)} {suffix} files for {sample_id}, {library_id}, {results_dir}')
+            raise ValueError(
+                f'found {len(sample_lib_filenames)} {suffix} files for {sample_id}, {library_id}, {results_dir}')
 
         sample_lib_filename = sample_lib_filenames[0]
         sample_lib_filepath = os.path.join(results_dir, sample_lib_filename)
 
         yield sample_id, library_id, sample_lib_filepath
-
-
