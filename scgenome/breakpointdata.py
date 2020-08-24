@@ -60,7 +60,7 @@ def filter_breakpoint_data(
         template_length_min_threshold=250,
         num_cells_threshold=2,
         num_unique_reads_threshold=2,
-        lumpy=False
+        lumpy=False,
     ):
     """ Filter breakpoint data and breakpoint counts
     """
