@@ -61,7 +61,7 @@ def filter_breakpoint_data(
         num_cells_threshold=2,
         num_unique_reads_threshold=2,
         lumpy=False
-):
+    ):
     """ Filter breakpoint data and breakpoint counts
     """
     index_cols = get_index_cols(is_lumpy=lumpy)
