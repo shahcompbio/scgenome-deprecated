@@ -15,7 +15,7 @@ def cache_qc_results(
         local_cache_directory,
         full_dataset=False,
         results_storage_name='singlecellresults',
-):
+    ):
     tantalus_api = dbclients.tantalus.TantalusApi()
 
     ticket_results = tantalus_api.list('results', analysis__jira_ticket=ticket_id)
@@ -62,7 +62,7 @@ def get_qc_data(
         sample_ids=None,
         additional_hmmcopy_reads_cols=None,
         do_caching=False,
-):
+    ):
     results_tables = {}
 
     for ticket_id in ticket_ids:
