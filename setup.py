@@ -6,9 +6,6 @@ setup(name='scgenome',
       author='Shah Lab',
       url='https://www.shahlab.ca/',
       packages=find_packages(),
-      install_requires=[
-          'click', 'numpy', 'matplotlib', 'pandas', 'adjusttext'
-      ],
       entry_points={
         'console_scripts': [
             'cluster_cells = scgenome.scripts.cluster_cells:main',
