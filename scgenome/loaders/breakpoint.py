@@ -4,6 +4,42 @@ import scgenome.loaders.utils
 import scgenome.utils
 
 
+lumpy_to_destruct_breakpoint_labels = {'INV': 'inversion',
+    'DEL': 'deletion',
+    'DUP': 'duplication',
+    'INS': 'insertion',
+    'CNV': 'CNV',
+    'DUP:TANDEM': 'tandem_duplication',
+    'BND': 'BND'}
+
+
+def label_rearrangement(row):
+    breakpoint_label = row.type
+    chrom1 = row.chrom1
+    chrom2 = row.chrom2
+    break_distance = row.start2 - row.start1
+    
+    rearrangement_type = breakpoint_label
+
+    if breakpoint_label == "BND":
+        if chrom1 == chrom2:
+            rearrangement_type = "inversion"
+        else:
+            rearrangement_type = "translocation"
+    if breakpoint_label == "inversion" or rearrangement_type == "inversion":
+        if chrom1 == chrom2:
+            if break_distance < 20000:
+                rearrangement_type = "foldback"
+    return rearrangement_type
+
+
+def load_lumpy_breakpoints_and_rearrangements(lumpy_data):
+    
+    lumpy_data["type"] =  lumpy_data.type.replace(lumpy_to_destruct_breakpoint_labels)
+    lumpy_data["rearrangement_type"] = lumpy_data.apply(lambda row: label_rearrangement(row), axis=1)
+    return lumpy_data
+
+
 def load_breakpoint_annotation_data(files, is_lumpy=False):
     """ Load breakpoint data from a pseudobulk run.
 
@@ -24,6 +60,9 @@ def load_breakpoint_annotation_data(files, is_lumpy=False):
     for sample_id, library_id, filepath in files:
         csv_input = scgenome.csvutils.CsvInput(filepath)
         data = csv_input.read_csv()
+        if is_lumpy:
+            data = load_lumpy_breakpoints_and_rearrangements(data)
+
 
         data[chrom_1_colname] = data[chrom_1_colname].astype(str)
         data[chrom_2_colname] = data[chrom_2_colname].astype(str)
