@@ -44,7 +44,7 @@ def annotate_breakpoint_data(breakpoint_data, breakpoint_count_data, is_lumpy=Fa
 
         breakpoint_data = breakpoint_data.merge(cell_counts, how='left')
         
-	assert not breakpoint_data['num_cells'].isnull().any()
+        assert not breakpoint_data['num_cells'].isnull().any()
 
     else:
         breakpoint_data['num_cells'] = 0
