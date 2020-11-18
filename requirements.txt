@@ -149,7 +149,7 @@ msrest==0.6.6
 msrestazure==0.6.2
 nbconvert==5.4.0
 nbformat==4.4.0
-notebook==5.7.0
+notebook==6.1.5
 numba==0.50.1
 numpy==1.19.0
 oauthlib==3.0.1
