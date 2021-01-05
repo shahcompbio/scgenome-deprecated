@@ -6,8 +6,8 @@ import dbclients.tantalus
 import scgenome.loaders.align
 import scgenome.loaders.hmmcopy
 import scgenome.loaders.qc
-from scgenome.db.loaders.qc_from_files import _aggregate_results_tables
-from scgenome.db.loaders.qc_from_files import _concat_results_tables
+from scgenome.db.qc_from_files import _aggregate_results_tables
+from scgenome.db.qc_from_files import _concat_results_tables
 
 
 def cache_qc_results(
