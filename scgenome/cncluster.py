@@ -190,7 +190,7 @@ def plot_umap_clusters(ax, df):
         ax.scatter(
             df_noise['umap1'].values,
             df_noise['umap2'].values,
-            c=color_map[-1],
+            color=color_map[-1],
             s=2,
             label=labels[-1],
         )
@@ -200,7 +200,7 @@ def plot_umap_clusters(ax, df):
         ax.scatter(
             cluster_df['umap1'].values,
             cluster_df['umap2'].values,
-            c=color_map[cluster_id],
+            color=color_map[cluster_id],
             s=2,
             label=labels[int(cluster_id)],
         )

@@ -52,7 +52,7 @@ def calculate_umap_hdbscan_clones(cn_data, metrics_data, results_prefix=None):
     return clusters
 
 
-def calculate_kmeans_clones(cn_data, metrics_data, results_prefix=None):
+def calculate_kmeans_clones(cn_data, metrics_data, results_prefix=None, min_k=2, max_k=100):
     """ Cluster copy number data.
     """
     logging.info('creating copy number matrix')
@@ -63,7 +63,7 @@ def calculate_kmeans_clones(cn_data, metrics_data, results_prefix=None):
     )
 
     logging.info('clustering copy number')
-    clusters = scgenome.cncluster.kmeans_cluster(cn)
+    clusters = scgenome.cncluster.kmeans_cluster(cn, min_k=min_k, max_k=max_k)
 
     embedding = umap.UMAP(
         n_neighbors=15,
@@ -323,6 +323,8 @@ def plot_clones(cn_data, cluster_col, plots_prefix=None):
     plot_data.loc[plot_data['copy'] > 5, 'copy'] = 5.
     plot_data.loc[plot_data['copy'] < 0, 'copy'] = 0.
 
+    logging.info('Plotting cluster cn matrix')
+
     num_clusters = len(cn_data[cluster_col].unique())
     fig = plt.figure(figsize=(15, num_clusters/8))
     scgenome.cnplot.plot_cluster_cn_matrix(
@@ -330,11 +332,15 @@ def plot_clones(cn_data, cluster_col, plots_prefix=None):
     if plots_prefix is not None:
         fig.savefig(plots_prefix + 'clone_cn.pdf', bbox_inches='tight')
 
+    logging.info('Plotting cell cn matrix')
+
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
         fig, plot_data, 'copy', cluster_field_name=cluster_col, raw=True)
     if plots_prefix is not None:
         fig.savefig(plots_prefix + 'raw_cn.pdf', bbox_inches='tight')
+
+    logging.info('Plotting cell cn matrix figure')
 
     fig = plt.figure(figsize=(20, 30))
     matrix_data = scgenome.cnplot.plot_clustered_cell_cn_matrix_figure(
@@ -342,13 +348,17 @@ def plot_clones(cn_data, cluster_col, plots_prefix=None):
     if plots_prefix is not None:
         fig.savefig(plots_prefix + 'cn_state.pdf', bbox_inches='tight')
 
+    logging.info('Generating clone data')
+
     clone_cn_data = (
         cn_data
-            .groupby(['chr', 'start', 'end', 'cluster_id'])
+            .groupby(['chr', 'start', 'end', 'cluster_id'], observed=True)
             .agg({'copy': np.mean, 'state': np.median})
             .reset_index()
     )
     clone_cn_data['state'] = clone_cn_data['state'].astype(float).round().astype(int)
+
+    logging.info('Plotting clone data')
 
     num_clusters = len(clone_cn_data['cluster_id'].unique())
     fig = plt.figure(figsize=(20, 4 * num_clusters))

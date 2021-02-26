@@ -278,7 +278,7 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='clus
     chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
 
     ax = fig.add_axes([0.125,1.,0.875,1.])
-    im = ax.imshow(plot_data.T, aspect='auto', cmap=get_cn_cmap(plot_data.values))
+    im = ax.imshow(plot_data.T, aspect='auto', cmap=get_cn_cmap(plot_data.values), interpolation='none')
 
     ax.set(xticks=chrom_mids)
     ax.set(xticklabels=utils.chrom_names)
