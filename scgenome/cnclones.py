@@ -52,7 +52,7 @@ def calculate_umap_hdbscan_clones(cn_data, metrics_data, results_prefix=None):
     return clusters
 
 
-def calculate_kmeans_clones(cn_data, metrics_data, results_prefix=None, min_k=2, max_k=100):
+def calculate_kmeans_clones(cn_data, metrics_data, results_prefix=None, min_k=2, max_k=100, min_cluster_size=None):
     """ Cluster copy number data.
     """
     logging.info('creating copy number matrix')
@@ -64,6 +64,10 @@ def calculate_kmeans_clones(cn_data, metrics_data, results_prefix=None, min_k=2,
 
     logging.info('clustering copy number')
     clusters = scgenome.cncluster.kmeans_cluster(cn, min_k=min_k, max_k=max_k)
+    clusters = clusters.merge(clusters.groupby('cluster_id').size().rename('cluster_size').reset_index())
+
+    if min_cluster_size is not None:
+        clusters = clusters.query(f"cluster_size >= {min_cluster_size}")
 
     embedding = umap.UMAP(
         n_neighbors=15,

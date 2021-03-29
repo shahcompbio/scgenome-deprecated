@@ -39,8 +39,11 @@ def filter_snv_data(
         .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True).size().rename('num_cells')
         .reset_index())
 
-    fig = plt.figure(figsize=(4, 4))
+    fig = plt.figure(figsize=(10, 4))
     cell_counts['num_cells'].astype(float).hist(bins=50)
+    plt.xlabel('Num. Cells')
+    plt.ylabel('Log Num SNVs')
+    plt.gca().set_yscale('log')
     if figures_prefix is not None:
         fig.savefig(figures_prefix + 'snv_cell_counts.pdf', bbox_inches='tight')
 
@@ -57,8 +60,11 @@ def filter_snv_data(
         .sum().rename('sum_alt_counts')
         .reset_index())
 
-    fig = plt.figure(figsize=(4, 4))
+    fig = plt.figure(figsize=(10, 4))
     sum_alt_counts['sum_alt_counts'].astype(float).hist(bins=50)
+    plt.xlabel('Total Alt. Counts')
+    plt.ylabel('Log Num SNVs')
+    plt.gca().set_yscale('log')
     if figures_prefix is not None:
         fig.savefig(figures_prefix + 'snv_alt_counts.pdf', bbox_inches='tight')
 
@@ -83,7 +89,7 @@ def filter_snv_data(
     return snv_data, snv_count_data
 
 
-def plot_mutation_signatures(snv_data, snv_class_col, results_prefix):
+def plot_mutation_signatures(snv_data, snv_class_col, figures_prefix=None):
     """
     Infer mutation signature probabilities and plot.
     """
@@ -106,18 +112,18 @@ def plot_mutation_signatures(snv_data, snv_class_col, results_prefix):
 
     fig = wgs_analysis.snvs.mutsig.plot_signature_heatmap(sample_sig)
     seaborn.despine(trim=True)
-    if results_prefix is not None:
-        fig.savefig(results_prefix + f'_{snv_class_col}_mutsig.pdf', bbox_inches='tight')
+    if figures_prefix is not None:
+        fig.savefig(figures_prefix + f'_{snv_class_col}_mutsig.pdf', bbox_inches='tight')
 
     fig = plt.figure(figsize=(4, 4))
     if len(sample_sig.index) > 0:
         sample_sig.loc['All', :].sort_values().iloc[-10:,].plot(kind='bar')
     seaborn.despine(trim=True)
-    if results_prefix is not None:
-        fig.savefig(results_prefix + f'_{snv_class_col}_top10_mutsig.pdf', bbox_inches='tight')
+    if figures_prefix is not None:
+        fig.savefig(figures_prefix + f'_{snv_class_col}_top10_mutsig.pdf', bbox_inches='tight')
 
 
-def run_mutation_signature_analysis(snv_data, results_prefix):
+def run_mutation_signature_analysis(snv_data, figures_prefix=None):
     """
     Run a mutation signature analysis
     """
@@ -129,13 +135,13 @@ def run_mutation_signature_analysis(snv_data, results_prefix):
     snv_data.loc[snv_data['num_cells'] > 5, 'num_cells_class'] = '6-20'
     snv_data.loc[snv_data['num_cells'] > 20, 'num_cells_class'] = '>20'
 
-    plot_mutation_signatures(snv_data, 'num_cells_class', results_prefix)
+    plot_mutation_signatures(snv_data, 'num_cells_class', figures_prefix=figures_prefix)
 
     # Adjacent distance class signatures
     snv_data['adjacent_distance_class'] = 'standard'
     snv_data.loc[snv_data['adjacent_distance'] <= 10000, 'adjacent_distance_class'] = 'hypermutated'
 
-    plot_mutation_signatures(snv_data, 'adjacent_distance_class', results_prefix)
+    plot_mutation_signatures(snv_data, 'adjacent_distance_class', figures_prefix=figures_prefix)
 
 
 def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_prefix=None):
@@ -146,13 +152,7 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
         total_alt_counts.query('alt_counts > 0')[['chrom', 'coord', 'ref', 'alt']].drop_duplicates())
 
     # Write high impact SNVs to a csv table
-    high_impact = (snv_data.query('effect_impact == "HIGH"')
-        [[
-            'chrom', 'coord', 'ref', 'alt',
-            'gene_name', 'effect', 'effect_impact',
-            'is_cosmic', 'max_museq_score', 'max_strelka_score',
-        ]]
-        .drop_duplicates())
+    high_impact = snv_data.query('effect_impact == "HIGH"')
     high_impact = high_impact.merge(
         snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['alt_counts'].sum().reset_index())
     high_impact = high_impact.merge(
@@ -161,8 +161,6 @@ def run_bulk_snv_analysis(snv_data, snv_count_data, filtered_cell_ids, results_p
         snv_count_data.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['total_counts'].sum().reset_index())
     if results_prefix is not None:
         high_impact.to_csv(results_prefix + 'snvs_high_impact.csv')
-    else:
-        print(high_impact)
 
     # Annotate adjacent distance
     snv_data = wgs_analysis.annotation.position.annotate_adjacent_distance(snv_data)

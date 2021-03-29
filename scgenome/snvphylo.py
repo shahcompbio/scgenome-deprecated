@@ -65,7 +65,7 @@ def snv_hierarchical_clustering_figure(snv_data, clusters):
     snv_matrix['total_counts'] = snv_matrix['ref_counts'] + snv_matrix['alt_counts']
 
     snv_matrix['vaf'] = snv_matrix['alt_counts'] / snv_matrix['total_counts']
-    snv_matrix['alt_counts'] = snv_matrix['alt_counts'].clip_upper(10)
+    snv_matrix['alt_counts'] = snv_matrix['alt_counts'].clip(upper=10)
     snv_matrix['is_present'] = (snv_matrix['alt_counts'] > 0) * 1
     snv_matrix['is_absent'] = (snv_matrix['alt_counts'] == 0) * 1
     snv_matrix['is_het'] = (snv_matrix['alt_counts'] < 0.99 * snv_matrix['total_counts']) * snv_matrix['is_present']
