@@ -109,7 +109,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
     return plot_data
 
 
-def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_cn=13, chromosome=None, s=5):
+def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_cn=13, chromosome=None, s=5, squashy=False):
     """ Plot copy number profile on a genome axis
 
     Args:
@@ -136,6 +136,11 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
     plot_data['start'] = plot_data['start'] + plot_data['chromosome_start']
     plot_data['end'] = plot_data['end'] + plot_data['chromosome_start']
 
+    squash_coeff = 0.15
+    squash_f = lambda a: np.tanh(squash_coeff * a)
+    if squashy:
+        plot_data[value_field_name] = squash_f(plot_data[value_field_name])
+
     if cn_field_name is not None:
         ax.scatter(
             plot_data['start'], plot_data[value_field_name],
@@ -151,7 +156,7 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
         chromosome_length = refgenome.info.chromosome_info.set_index('chr').loc[chromosome, 'chromosome_length']
         chromosome_start = refgenome.info.chromosome_info.set_index('chr').loc[chromosome, 'chromosome_start']
         chromosome_end = refgenome.info.chromosome_info.set_index('chr').loc[chromosome, 'chromosome_end']
-        xticks = np.arange(0, chromosome_length, 1e7)
+        xticks = np.arange(0, chromosome_length, 2e7)
         xticklabels = ['{0:d}M'.format(int(x / 1e6)) for x in xticks]
         xminorticks = np.arange(0, chromosome_length, 1e6)
         ax.set_xlabel(f'chromosome {chromosome}')
@@ -171,10 +176,19 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
         ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_mid))
         ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.chromosomes))
 
-    if cn_field_name is not None:
-        ax.set_ylim((-0.5, max_cn))
-        ax.set_yticks(np.arange(0, max_cn, 2))
-    
+    if squashy:
+        yticks = np.array([0, 2, 4, 7, 20])
+        yticks_squashed = squash_f(yticks)
+        ytick_labels = [str(a) for a in yticks]
+        ax.set_yticks(yticks_squashed)
+        ax.set_yticklabels(ytick_labels)
+        ax.set_ylim((-0.01, 1.01))
+        ax.spines['left'].set_bounds(0, 1)
+    else:
+        ax.set_ylim((-0.05*maxcopies, maxcopies))
+        ax.set_yticks(range(0, int(maxcopies) + 1))
+        ax.spines['left'].set_bounds(0, maxcopies)
+
     if chromosome is not None:
         seaborn.despine(ax=ax, offset=10, trim=False)
     else:
