@@ -60,6 +60,40 @@ def _prep_filenames_for_loading(files):
         yield None, None, f
 
 
+def find_results_filepath(results_dir, filename_suffix, analysis_type=None):
+    """ Get filepaths for libraries and samples by suffix
+    
+    Args:
+        results_dir (str): pseudobulk results directory
+        filename_suffix (str): suffix of requested files
+
+    KwArgs:
+        analysis_type (str): check analysis type
+
+    Returns:
+        str: filepath
+    """
+
+    manifest_filename = os.path.join(results_dir, 'metadata.yaml')
+    manifest = yaml.load(open(manifest_filename))
+
+    if analysis_type is not None and manifest['meta']['type'] != analysis_type:
+        raise Exception(f"expected analysis {analysis_type} and found {manifest['meta']['type']}")
+
+    if packaging.version.parse(manifest['meta']['version']) < packaging.version.parse('v0.5.0'):
+        raise Exception(f"unsupoorted version {manifest['meta']['version']}")
+
+    filenames = list(filter(lambda a: a.endswith(filename_suffix), manifest['filenames']))
+
+    if len(filenames) != 1:
+        raise Exception(f'found {len(filenames)} {filename_suffix} files for {results_dir}: {filenames}')
+
+    filename = filenames[0]
+    filepath = os.path.join(results_dir, filename)
+
+    return filepath
+
+
 def get_pseudobulk_files(results_dir, suffix):
     """ Get files for libraries and samples by suffix
     
