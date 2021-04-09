@@ -72,6 +72,8 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [plot_data.shape[0] - 1])
     chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
     chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
+    ordered_mat_chrom_idxs = mat_chrom_idxs[np.where(np.array([1] + list(np.diff(mat_chrom_idxs))) != 0)]
+    chrom_names = np.array(utils.chrom_names)[ordered_mat_chrom_idxs]
 
     mat_cluster_ids = plot_data.columns.get_level_values(1).values
     cluster_boundaries = np.array([0] + list(np.where(mat_cluster_ids[1:] != mat_cluster_ids[:-1])[0]) + [plot_data.shape[1] - 1])
@@ -85,7 +87,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     im = ax.imshow(plot_data.astype(float).T, aspect='auto', cmap=cmap)
 
     ax.set(xticks=chrom_mids)
-    ax.set(xticklabels=utils.chrom_names)
+    ax.set(xticklabels=chrom_names)
 
     for val in chrom_boundaries[:-1]:
         ax.axvline(x=val, linewidth=1, color='black', zorder=100)
