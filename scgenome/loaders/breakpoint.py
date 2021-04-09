@@ -87,7 +87,7 @@ def load_lumpy(lumpy_filepath, standardize_columns=False):
 
     Args:
         lumpy_filepath(str): results filepath
-        
+
     KwArgs:
         standardize_columns(bool): rename columns to be similar to destruct
     """
@@ -95,6 +95,11 @@ def load_lumpy(lumpy_filepath, standardize_columns=False):
     csv_input = scgenome.csvutils.CsvInput(lumpy_filepath)
     data = csv_input.read_csv()
 
+    count_cols = ['normal_PE', 'tumour_SR', 'normal_SR', 'tumour_PE']
+    data[count_cols] = data[count_cols].fillna(0).astype(int)
+
+    data = data[(data['normal_PE'] == 0) & (data['normal_SR'] == 0)]
+    
     data['chrom1'] = data['chrom1'].astype(str)
     data['chrom2'] = data['chrom2'].astype(str)
 
@@ -119,7 +124,7 @@ def load_lumpy(lumpy_filepath, standardize_columns=False):
         # Note: its unclear whether lumpy uses 0-based or 1-based coordinates
         data['position_1'] = data[['confidence_interval_start1', 'confidence_interval_end1']].mean(axis=1)
         data['position_2'] = data[['confidence_interval_start2', 'confidence_interval_end2']].mean(axis=1)
-        
+
         data['position_1'] = data['position_1'].astype(int)
         data['position_2'] = data['position_2'].astype(int)
 
