@@ -112,7 +112,19 @@ def kmeans_cluster(
     logging.info(f'selected k={opt_k}')
 
     model = kmeans[opt_k]
-    clusters = pd.Series(model.labels_, index=cn.columns).rename('cluster_id').reset_index()
+
+    embedding = umap.UMAP(
+        n_neighbors=15,
+        min_dist=0.1,
+        n_components=2,
+        random_state=42,
+        metric='euclidean',
+    ).fit_transform(cn.fillna(0).values.T)
+
+    clusters = pd.DataFrame({
+        'cell_id': cn.columns, 'cluster_id': model.labels_,
+        'umap1': embedding[:, 0], 'umap2': embedding[:, 1]
+    })
 
     return clusters
 
