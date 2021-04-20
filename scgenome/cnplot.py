@@ -187,9 +187,9 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
         ax.set_ylim((-0.01, 1.01))
         ax.spines['left'].set_bounds(0, 1)
     else:
-        ax.set_ylim((-0.05*maxcopies, maxcopies))
-        ax.set_yticks(range(0, int(maxcopies) + 1))
-        ax.spines['left'].set_bounds(0, maxcopies)
+        ax.set_ylim((-0.05*max_cn, max_cn))
+        ax.set_yticks(range(0, int(max_cn) + 1))
+        ax.spines['left'].set_bounds(0, max_cn)
 
     if chromosome is not None:
         seaborn.despine(ax=ax, offset=10, trim=False)

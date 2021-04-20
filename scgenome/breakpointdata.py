@@ -32,7 +32,6 @@ def annotate_breakpoint_data(breakpoint_data, breakpoint_count_data, is_lumpy=Fa
     evidence_count_colname = "read_count"
     if is_lumpy:
         evidence_count_colname = "count"
-
     # Calculate cell counts
     if len(breakpoint_count_data.index) > 0:
         cell_counts = (
@@ -41,6 +40,7 @@ def annotate_breakpoint_data(breakpoint_data, breakpoint_count_data, is_lumpy=Fa
             .drop_duplicates(index_cols + ['cell_id'])
             .groupby(index_cols).size().rename('num_cells')
             .reset_index())
+        breakpoint_data = breakpoint_data[breakpoint_data[index_cols[0]].isin(breakpoint_count_data[index_cols[0]].tolist())]
 
         breakpoint_data = breakpoint_data.merge(cell_counts, how='left')
         
