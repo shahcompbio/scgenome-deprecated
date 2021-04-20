@@ -126,6 +126,6 @@ urllib3==1.25.7
 wcwidth==0.1.7
 webencodings==0.5.1
 websocket-client==0.56.0
--e git+https://bitbucket.org/dranew/wgs_analysis.git@e9c35fa47334fa431b010ebe5744c7bfada78b73#egg=wgs_analysis
+-e git+https://github.com/amcpherson/wgs_analysis.git@c73a9bd0268b5e6fb55a8c18a58ac28e5f918482#egg=wgs_analysis
 widgetsnbextension==3.5.1
 zipp==3.4.1
