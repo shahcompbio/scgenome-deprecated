@@ -190,15 +190,18 @@ def load_consensus_breakpoint_files(destruct_filepath, lumpy_filepath, destruct_
     destruct_breakpoints = scgenome.loaders.breakpoint.load_destruct(destruct_filepath)
     lumpy_breakpoints = scgenome.loaders.breakpoint.load_lumpy(lumpy_filepath, standardize_columns=True)
 
+    destruct_breakpoint_counts = scgenome.loaders.breakpoint.load_destruct_counts(destruct_counts_filepath)
+
     destruct_lumpy_matches = wgs_analysis.algorithms.rearrangement.match_breakpoints(
-        destruct_breakpoints, lumpy_breakpoints)
+        lumpy_breakpoints, destruct_breakpoints, window_size=200)
+
+    matched_destruct_predictions = (
+        destruct_lumpy_matches[['target_id']].drop_duplicates()
+        .rename(columns={'target_id': 'prediction_id'}))
 
     # Filter destruct by lumpy matches
-    destruct_breakpoints = destruct_breakpoints.merge(
-        destruct_lumpy_matches[['reference_prediction_id']].drop_duplicates()
-        .rename(columns={'reference_prediction_id': 'prediction_id'}))
-
-    destruct_breakpoint_counts = scgenome.loaders.breakpoint.load_destruct_counts(destruct_counts_filepath)
+    destruct_breakpoints = destruct_breakpoints.merge(matched_destruct_predictions)
+    destruct_breakpoint_counts = destruct_breakpoint_counts.merge(matched_destruct_predictions)
 
     return {
         'breakpoint_data': destruct_breakpoints,
