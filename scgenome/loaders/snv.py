@@ -318,19 +318,19 @@ def _concat_annotation_results(
     data = data.merge(tnc, how='left')
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
-    if museq_filter != -np.inf:
-        data = data[data['max_museq_score'] > museq_filter]
+    if museq_filter is not None:
+        data = data[data['max_museq_score'] >= museq_filter]
         logging.info('post museq filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
         logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
-    if strelka_filter != -np.inf:
-        data = data[data['max_strelka_score'] > strelka_filter]
+    if strelka_filter is not None:
+        data = data[data['max_strelka_score'] >= strelka_filter]
         logging.info(
             'post strelka filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
         logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
-    if mappability_filter != -np.inf:
-        data = data[data['mappability'] > mappability_filter]
+    if mappability_filter is not None:
+        data = data[data['mappability'] >= mappability_filter]
         logging.info(
             'post mappability filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
         logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
