@@ -11,6 +11,7 @@ import yaml
 
 default_museq_filter = 0.9
 default_strelka_filter = 20.
+default_mappability_filter = 0.99
 
 categorical_columns = [
     'chrom',
@@ -218,7 +219,7 @@ def get_highest_snpeff_effect(snpeff_data):
 def load_snv_annotation_results_from_filenames(
         mappability_path, strelka_path, museq_path, cosmic_path,
         snpeff_path, dbsnp_path, trinuc_path, museq_filter=None,
-        strelka_filter=None
+        strelka_filter=None, default_mappability_filter=None,
 ):
     """ Collate snv results into a single table from input filenames. path inputs must be lists of file strings. 
     """
@@ -229,11 +230,13 @@ def load_snv_annotation_results_from_filenames(
     if strelka_filter is None:
         strelka_filter = default_strelka_filter
 
+    if mappability_filter is None:
+        mappability_filter = default_mappability_filter
+
     logging.info('starting load')
 
     mappability = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
         mappability_path))
-    mappability = mappability[mappability['mappability'] > 0.99]
 
     strelka_results = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
         strelka_path))
@@ -265,13 +268,14 @@ def load_snv_annotation_results_from_filenames(
 
     return _concat_annotation_results(
         mappability, cosmic, snpeff, dbsnp, tnc, strelka_results,
-        museq_results, museq_filter=museq_filter, strelka_filter=strelka_filter
+        museq_results, museq_filter=museq_filter, strelka_filter=strelka_filter,
+        mappability_filter=mappability_filter,
     )
 
 
 def _concat_annotation_results(
         mappability, cosmic, snpeff, dbsnp, tnc, strelka_results, museq_results,
-        museq_filter=None, strelka_filter=None
+        museq_filter=None, strelka_filter=None, mappability_filter=None,
 ):
     '''
     private function to concatenate and filter snv annotation data
@@ -325,6 +329,12 @@ def _concat_annotation_results(
             'post strelka filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
         logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
+    if mappability_filter != -np.inf:
+        data = data[data['mappability'] > mappability_filter]
+        logging.info(
+            'post mappability filter with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
+        logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
+
     logging.info('finishing load with snv count {}'.format(data[['chrom', 'coord']].drop_duplicates().shape[0]))
     logging.info(f'snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
@@ -336,7 +346,7 @@ def _concat_annotation_results(
     return data
 
 
-def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filter=None):
+def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filter=None, mappability_filter=None):
     """ Collate snv results into a single table.
     """
 
@@ -346,13 +356,15 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     if strelka_filter is None:
         strelka_filter = default_strelka_filter
 
+    if mappability_filter is None:
+        mappability_filter = default_mappability_filter
+
     logging.info('starting load')
 
     mappability_files = scgenome.loaders.utils.get_pseudobulk_files(
         pseudobulk_dir, 'snv_mappability.csv.gz'
     )
     mappability = load_snv_annotation_table(mappability_files)
-    mappability = mappability[mappability['mappability'] > 0.99]
 
     strelka_files = scgenome.loaders.utils.get_pseudobulk_files(
         pseudobulk_dir, 'snv_strelka.csv.gz'
@@ -402,9 +414,11 @@ def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filte
     )
     tnc = load_snv_annotation_table(trinuc_files)
 
-    return _concat_annotation_results(mappability, cosmic, snpeff, dbsnp, tnc, strelka_results, museq_results,
-                                      museq_filter=museq_filter, strelka_filter=strelka_filter
-                                      )
+    return _concat_annotation_results(
+        mappability, cosmic, snpeff, dbsnp, tnc, strelka_results, museq_results,
+        museq_filter=museq_filter, strelka_filter=strelka_filter,
+        mappability_filter=mappability_filter,
+    )
 
 
 def load_snv_data_from_files(
@@ -418,6 +432,7 @@ def load_snv_data_from_files(
         counts_path,
         museq_filter=None,
         strelka_filter=None,
+        mappability_filter=None,
         positions=None,
         filter_sample_id=None,
         filter_library_id=None,
@@ -432,7 +447,7 @@ def load_snv_data_from_files(
     if snv_annotation:
         snv_data = load_snv_annotation_results_from_filenames(
             mappability_path, strelka_path, museq_path, cosmic_path, snpeff_path, dbsnp_path, trinuc_path,
-            museq_filter=museq_filter, strelka_filter=strelka_filter
+            museq_filter=museq_filter, strelka_filter=strelka_filter, mappability_filter=mappability_filter,
         )
 
         assert not snv_data['coord'].isnull().any()
@@ -460,6 +475,7 @@ def load_snv_data(
         results_dir,
         museq_filter=None,
         strelka_filter=None,
+        mappability_filter=None,
         positions=None,
         filter_sample_id=None,
         filter_library_id=None,
@@ -474,6 +490,7 @@ def load_snv_data(
         filter_library_id (str): restrict to specific library id
         museq_filter (float, optional): mutationseq score threshold. Defaults to None.
         strelka_filter (float, optional): strelka score threshold. Defaults to None.
+        mappability_filter (float, optional): mappability threshold. Defaults to None.
         positions:  #TODO 
         
     Returns:
@@ -489,7 +506,9 @@ def load_snv_data(
         snv_data = load_snv_annotation_results(
             pseudobulk_dir,
             museq_filter=museq_filter,
-            strelka_filter=strelka_filter)
+            strelka_filter=strelka_filter,
+            mappability_filter=mappability_filter,
+        )
 
         assert not snv_data['coord'].isnull().any()
 
@@ -525,7 +544,9 @@ def load_snv_data(
         snv_data = load_snv_annotation_results(
             variant_calling_dir[0],
             museq_filter=museq_filter,
-            strelka_filter=strelka_filter)
+            strelka_filter=strelka_filter,
+            mappability_filter=mappability_filter,
+        )
 
         assert not snv_data['coord'].isnull().any()
 
