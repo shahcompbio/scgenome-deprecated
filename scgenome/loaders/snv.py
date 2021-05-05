@@ -219,7 +219,7 @@ def get_highest_snpeff_effect(snpeff_data):
 def load_snv_annotation_results_from_filenames(
         mappability_path, strelka_path, museq_path, cosmic_path,
         snpeff_path, dbsnp_path, trinuc_path, museq_filter=None,
-        strelka_filter=None, default_mappability_filter=None,
+        strelka_filter=None, mappability_filter=None,
 ):
     """ Collate snv results into a single table from input filenames. path inputs must be lists of file strings. 
     """
