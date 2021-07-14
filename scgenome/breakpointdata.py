@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 import seaborn
 import wgs_analysis.plots.rearrangement
+import wgs_analysis.algorithms.merge
+
+import scgenome.cntransitions
 
 
 def get_index_cols(is_lumpy=False):
@@ -226,3 +229,88 @@ def plot_breakpoint_clustering(breakpoint_data, breakpoint_count_data, clusters,
     g = seaborn.clustermap(plot_data, mask=mask, rasterized=True, figsize=(4, 12))
     if figures_prefix is not None:
         g.fig.savefig(figures_prefix + 'cluster_map.pdf', bbox_inches='tight')
+
+
+def overlap_regions_positions_stranded(regions, positions):
+    """ Find overlaps between regions and positions accounting for strand/orientation.
+
+    Args:
+        regions (DataFrame): oriented genomic regions
+        positions (DataFrame): genomic positions with orientation as strand
+
+    Returns:
+        DataFrame: cross product of overlapping regions and positions
+
+    """
+
+    merged = []
+    for (chromosome, strand), chr_str_posns in positions.groupby(['chromosome', 'strand']):
+        chr_str_regions = regions[
+            (regions['chr'] == chromosome) &
+            (regions['orientation'] == strand)]
+        interval_idx, position_idx = wgs_analysis.algorithms.merge.interval_position_overlap_unsorted(
+            chr_str_regions[['start', 'end']].values,
+            chr_str_posns['position'].values)
+        chr_str_merged = pd.concat([
+            chr_str_regions.iloc[interval_idx].reset_index(drop=True),
+            chr_str_posns.iloc[position_idx].reset_index(drop=True)], axis=1)
+        merged.append(chr_str_merged)
+    merged = pd.concat(merged, ignore_index=True)
+    return merged
+
+
+def overlap_regions_breakpoints_stranded(regions, breakpoints, cols):
+    """ Find overlap between breakends and regions.
+
+    Args:
+        regions (DataFrame): oriented genomic regions
+        breakpoints (DataFrame): breakpoints table
+        cols (list): list of columns to include in annotated breakpoint dataframe
+
+    Returns:
+        DataFrame: breakpoints with additional columns from overlapping with regions
+
+    """
+
+    for end in ('1', '2'):
+        breakends = breakpoints[['prediction_id', f'chromosome_{end}', f'strand_{end}', f'position_{end}']].rename(
+            columns={
+                f'chromosome_{end}': 'chromosome',
+                f'strand_{end}': 'strand',
+                f'position_{end}': 'position'})[['prediction_id', 'chromosome', 'strand', 'position']]
+        merged = overlap_regions_positions_stranded(regions, breakends)
+        end_cols = [f'{a}_{end}' for a in cols]
+        merged = merged.rename(columns=dict(zip(cols, end_cols)))
+        breakpoints = breakpoints.merge(merged[['prediction_id'] + end_cols], how='left', on=['prediction_id'])
+    return breakpoints
+
+
+def annotate_transition_cell_counts(breakpoints, cn_data):
+    """ Annotate breakpoints with counts of cells supporting matching transitions.
+
+    Args:
+        breakpoints (DataFrame): breakpoints table
+        cn_data (DataFrame): copy number data
+    
+    Returns:
+        DataFrame: breakpoints table with counts of supporting cells
+
+    """
+
+    cn_transition_counts = scgenome.cntransitions.generate_cn_transition_counts(cn_data)
+
+    breakpoints = scgenome.breakpointdata.overlap_regions_breakpoints_stranded(
+        cn_transition_counts, breakpoints,
+        ['region_index', 'cell_count'])
+
+    breakpoints['cell_count_1'] = breakpoints['cell_count_1'].fillna(0).astype(int)
+    breakpoints['cell_count_2'] = breakpoints['cell_count_2'].fillna(0).astype(int)
+
+    cn_transitions_matrix = scgenome.cntransitions.generate_cn_transition_pair_counts(cn_data)
+
+    breakpoints = breakpoints.merge(cn_transitions_matrix, how='left')
+    breakpoints['pair_cell_count'] = breakpoints['pair_cell_count'].fillna(0).astype(int)
+
+    breakpoints = breakpoints.drop(['region_index_1', 'region_index_2'], axis=1)
+
+    return breakpoints
