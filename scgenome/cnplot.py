@@ -84,7 +84,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     if not raw:
         cmap = get_cn_cmap(plot_data.values)
 
-    im = ax.imshow(plot_data.astype(float).T, aspect='auto', cmap=cmap)
+    im = ax.imshow(plot_data.astype(float).T, aspect='auto', cmap=cmap, interpolation='none')
 
     ax.set(xticks=chrom_mids)
     ax.set(xticklabels=chrom_names)
