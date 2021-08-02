@@ -236,7 +236,8 @@ def calculate_cluster_allele_counts(allele_data, clusters, cn_bin_size):
 
     # Create allele 1 and 2 counts matrix
     allele_data = allele_data.set_index(index_cols + ['cell_id', 'allele_id'])['readcount'].unstack(fill_value=0)
-    allele_data.rename(columns={0: 'allele_1', 1: 'allele_2'}, inplace=True)
+    assert '0' in allele_data.columns and '1' in allele_data.columns
+    allele_data.rename(columns={'0': 'allele_1', '1': 'allele_2'}, inplace=True)
     allele_data.reset_index(inplace=True)
 
     # Merge clusters and redo categoricals
