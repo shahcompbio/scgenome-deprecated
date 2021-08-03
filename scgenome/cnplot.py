@@ -103,7 +103,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
     color_mat = cncluster.get_cluster_colors(cluster_ids)
 
     ax = fig.add_axes([0.0,0.0,0.05,1.])
-    ax.imshow(np.array(color_mat)[::-1, np.newaxis], aspect='auto', origin='lower')
+    ax.imshow(np.array(color_mat)[::-1, np.newaxis], aspect='auto', origin='lower', interpolation='none')
     ax.grid(False)
     ax.set_xticks([])
     ax.set_yticks([])

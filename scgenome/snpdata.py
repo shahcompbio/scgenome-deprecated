@@ -73,13 +73,13 @@ def calculate_haplotype_allele_counts(snp_data, haps, bin_size):
 def plot_vaf_cn_profile(ax, hap_data, allele_cn):
     """ Plot genome wide VAF and predicted CN state for haplotype alleles.
     """
-    allele_cn = allele_cn.copy()
+    allele_cn = allele_cn.query('total_cn != 0')
 
     chrom_info = plot_vaf_profile(
         ax, hap_data, 'maf',
         size_field_name='total_counts_sum',
         size_scale=100.,
-    )   
+    )
 
     allele_cn['cn_ratio'] = allele_cn['minor_cn'] / allele_cn['total_cn']
 
@@ -265,12 +265,12 @@ def calculate_cluster_allele_cn(
     """
     clone_cn_state = (
         cn_data.merge(clusters[['cell_id', 'cluster_id']])
-        .groupby(['chr', 'start', 'end', 'cluster_id'])['state']
+        .groupby(['chr', 'start', 'end', 'cluster_id'], observed=True)['state']
         .median().astype(int).reset_index())
 
     clone_cn_copy = (
         cn_data.merge(clusters[['cell_id', 'cluster_id']])
-        .groupby(['chr', 'start', 'end', 'cluster_id'])['copy']
+        .groupby(['chr', 'start', 'end', 'cluster_id'], observed=True)['copy']
         .mean().reset_index())
 
     clone_cn_data = clone_cn_state.merge(clone_cn_copy)
@@ -302,7 +302,10 @@ def calculate_cluster_allele_cn(
         ax = fig.add_subplot(num_clusters, 1, idx)
         scgenome.snpdata.plot_vaf_cn_profile(
             ax, cluster_allele_data, cluster_allele_cn)
+        ax.set_ylabel(f'Clone {cluster_id} BAF')
+
         idx += 1
+
     if plots_prefix is not None:
         fig.savefig(plots_prefix + 'allele_cn_profiles.png', bbox_inches='tight')
 

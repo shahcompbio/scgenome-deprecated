@@ -5,9 +5,13 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 import scipy.misc
+import scipy.special
+import matplotlib.pyplot as plt
+import matplotlib
 
 import dollo.tasks
 import dollo.run
+import wgs_analysis.plots.trees
 
 import scgenome.snvphylo
 
@@ -167,7 +171,7 @@ def log_likelihood_present(c_m, c_t, e_s, n_v, n_t):
         r = (1 - e_s) * allele_ratio + e_s * (1 - allele_ratio)
         conditional_log_likelihoods.append(log_binomial_pdf(n_v, n_t, r))
 
-    return scipy.misc.logsumexp(conditional_log_likelihoods)
+    return scipy.special.logsumexp(conditional_log_likelihoods)
 
 
 def compute_dollo_ml_tree(snv_log_likelihoods, leaf_name_groups=None):
@@ -195,7 +199,7 @@ def compute_dollo_ml_tree(snv_log_likelihoods, leaf_name_groups=None):
 
 
 def plot_dollo_ml_tree(tree, nodes):
-    """
+    """ Plot a tree with branchlengths as snv origin counts
     """
     leaf_order = []
     for leaf in tree.leaves:
@@ -221,59 +225,7 @@ def plot_dollo_ml_tree(tree, nodes):
 
     wgs_analysis.plots.trees.plot_tree(ax, tree, landscape=False, flip=True, branch_length_attr='origin_count', leaf_name_attr='plot_id')
 
-    ## OV specific
-    # annotate_coords = [
-    #     (7578265, 'TP53'),
-    #     (23520184, 'HTR1D'),
-    #     (40900013, 'C7orf10'),
-    #     (114329967, 'FOXP2'),
-    #     (124266354, 'ZHX1'),
-    #     (5231710, 'INSL4'),
-    # ]
-
-    # patient_snv_gene_names = collections.defaultdict(list)
-
-    # for coord, gene_name in annotate_coords:
-    #     print coord, gene_name
-    #     node = nodes.query('(coord == {}) & (ml_origin == 1)'.format(coord))['node'].values[0]
-    #     patient_snv_gene_names[node].append(gene_name)
-    #     print node
-    #     raise
-    # # patient_snv_gene_names = {
-    # #     0: ['TP53', 'C7orf10', 'FOXP2'],
-    # #     12: [],
-    # #     14: ['LRP1B Del'],
-    # #     1: ['HTR1D', 'MSH2 Inv'],
-    # # }
-
-    for node in tree.nodes:
-
-        x, y = node.branch_line.get_data()
-
-    #     if loss_counts[node.label] != 0:
-    #         loss_counts_text = u'\u2014{}'.format(loss_counts[node.label])
-    #         ax.annotate(loss_counts_text,
-    #                     xy=(x[0], y.mean()), xytext=(x[0] + 0.1, y.mean()), fontsize=8)
-
-        snv_gene_names = patient_snv_gene_names.get(node.label, [])
-
-        positions = np.linspace(0, 1, len(snv_gene_names) + 2)[1:-1]
-
-        for pos, gene_name in zip(positions, snv_gene_names):
-
-            x = pos * node.branch[0][0] + (1 - pos) * node.branch[0][1]
-            y = pos * node.branch[1][0] + (1 - pos) * node.branch[1][1]
-
-            ax.annotate(gene_name, xy=(x, y), xycoords='data',
-                xytext=(x - 0.2, y), textcoords='data', fontsize=8, style='italic',
-                arrowprops=dict(arrowstyle='-', color='black', shrinkB=0),
-                ha='right', va='center',
-                )
-
-#     xtickrelabel = [leaf_name_remap[int(str(a.get_text()))] for a in ax.get_xticklabels()]
-
     ax.set_ylabel('SNV count')
-#     ax.set_xticklabels(xtickrelabel, rotation=0)
 
     plt.tight_layout()
 
