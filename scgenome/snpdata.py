@@ -35,7 +35,7 @@ def get_clone_snp_count(het_counts, cluster_df):
             snp_data = df
         else:
             snp_data = pd.concat([snp_data, df], ignore_index=True)
-            snp_data = snp_data.groupby(['chromosome', 'coord', 'cluster_id'])[['ref_counts', 'alt_counts']].sum().reset_index()
+            snp_data = snp_data.groupby(['chromosome', 'coord', 'cluster_id'], observed=True)[['ref_counts', 'alt_counts']].sum().reset_index()
 
     snp_data['total_counts'] = snp_data['ref_counts'] + snp_data['alt_counts']
     snp_data['vaf'] = snp_data['alt_counts'] / snp_data['total_counts'].astype(float)
@@ -55,7 +55,7 @@ def calculate_haplotype_allele_counts(snp_data, haps, bin_size):
 
     # Aggregated by bin and haplotype block
     data2 = (
-        data.groupby(['cluster_id', 'chromosome', 'hap_label', 'bin'])[['allele_1', 'allele_2', 'total_counts', 'coord']]
+        data.groupby(['cluster_id', 'chromosome', 'hap_label', 'bin'], observed=True)[['allele_1', 'allele_2', 'total_counts', 'coord']]
         .aggregate({'allele_1': sum, 'allele_2': sum, 'total_counts': sum, 'coord': (np.min, np.max, len)}).reset_index())
     data2.columns = ['_'.join(col).strip().rstrip('_') for col in data2.columns.values]
     data2['maf'] = np.minimum(data2['allele_1_sum'], data2['allele_2_sum']) / data2['total_counts_sum'].astype(float)

@@ -268,7 +268,7 @@ def plot_breakends(ax, breakends, lw=0.5):
 
 def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='cluster_id'):
     plot_data = cn_data.merge(utils.chrom_idxs)
-    plot_data = plot_data.groupby(['chr_index', 'start', cluster_field_name])[cn_field_name].median().astype(int)
+    plot_data = plot_data.groupby(['chr_index', 'start', cluster_field_name], observed=True)[cn_field_name].median().astype(int)
     plot_data = plot_data.unstack(level=[cluster_field_name]).fillna(0)
     plot_data = plot_data.sort_index(axis=1, level=1)
 

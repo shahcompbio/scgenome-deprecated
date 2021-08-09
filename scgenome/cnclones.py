@@ -270,7 +270,7 @@ def calculate_cell_clone_distances(cn_data, clusters, results_prefix):
     clone_cn_data = (
         cn_data
             .merge(clusters[['cell_id', 'cluster_id']].drop_duplicates())
-            .groupby(['chr', 'start', 'end', 'cluster_id'])
+            .groupby(['chr', 'start', 'end', 'cluster_id'], observed=True)
             .agg({'copy': np.mean, 'state': np.median})
             .reset_index()
     )
@@ -389,7 +389,7 @@ def calculate_mitotic_errors(
     clone_cn_data = (
     cn_data
         .merge(clusters)
-        .groupby(['chr', 'start', 'end', 'cluster_id'])
+        .groupby(['chr', 'start', 'end', 'cluster_id'], observed=True)
         .agg({'copy': np.mean, 'state': np.median})
         .reset_index()
     )
@@ -405,7 +405,7 @@ def calculate_mitotic_errors(
 
     # Calculate proportion of each chromosome for each cell that has
     # a different state from the clone (mean_diff)
-    size_state_diff = clone_cell_cn.set_index('state_diff', append=True).groupby(['chr', 'cell_id', 'state_diff'])['bin_size'].sum().rename('state_size').reset_index()
+    size_state_diff = clone_cell_cn.set_index('state_diff', append=True).groupby(['chr', 'cell_id', 'state_diff'], observed=True)['bin_size'].sum().rename('state_size').reset_index()
     size_total = clone_cell_cn.groupby(['chr', 'cell_id'])['bin_size'].sum().astype(float).rename('total_size').reset_index()
     mean_state_diff = size_state_diff.merge(size_total)
     mean_state_diff['mean_diff'] = mean_state_diff['state_size'] / mean_state_diff['total_size']
