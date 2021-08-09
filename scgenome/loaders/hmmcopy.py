@@ -110,7 +110,7 @@ def load_hmmcopy_data(
         hmmcopy_reads_cols.extend(additional_reads_cols)
 
     manifest_filename = os.path.join(hmmcopy_results_dir, 'metadata.yaml')
-    manifest = yaml.load(open(manifest_filename))
+    manifest = yaml.safe_load(open(manifest_filename))
 
     # KLUDGE: 0.3.1 -> v0.3.1
     if not manifest['meta']['version'].startswith('v'):
@@ -152,17 +152,17 @@ def process_hmmcopy_data(filepath, table_name, usecols=None):
     if table_name == 'hmmcopy_metrics':
         dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
         dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
-        dtypes_override = yaml.load(open(dtypes_filename))
+        dtypes_override = yaml.safe_load(open(dtypes_filename))
         dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
     elif table_name == 'hmmcopy_reads':
         dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
         dtypes_filename = os.path.join(dtypes_directory, 'hmmcopy_reads_defs.yaml')
-        dtypes_override = yaml.load(open(dtypes_filename))
+        dtypes_override = yaml.safe_load(open(dtypes_filename))
         dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
     elif table_name == 'hmmcopy_segs':
         dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
         dtypes_filename = os.path.join(dtypes_directory, 'hmmcopy_segments_defs.yaml')
-        dtypes_override = yaml.load(open(dtypes_filename))
+        dtypes_override = yaml.safe_load(open(dtypes_filename))
         dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
 
     data = csv_input.read_csv(usecols=usecols, dtypes_override=dtypes_override)

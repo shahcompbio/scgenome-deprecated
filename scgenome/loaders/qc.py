@@ -54,7 +54,7 @@ def load_cell_state_prediction(results_dir):
     cell_state_results_dir = cell_state_results_dir[0]
 
     manifest_filename = os.path.join(cell_state_results_dir, 'metadata.yaml')
-    manifest = yaml.load(open(manifest_filename))
+    manifest = yaml.safe_load(open(manifest_filename))
 
     filenames = scgenome.loaders.utils.find_filenames(manifest['filenames'], 'cell_state_prediction.csv')
 

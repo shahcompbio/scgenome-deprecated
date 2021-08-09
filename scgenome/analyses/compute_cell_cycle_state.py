@@ -75,7 +75,7 @@ def _get_hmmcopy_meta(results_dir):
     align_results_dir = analysis_dirs['hmmcopy']
 
     manifest_filename = os.path.join(align_results_dir, 'metadata.yaml')
-    manifest = yaml.load(open(manifest_filename))
+    manifest = yaml.safe_load(open(manifest_filename))
 
     return manifest
 
@@ -158,7 +158,7 @@ def run_tantalus_analysis(
 
     cellcycle_dir = run_analysis(ticket_directory)
 
-    metadata = yaml.load(open(os.path.join(cellcycle_dir, 'metadata.yaml')))
+    metadata = yaml.safe_load(open(os.path.join(cellcycle_dir, 'metadata.yaml')))
 
     logging.info('registering results with tantalus')
 

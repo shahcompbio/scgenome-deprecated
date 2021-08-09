@@ -564,7 +564,7 @@ def load_snv_data(
         variant_counting_dir = variant_counting_dir[0]
 
         manifest_filename = os.path.join(variant_counting_dir, 'metadata.yaml')
-        manifest = yaml.load(open(manifest_filename))
+        manifest = yaml.safe_load(open(manifest_filename))
 
         suffix = 'counts.csv.gz'
         if packaging.version.parse(manifest['meta']['version']) > packaging.version.parse('v0.6.0'):

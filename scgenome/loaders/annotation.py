@@ -62,7 +62,7 @@ def load_annotation_data(
     annotation_results_dir = annotation_results_dir[0]
 
     manifest_filename = os.path.join(annotation_results_dir, 'metadata.yaml')
-    manifest = yaml.load(open(manifest_filename))
+    manifest = yaml.safe_load(open(manifest_filename))
 
     # KLUDGE: 0.3.1 -> v0.3.1
     if not manifest['meta']['version'].startswith('v'):
@@ -101,7 +101,7 @@ def process_annotation_file(filepath, is_anno_metrics_table=False):
     if is_anno_metrics_table:
         dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
         dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
-        dtypes_override = yaml.load(open(dtypes_filename))
+        dtypes_override = yaml.safe_load(open(dtypes_filename))
         dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
 
     data = csv_input.read_csv(dtypes_override=dtypes_override)

@@ -24,7 +24,7 @@ def find_results_directories(results_dir):
     results_directories = collections.defaultdict(list)
 
     for manifest_filename in _find_manifest_filenames(results_dir):
-        manifest = yaml.load(open(manifest_filename))
+        manifest = yaml.safe_load(open(manifest_filename))
 
         results_type = manifest['meta']['type']
 
@@ -51,7 +51,7 @@ def get_version(results_dir):
         str: results version
     """
     manifest_filename = os.path.join(results_dir, 'metadata.yaml')
-    manifest = yaml.load(open(manifest_filename))
+    manifest = yaml.safe_load(open(manifest_filename))
     return manifest['meta']['version']
 
 
@@ -75,7 +75,7 @@ def find_results_filepath(results_dir, filename_suffix, analysis_type=None):
     """
 
     manifest_filename = os.path.join(results_dir, 'metadata.yaml')
-    manifest = yaml.load(open(manifest_filename))
+    manifest = yaml.safe_load(open(manifest_filename))
 
     if analysis_type is not None and manifest['meta']['type'] != analysis_type:
         raise Exception(f"expected analysis {analysis_type} and found {manifest['meta']['type']}")
@@ -106,7 +106,7 @@ def get_pseudobulk_files(results_dir, suffix):
     """
 
     manifest_filename = os.path.join(results_dir, 'metadata.yaml')
-    manifest = yaml.load(open(manifest_filename))
+    manifest = yaml.safe_load(open(manifest_filename))
 
     if packaging.version.parse(manifest['meta']['version']) < packaging.version.parse('v0.5.0'):
         for a in _get_pseudobulk_files_v_lt_050(results_dir, suffix):
@@ -126,7 +126,7 @@ def get_pseudobulk_files(results_dir, suffix):
 
 def _get_pseudobulk_files_v_lt_050(results_dir, suffix):
     manifest_filename = os.path.join(results_dir, 'metadata.yaml')
-    manifest = yaml.load(open(manifest_filename))
+    manifest = yaml.safe_load(open(manifest_filename))
 
     tumour_samples = manifest['meta']['tumour_samples']
     filenames = manifest['filenames']
