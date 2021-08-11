@@ -55,6 +55,7 @@ def get_version(results_dir):
     return manifest['meta']['version']
 
 
+# Deprecate
 def _prep_filenames_for_loading(files):
     for f in files:
         yield None, None, f
