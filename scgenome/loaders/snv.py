@@ -25,161 +25,109 @@ categorical_columns = [
 ]
 
 
-def load_snv_count_data_from_filenames(
-        files, positions, filter_sample_id=None, filter_library_id=None
-):
-    return _process_snv_count_data(
-        scgenome.loaders.utils._prep_filenames_for_loading(files),
-        positions, filter_sample_id=filter_sample_id, filter_library_id=filter_library_id
-    )
-
-
-def load_snv_count_data(
-        pseudobulk_dir, suffix, positions,
-        filter_sample_id=None, filter_library_id=None
-):
-    """ Load per cell SNV count data
+def load_snv_counts_from_results(results_dir, positions=None):
+    """ Load per cell SNV count data from results directory
     
     Args:
-        pseudobulk_dir (str): pseudobulk results directory
-        suffix (str): suffix of snv count tables
+        results_dir (str): results directory
         positions (pandas.DataFrame): restrict to the specified positions
 
-    Kwargs:
-        filter_sample_id (str): restrict to specific sample id
-        filter_library_id (str): restrict to specific library id
     Returns:
         pandas.DataFrame: SNV alt and ref counts per cell
     """
 
-    files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, suffix)
+    counts_filepath = scgenome.loaders.utils.find_results_filepath(
+        results_dir, 'counts.csv.gz', analysis_type='snv_genotyping')
 
-    return _process_snv_count_data(
-        files, positions, filter_sample_id=filter_sample_id,
-        filter_library_id=filter_library_id
+    return load_snv_counts(counts_filepath, positions=positions)
+
+
+def load_snv_counts(filepath, positions=None):
+    """ Load per cell SNV count data from filepath
+    
+    Args:
+        filepath (str): counts filepath
+        positions (pandas.DataFrame): restrict to the specified positions
+
+    Returns:
+        pandas.DataFrame: SNV alt and ref counts per cell
+    """
+
+    logging.info('Loading snv counts from {}'.format(filepath))
+
+    data = []
+
+    csv_input = scgenome.csvutils.CsvInput(filepath)
+
+    chunk_iter = csv_input.read_csv(
+        chunksize=10 ** 6,
+        dtypes_override={
+            'chrom': 'category',
+            'ref': 'category',
+            'alt': 'category',
+            'cell_id': 'category',
+            'sample_id': 'category',
+            'library_id': 'category',
+        },
     )
 
-
-def _process_snv_count_data(files, positions, filter_sample_id=None, filter_library_id=None):
-    snv_count_data = []
-
-    for sample_id, library_id, filepath in files:
-        logging.info('Loading snv counts from {}'.format(filepath))
-
-        if sample_id is not None and filter_sample_id is not None and sample_id != filter_sample_id:
-            logging.info('skipping {sample_id}', sample_id, filter_sample_id)
-            continue
-
-        if library_id is not None and filter_sample_id is not None and library_id != filter_library_id:
-            logging.info('skipping', library_id, filter_library_id)
-            continue
-
-        data = []
-        csv_input = scgenome.csvutils.CsvInput(filepath)
-
-        chunk_iter = csv_input.read_csv(
-            chunksize=10 ** 6,
-            dtypes_override={
-                'chrom': 'category',
-                'ref': 'category',
-                'alt': 'category',
-                'cell_id': 'category',
-                'sample_id': 'category',
-                'library_id': 'category',
-            },
-        )
-
-        for chunk in chunk_iter:
-            scgenome.utils.union_categories(
-                [chunk, positions],
-                cat_cols=['chrom', 'ref', 'alt'])
-            chunk = chunk.merge(positions)
-
-            if filter_sample_id is not None and 'sample_id' in chunk:
-                chunk = chunk[chunk['sample_id'] == filter_sample_id]
-
-            if filter_library_id is not None and 'library_id' in chunk:
-                chunk = chunk[chunk['library_id'] == filter_library_id]
-
-            data.append(chunk)
-
-        data = scgenome.utils.concat_with_categories(data, ignore_index=True)
-
-        if library_id is not None:
-            data['library_id'] = pd.Series([library_id], dtype="category")
-
-        if sample_id is not None:
-            data['sample_id'] = pd.Series([sample_id], dtype="category")
-
-        logging.info(f'Loaded snv counts table with shape {data.shape}, memory {data.memory_usage().sum()}')
-
+    for chunk in chunk_iter:
         scgenome.utils.union_categories(
-            [data, positions],
+            [chunk, positions],
             cat_cols=['chrom', 'ref', 'alt'])
-        data = data.merge(positions, how='inner')
+        chunk = chunk.merge(positions)
 
-        logging.info(f'Filtered snv counts table to shape {data.shape}, memory {data.memory_usage().sum()}')
+        data.append(chunk)
 
-        snv_count_data.append(data)
+    data = scgenome.utils.concat_with_categories(data, ignore_index=True)
 
-    snv_count_data = scgenome.utils.concat_with_categories(snv_count_data, ignore_index=True)
+    logging.info(f'Loaded snv counts table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
-    shape = snv_count_data.shape
-    memory = snv_count_data.memory_usage().sum()
+    scgenome.utils.union_categories(
+        [data, positions],
+        cat_cols=['chrom', 'ref', 'alt'])
+    data = data.merge(positions, how='inner')
+
+    logging.info(f'Filtered snv counts table to shape {data.shape}, memory {data.memory_usage().sum()}')
+
+    shape = data.shape
+    memory = data.memory_usage().sum()
     logging.info(f'Loaded all snv counts tables with shape {shape}, memory {memory}')
 
-    return snv_count_data
+    data['total_counts'] = data['ref_counts'] + data['alt_counts']
+
+    return data
 
 
-def load_snv_annotation_table(files):
+def load_snv_annotation_table(filepath):
     """ Load SNV annotation data
 
     Args:
-        pseudobulk_dir (str): pseudobulk results directory
-        table_name (str): name of annotation table to load.
+        filepath (str): path of snv annotation table.
 
     Returns:
-        pandas.DataFrame: SNVs annotation data per sample / library
+        pandas.DataFrame: SNVs annotation data
     """
-    snv_data = []
+    logging.info(f'Loading from {filepath}')
 
-    for sample_id, library_id, filepath in files:
-        logging.info(f'Loading from {filepath}')
-
-        csv_input = scgenome.csvutils.CsvInput(filepath)
-        data = csv_input.read_csv(
-            dtypes_override={
-                'chrom': 'category',
-                'ref': 'category',
-                'alt': 'category',
-                'cell_id': 'category',
-                'effect': 'category',
-                'effect_impact': 'category',
-                'functional_class': 'category',
-                'codon_change': 'category',
-                'amino_acid_change': 'category',
-                'gene_name': 'category',
-                'transcript_biotype': 'category',
-                'gene_coding': 'category',
-                'transcript_id': 'category',
-                'genotype': 'category',
-            })
-
-        if library_id is not None:
-            data['library_id'] = pd.Series([library_id], dtype="category")
-
-        if sample_id is not None:
-            data['sample_id'] = pd.Series([sample_id], dtype="category")
-
-        snv_data.append(data)
-
-    snv_data = scgenome.utils.concat_with_categories(snv_data, ignore_index=True)
-
-    # Drop potential duplicates resulting from creating
-    # sets of annotations from overlapping mutations
-    # across different libraries
-    snv_data = snv_data.drop_duplicates()
+    csv_input = scgenome.csvutils.CsvInput(filepath)
+    snv_data = csv_input.read_csv(
+        dtypes_override={
+            'chrom': 'category',
+            'ref': 'category',
+            'alt': 'category',
+            'cell_id': 'category',
+            'effect': 'category',
+            'effect_impact': 'category',
+            'functional_class': 'category',
+            'codon_change': 'category',
+            'amino_acid_change': 'category',
+            'gene_name': 'category',
+            'transcript_biotype': 'category',
+            'gene_coding': 'category',
+            'transcript_id': 'category',
+            'genotype': 'category',
+        })
 
     return snv_data
 
@@ -216,12 +164,89 @@ def get_highest_snpeff_effect(snpeff_data):
     return snpeff_data
 
 
-def load_snv_annotation_results_from_filenames(
-        mappability_path, strelka_path, museq_path, cosmic_path,
-        snpeff_path, dbsnp_path, trinuc_path, museq_filter=None,
-        strelka_filter=None, mappability_filter=None,
-):
+def load_snv_annotations_from_results(
+        results_dir,
+        museq_filter=None,
+        strelka_filter=None,
+        mappability_filter=None,
+    ):
+    """ Load per cell SNV count data from results directory
+    
+    Args:
+        results_dir (str): results directory
+
+    Kwargs:
+        museq_filter (float, optional): mutationseq score threshold. Defaults to None.
+        strelka_filter (float, optional): strelka score threshold. Defaults to None.
+        mappability_filter (float, optional): mappability threshold. Defaults to None.
+
+    Returns:
+        pandas.DataFrame: SNV alt and ref per cell
+    """
+
+    mappability_path = scgenome.loaders.utils.find_results_filepath(
+        results_dir, 'snv_mappability.csv.gz', analysis_type='variant_calling')
+
+    strelka_path = scgenome.loaders.utils.find_results_filepath(
+        results_dir, 'snv_strelka.csv.gz', analysis_type='variant_calling')
+
+    museq_path = scgenome.loaders.utils.find_results_filepath(
+        results_dir, 'snv_museq.csv.gz', analysis_type='variant_calling')
+
+    cosmic_path = scgenome.loaders.utils.find_results_filepath(
+        results_dir, 'snv_cosmic_status.csv.gz', analysis_type='variant_calling')
+
+    snpeff_path = scgenome.loaders.utils.find_results_filepath(
+        results_dir, 'snv_snpeff.csv.gz', analysis_type='variant_calling')
+
+    dbsnp_path = scgenome.loaders.utils.find_results_filepath(
+        results_dir, 'snv_dbsnp_status.csv.gz', analysis_type='variant_calling')
+
+    trinuc_path = scgenome.loaders.utils.find_results_filepath(
+        results_dir, 'snv_trinuc.csv.gz', analysis_type='variant_calling')
+
+    return load_snv_annotations(
+        mappability_path,
+        strelka_path,
+        museq_path,
+        cosmic_path,
+        snpeff_path,
+        dbsnp_path,
+        trinuc_path,
+        museq_filter=museq_filter,
+        strelka_filter=strelka_filter,
+        mappability_filter=mappability_filter,
+    )
+
+
+def load_snv_annotations(
+        mappability_path,
+        strelka_path,
+        museq_path,
+        cosmic_path,
+        snpeff_path,
+        dbsnp_path,
+        trinuc_path,
+        museq_filter=None,
+        strelka_filter=None,
+        mappability_filter=None,
+    ):
     """ Collate snv results into a single table from input filenames. path inputs must be lists of file strings. 
+
+    Args:
+        mappability_path (str): mappability file path
+        strelka_path (str): strelka file path
+        museq_path (str): museq file path
+        cosmic_path (str): cosmic file path
+        snpeff_path (str): snpeff file path
+        dbsnp_path (str): dbsnp file path
+        trinuc_path (str): trinuc file path
+
+    Kwargs:
+        museq_filter (float, optional): mutationseq score threshold. Defaults to None.
+        strelka_filter (float, optional): strelka score threshold. Defaults to None.
+        mappability_filter (float, optional): mappability threshold. Defaults to None.
+
     """
 
     if museq_filter is None:
@@ -235,51 +260,35 @@ def load_snv_annotation_results_from_filenames(
 
     logging.info('starting load')
 
-    mappability = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
-        mappability_path))
+    mappability = load_snv_annotation_table(mappability_path)
 
-    strelka_results = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
-        strelka_path))
-    strelka_results = strelka_results.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)
-    strelka_results = strelka_results['score'].max().rename('max_strelka_score')
-    strelka_results = strelka_results.reset_index()
+    strelka_results = load_snv_annotation_table(strelka_path)
+    strelka_results = (
+        strelka_results
+            .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
+            .max().rename('max_strelka_score').reset_index())
 
-    museq_results = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(
-        museq_path))
-    museq_results = museq_results.groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)
-    museq_results = museq_results['score'].max().rename('max_museq_score')
-    museq_results = museq_results.reset_index()
+    museq_results = load_snv_annotation_table(museq_path)
+    museq_results = (
+        museq_results
+            .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
+            .max().rename('max_museq_score').reset_index())
 
-    cosmic = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(cosmic_path))
+    cosmic = load_snv_annotation_table(cosmic_path)
     logging.info(f'cosmic table with shape {cosmic.shape}, memory {cosmic.memory_usage().sum()}')
     cosmic['is_cosmic'] = 1
     cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
 
-    snpeff = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(snpeff_path))
+    snpeff = load_snv_annotation_table(snpeff_path)
 
     snpeff = get_highest_snpeff_effect(snpeff)
     logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
 
-    dbsnp = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(dbsnp_path))
+    dbsnp = load_snv_annotation_table(dbsnp_path)
     dbsnp = dbsnp[['chrom', 'coord', 'ref', 'alt', 'exact_match']].rename(columns={'exact_match': 'is_dbsnp'})
     logging.info(f'dbsnp table with shape {dbsnp.shape}, memory {dbsnp.memory_usage().sum()}')
 
-    tnc = load_snv_annotation_table(scgenome.loaders.utils._prep_filenames_for_loading(trinuc_path))
-
-    return _concat_annotation_results(
-        mappability, cosmic, snpeff, dbsnp, tnc, strelka_results,
-        museq_results, museq_filter=museq_filter, strelka_filter=strelka_filter,
-        mappability_filter=mappability_filter,
-    )
-
-
-def _concat_annotation_results(
-        mappability, cosmic, snpeff, dbsnp, tnc, strelka_results, museq_results,
-        museq_filter=None, strelka_filter=None, mappability_filter=None,
-):
-    '''
-    private function to concatenate and filter snv annotation data
-    '''
+    tnc = load_snv_annotation_table(trinuc_path)
 
     scgenome.utils.union_categories([
         mappability,
@@ -346,82 +355,7 @@ def _concat_annotation_results(
     return data
 
 
-def load_snv_annotation_results(pseudobulk_dir, museq_filter=None, strelka_filter=None, mappability_filter=None):
-    """ Collate snv results into a single table.
-    """
-
-    if museq_filter is None:
-        museq_filter = default_museq_filter
-
-    if strelka_filter is None:
-        strelka_filter = default_strelka_filter
-
-    if mappability_filter is None:
-        mappability_filter = default_mappability_filter
-
-    logging.info('starting load')
-
-    mappability_files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, 'snv_mappability.csv.gz'
-    )
-    mappability = load_snv_annotation_table(mappability_files)
-
-    strelka_files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, 'snv_strelka.csv.gz'
-    )
-    strelka_results = load_snv_annotation_table(strelka_files)
-
-    strelka_results = (
-        strelka_results
-            .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
-            .max().rename('max_strelka_score').reset_index())
-
-    museq_files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, 'snv_museq.csv.gz'
-    )
-    museq_results = load_snv_annotation_table(museq_files)
-    museq_results = (
-        museq_results
-            .groupby(['chrom', 'coord', 'ref', 'alt'], observed=True)['score']
-            .max().rename('max_museq_score').reset_index())
-
-    cosmic_files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, 'snv_cosmic_status.csv.gz'
-    )
-    cosmic = load_snv_annotation_table(cosmic_files)
-    logging.info(f'cosmic table with shape {cosmic.shape}, memory {cosmic.memory_usage().sum()}')
-    cosmic['is_cosmic'] = 1
-    cosmic = cosmic[['chrom', 'coord', 'ref', 'alt', 'is_cosmic']].drop_duplicates()
-
-    snpeff_files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, 'snv_snpeff.csv.gz'
-    )
-
-    snpeff = load_snv_annotation_table(snpeff_files)
-
-    snpeff = get_highest_snpeff_effect(snpeff)
-    logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
-
-    dbsnp_files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, 'snv_dbsnp_status.csv.gz'
-    )
-    dbsnp = load_snv_annotation_table(dbsnp_files)
-    dbsnp = dbsnp[['chrom', 'coord', 'ref', 'alt', 'exact_match']].rename(columns={'exact_match': 'is_dbsnp'})
-    logging.info(f'dbsnp table with shape {dbsnp.shape}, memory {dbsnp.memory_usage().sum()}')
-
-    trinuc_files = scgenome.loaders.utils.get_pseudobulk_files(
-        pseudobulk_dir, 'snv_trinuc.csv.gz'
-    )
-    tnc = load_snv_annotation_table(trinuc_files)
-
-    return _concat_annotation_results(
-        mappability, cosmic, snpeff, dbsnp, tnc, strelka_results, museq_results,
-        museq_filter=museq_filter, strelka_filter=strelka_filter,
-        mappability_filter=mappability_filter,
-    )
-
-
-def load_snv_data_from_files(
+def load_snvs(
         mappability_path,
         strelka_path,
         museq_path,
@@ -433,158 +367,36 @@ def load_snv_data_from_files(
         museq_filter=None,
         strelka_filter=None,
         mappability_filter=None,
-        positions=None,
-        filter_sample_id=None,
-        filter_library_id=None,
-        snv_annotation=False,
-        snv_counts=False
 ):
     """ Load filtered SNV annotation and count data
     """
 
-    outputs = {}
+    results = {}
 
-    if snv_annotation:
-        snv_data = load_snv_annotation_results_from_filenames(
-            mappability_path, strelka_path, museq_path, cosmic_path, snpeff_path, dbsnp_path, trinuc_path,
-            museq_filter=museq_filter, strelka_filter=strelka_filter, mappability_filter=mappability_filter,
-        )
+    snv_data = load_snv_annotations(
+        mappability_path,
+        strelka_path,
+        museq_path,
+        cosmic_path,
+        snpeff_path,
+        dbsnp_path,
+        trinuc_path,
+        museq_filter=museq_filter,
+        strelka_filter=strelka_filter,
+        mappability_filter=mappability_filter,
+    )
 
-        assert not snv_data['coord'].isnull().any()
+    assert not snv_data['coord'].isnull().any()
 
-        outputs["snv_data"] = snv_data
+    positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
 
-    if snv_counts:
-        assert positions is not None
+    results["snv_data"] = snv_data
 
-        snv_count_data = load_snv_count_data_from_filenames(
-            counts_path,
-            positions,
-            filter_sample_id=filter_sample_id,
-            filter_library_id=filter_library_id)
+    assert positions is not None
 
-        snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
-        snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
+    snv_count_data = load_snv_counts(counts_path, positions)
 
-        outputs["snv_count_data"] = snv_count_data
+    results["snv_count_data"] = snv_count_data
 
-    return outputs
+    return results
 
-
-def load_snv_data(
-        results_dir,
-        museq_filter=None,
-        strelka_filter=None,
-        mappability_filter=None,
-        positions=None,
-        filter_sample_id=None,
-        filter_library_id=None,
-):
-    """ Load filtered SNV annotation and count data
-    
-    Args:
-        results_dir (str): results directory to load from.
-
-    Kwargs:
-        filter_sample_id (str): restrict to specific sample id
-        filter_library_id (str): restrict to specific library id
-        museq_filter (float, optional): mutationseq score threshold. Defaults to None.
-        strelka_filter (float, optional): strelka score threshold. Defaults to None.
-        mappability_filter (float, optional): mappability threshold. Defaults to None.
-        positions:  #TODO 
-        
-    Returns:
-        pandas.DataFrame, pandas.DataFrame: SNV annotations, SNV counts
-    """
-
-    analysis_dirs = scgenome.loaders.utils.find_results_directories(
-        results_dir)
-
-    if 'pseudobulk' in analysis_dirs:
-        pseudobulk_dir = analysis_dirs['pseudobulk']
-
-        snv_data = load_snv_annotation_results(
-            pseudobulk_dir,
-            museq_filter=museq_filter,
-            strelka_filter=strelka_filter,
-            mappability_filter=mappability_filter,
-        )
-
-        assert not snv_data['coord'].isnull().any()
-
-        positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
-
-        snv_count_data = load_snv_count_data(pseudobulk_dir, 'snv_union_counts.csv.gz', positions)
-        snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
-
-        return {
-            'snv_data': snv_data,
-            'snv_count_data': snv_count_data,
-        }
-
-    if 'variant_calling' in analysis_dirs:
-        variant_calling_dir = analysis_dirs['variant_calling']
-
-        if len(variant_calling_dir) == 0:
-            raise ValueError(f'found {len(variant_calling_dir)} dirs for variant_calling')
-
-        elif len(variant_calling_dir) > 1:
-            if filter_sample_id is None:
-                raise ValueError(f'found {len(variant_calling_dir)} without filter_sample_id')
-
-            filtered_variant_calling_dir = list(
-                filter(lambda a: f'sample_{filter_sample_id}' in a, variant_calling_dir))
-
-            if len(filtered_variant_calling_dir) != 1:
-                raise ValueError(
-                    f'found {len(filtered_variant_calling_dir)} in {variant_calling_dir} matching filter_sample_id')
-
-            variant_calling_dir = filtered_variant_calling_dir
-
-        snv_data = load_snv_annotation_results(
-            variant_calling_dir[0],
-            museq_filter=museq_filter,
-            strelka_filter=strelka_filter,
-            mappability_filter=mappability_filter,
-        )
-
-        assert not snv_data['coord'].isnull().any()
-
-        return {
-            'snv_data': snv_data,
-        }
-
-    if 'snv_genotyping' in analysis_dirs:
-        assert positions is not None
-
-        variant_counting_dir = analysis_dirs['snv_genotyping']
-
-        if len(variant_counting_dir) != 1:
-            raise ValueError(f'found {len(variant_counting_dir)} dirs for snv_genotyping')
-        variant_counting_dir = variant_counting_dir[0]
-
-        manifest_filename = os.path.join(variant_counting_dir, 'metadata.yaml')
-        manifest = yaml.safe_load(open(manifest_filename))
-
-        suffix = 'counts.csv.gz'
-        if packaging.version.parse(manifest['meta']['version']) > packaging.version.parse('v0.6.0'):
-            if filter_sample_id is None or filter_library_id is None:
-                raise ValueError('both filter_sample_id and filter_library_id must be specified')
-            suffix = f'{filter_sample_id}_{filter_library_id}_counts.csv.gz'
-
-        snv_count_data = load_snv_count_data(
-            variant_counting_dir,
-            suffix,
-            positions,
-            filter_sample_id=filter_sample_id,
-            filter_library_id=filter_library_id)
-
-        snv_count_data['total_counts'] = snv_count_data['ref_counts'] + snv_count_data['alt_counts']
-        snv_count_data['sample_id'] = snv_count_data['cell_id'].apply(lambda a: a.split('-')[0]).astype('category')
-
-        return {
-            'snv_count_data': snv_count_data,
-        }
-
-    else:
-        raise ValueError(f'no variant calling found for directory {results_dir}')
