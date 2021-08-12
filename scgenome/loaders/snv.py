@@ -25,7 +25,7 @@ categorical_columns = [
 ]
 
 
-def load_snv_counts_from_results(results_dir, positions=None):
+def load_snv_genotyping_results(results_dir, positions=None):
     """ Load per cell SNV count data from results directory
     
     Args:
@@ -39,10 +39,10 @@ def load_snv_counts_from_results(results_dir, positions=None):
     counts_filepath = scgenome.loaders.utils.find_results_filepath(
         results_dir, 'counts.csv.gz', analysis_type='snv_genotyping')
 
-    return load_snv_counts(counts_filepath, positions=positions)
+    return load_snv_genotyping_files(counts_filepath, positions=positions)
 
 
-def load_snv_counts(filepath, positions=None):
+def load_snv_genotyping_files(filepath, positions=None):
     """ Load per cell SNV count data from filepath
     
     Args:
@@ -72,10 +72,11 @@ def load_snv_counts(filepath, positions=None):
     )
 
     for chunk in chunk_iter:
-        scgenome.utils.union_categories(
-            [chunk, positions],
-            cat_cols=['chrom', 'ref', 'alt'])
-        chunk = chunk.merge(positions)
+        if positions is not None:
+            scgenome.utils.union_categories(
+                [chunk, positions],
+                cat_cols=['chrom', 'ref', 'alt'])
+            chunk = chunk.merge(positions)
 
         data.append(chunk)
 
@@ -83,10 +84,11 @@ def load_snv_counts(filepath, positions=None):
 
     logging.info(f'Loaded snv counts table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
-    scgenome.utils.union_categories(
-        [data, positions],
-        cat_cols=['chrom', 'ref', 'alt'])
-    data = data.merge(positions, how='inner')
+    if positions is not None:
+        scgenome.utils.union_categories(
+            [data, positions],
+            cat_cols=['chrom', 'ref', 'alt'])
+        data = data.merge(positions, how='inner')
 
     logging.info(f'Filtered snv counts table to shape {data.shape}, memory {data.memory_usage().sum()}')
 
@@ -96,7 +98,7 @@ def load_snv_counts(filepath, positions=None):
 
     data['total_counts'] = data['ref_counts'] + data['alt_counts']
 
-    return data
+    return {'snv_count_data': data}
 
 
 def load_snv_annotation_table(filepath):
@@ -164,7 +166,7 @@ def get_highest_snpeff_effect(snpeff_data):
     return snpeff_data
 
 
-def load_snv_annotations_from_results(
+def load_snv_annotation_results(
         results_dir,
         museq_filter=None,
         strelka_filter=None,
@@ -205,7 +207,7 @@ def load_snv_annotations_from_results(
     trinuc_path = scgenome.loaders.utils.find_results_filepath(
         results_dir, 'snv_trinuc.csv.gz', analysis_type='variant_calling')
 
-    return load_snv_annotations(
+    return load_snv_annotation_files(
         mappability_path,
         strelka_path,
         museq_path,
@@ -219,7 +221,7 @@ def load_snv_annotations_from_results(
     )
 
 
-def load_snv_annotations(
+def load_snv_annotation_files(
         mappability_path,
         strelka_path,
         museq_path,
@@ -352,10 +354,43 @@ def load_snv_annotations(
 
     logging.info(f'final snv table with shape {data.shape}, memory {data.memory_usage().sum()}')
 
-    return data
+    return {'snv_data': data}
 
 
-def load_snvs(
+def load_snv_results(
+        variant_calling_results_dir,
+        snv_genotyping_results_dir,
+        museq_filter=None,
+        strelka_filter=None,
+        mappability_filter=None,
+    ):
+    """ Load filtered SNV annotation and genotyping data
+    """
+
+    variant_calling_results_dir = scgenome.loaders.utils.find_results_directory(
+        variant_calling_results_dir, 'variant_calling')
+
+    results_tables = load_snv_annotation_results(
+        variant_calling_results_dir,
+        museq_filter=museq_filter,
+        strelka_filter=strelka_filter,
+        mappability_filter=mappability_filter,
+    )
+
+    snv_genotyping_results_dir = scgenome.loaders.utils.find_results_directory(
+        snv_genotyping_results_dir, 'snv_genotyping')
+
+    positions = results_tables['snv_data'][['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
+
+    snv_genotyping_results = load_snv_genotyping_results(snv_genotyping_results_dir, positions)
+    results_tables.update(snv_genotyping_results)
+
+    scgenome.utils.union_categories(results_tables.values())
+
+    return results_tables
+
+
+def load_snv_files(
         mappability_path,
         strelka_path,
         museq_path,
@@ -367,13 +402,11 @@ def load_snvs(
         museq_filter=None,
         strelka_filter=None,
         mappability_filter=None,
-):
-    """ Load filtered SNV annotation and count data
+    ):
+    """ Load filtered SNV annotation and genotyping data
     """
 
-    results = {}
-
-    snv_data = load_snv_annotations(
+    results_tables = load_snv_annotation_files(
         mappability_path,
         strelka_path,
         museq_path,
@@ -386,17 +419,12 @@ def load_snvs(
         mappability_filter=mappability_filter,
     )
 
-    assert not snv_data['coord'].isnull().any()
+    assert not results_tables['snv_data']['coord'].isnull().any()
 
-    positions = snv_data[['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
+    positions = results_tables['snv_data'][['chrom', 'coord', 'ref', 'alt']].drop_duplicates()
 
-    results["snv_data"] = snv_data
+    snv_genotyping_results = load_snv_genotyping_files(counts_path, positions)
+    results_tables.update(snv_genotyping_results)
 
-    assert positions is not None
-
-    snv_count_data = load_snv_counts(counts_path, positions)
-
-    results["snv_count_data"] = snv_count_data
-
-    return results
+    return results_tables
 
