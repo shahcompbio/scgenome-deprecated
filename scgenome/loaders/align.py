@@ -13,35 +13,8 @@ _categorical_cols = [
     'library_id',
 ]
 
-_table_suffixes_v0_0_0 = (
-    ('align_metrics', '_alignment_metrics.csv.gz'),
-)
 
-_table_suffixes_v0_2_25 = (
-    ('align_metrics', '_alignment_metrics.csv.gz'),
-    ('gc_metrics', '_gc_metrics.csv.gz'),
-)
-
-table_suffixes = defaultdict(lambda: _table_suffixes_v0_2_25, {
-    'v0.0.0': _table_suffixes_v0_0_0,
-    'v0.1.5': _table_suffixes_v0_0_0,
-    'v0.2.2': _table_suffixes_v0_0_0,
-    'v0.2.3': _table_suffixes_v0_0_0,
-    'v0.2.6': _table_suffixes_v0_0_0,
-    'v0.2.7': _table_suffixes_v0_0_0,
-    'v0.2.9': _table_suffixes_v0_0_0,
-    'v0.2.10': _table_suffixes_v0_0_0,
-    'v0.2.11': _table_suffixes_v0_0_0,
-    'v0.2.15': _table_suffixes_v0_0_0,
-    'v0.2.19': _table_suffixes_v0_0_0,
-    'v0.2.20': _table_suffixes_v0_0_0,
-    'v0.2.25': _table_suffixes_v0_2_25,
-    'v0.3.0': _table_suffixes_v0_2_25,
-    'v0.3.1': _table_suffixes_v0_2_25,
-})
-
-
-def load_align_data_from_files(align_metrics, gc_metrics=None):
+def load_alignment_files(align_metrics, gc_metrics=None):
     results_tables = dict()
 
     results_tables["align_metrics"] = process_alignment_data(align_metrics, "align_metrics")
@@ -54,10 +27,8 @@ def load_align_data_from_files(align_metrics, gc_metrics=None):
     return results_tables
 
 
-def load_align_data(
-        results_dir,
-):
-    """ Load copy number tables
+def load_alignment_results(results_dir):
+    """ Load alignment metrics tables
     
     Args:
         results_dir (str): results directory to load from.
@@ -66,42 +37,13 @@ def load_align_data(
         dict: pandas.DataFrame tables keyed by table name
     """
 
-    analysis_dirs = scgenome.loaders.utils.find_results_directories(
-        results_dir)
+    alignment_metrics_filepath = scgenome.loaders.utils.find_results_filepath(
+        results_dir, '_alignment_metrics.csv.gz', analysis_type='alignment')
 
-    if 'align' not in analysis_dirs:
-        raise ValueError(f'no align found for directory {results_dir}')
+    gc_metrics_filepath = scgenome.loaders.utils.find_results_filepath(
+        results_dir, '_gc_metrics.csv.gz', analysis_type='alignment')
 
-    align_results_dir = analysis_dirs['align']
-    assert len(align_results_dir) == 1
-    align_results_dir = align_results_dir[0]
-
-    manifest_filename = os.path.join(align_results_dir, 'metadata.yaml')
-    manifest = yaml.safe_load(open(manifest_filename))
-
-    # KLUDGE: 0.3.1 -> v0.3.1
-    if not manifest['meta']['version'].startswith('v'):
-        manifest['meta']['version'] = 'v' + manifest['meta']['version']
-
-    version = manifest['meta']['version']
-
-    results_tables = {}
-
-    for table_name, suffix in table_suffixes[version]:
-        filenames = scgenome.loaders.utils.find_filenames(manifest['filenames'], suffix)
-
-        if len(filenames) != 1:
-            raise ValueError(f'found filenames {filenames} for suffix {suffix}')
-
-        filename = filenames[0]
-
-        filepath = os.path.join(align_results_dir, filename)
-
-        results_tables[table_name] = process_alignment_data(filepath, table_name)
-
-    scgenome.utils.union_categories(results_tables.values())
-
-    return results_tables
+    return load_alignment_files(alignment_metrics_filepath, gc_metrics=gc_metrics_filepath)
 
 
 def process_alignment_data(filepath, table_name):

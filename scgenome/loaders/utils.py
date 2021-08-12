@@ -1,8 +1,9 @@
 import collections
 import os
-
 import packaging.version
 import yaml
+
+import scgenome.utils
 
 
 def find_filenames(filenames, suffix):
@@ -28,10 +29,6 @@ def find_results_directories(results_dir):
 
         results_type = manifest['meta']['type']
 
-        # KLUDGE: alignment -> align
-        if results_type == 'alignment':
-            results_type = 'align'
-
         # KLUDGE: 0.3.1 -> v0.3.1
         if not manifest['meta']['version'].startswith('v'):
             manifest['meta']['version'] = 'v' + manifest['meta']['version']
@@ -39,6 +36,18 @@ def find_results_directories(results_dir):
         results_directories[results_type].append(os.path.dirname(manifest_filename))
 
     return results_directories
+
+
+def find_results_directory(results_dir, analysis_type):
+    analysis_results_dirs = find_results_directories(results_dir)
+
+    if analysis_type not in analysis_results_dirs:
+        raise Exception(f'no analysis type {analysis_type} found at {results_dir}')
+
+    if len(analysis_results_dirs[analysis_type]) > 1:
+        raise Exception(f'found {len(analysis_results_dirs[analysis_type])} analyses of type {analysis_type} found at {results_dir}')
+
+    return analysis_results_dirs[analysis_type][0]
 
 
 def get_version(results_dir):
@@ -55,12 +64,6 @@ def get_version(results_dir):
     return manifest['meta']['version']
 
 
-# Deprecate
-def _prep_filenames_for_loading(files):
-    for f in files:
-        yield None, None, f
-
-
 def find_results_filepath(results_dir, filename_suffix, analysis_type=None):
     """ Get filepaths for libraries and samples by suffix
     
@@ -74,6 +77,9 @@ def find_results_filepath(results_dir, filename_suffix, analysis_type=None):
     Returns:
         str: filepath
     """
+
+    if analysis_type is not None:
+        results_dir = find_results_directory(results_dir, analysis_type)
 
     manifest_filename = os.path.join(results_dir, 'metadata.yaml')
     manifest = yaml.safe_load(open(manifest_filename))
@@ -147,3 +153,31 @@ def _get_pseudobulk_files_v_lt_050(results_dir, suffix):
         sample_lib_filepath = os.path.join(results_dir, sample_lib_filename)
 
         yield sample_id, library_id, sample_lib_filepath
+
+
+def concat_results(results):
+    """ Merge a set of results tables
+
+    Args:
+        tables (list of dict of DataFrame): list of named results tables
+
+    Returns:
+        dict of DataFrame: named results tables with unified categories
+    """
+
+    names = set()
+    for tables in results:
+        for name in tables.keys():
+            names.add(name)
+
+    concatenated = {}
+    for name in names:
+        concatenated[name] = []
+        for tables in results:
+            if name in tables:
+                concatenated[name].append(tables[name])
+
+    for name in names:
+        concatenated[name] = scgenome.utils.concat_with_categories(concatenated[name], ignore_index=True)
+
+    return concatenated
