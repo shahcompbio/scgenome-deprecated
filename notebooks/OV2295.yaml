@@ -1,0 +1,66 @@
+SA1090:
+  alignment:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/85/03/8503/results/
+    version: v0.6.42
+  annotation:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/88/15/8815/results/
+    version: v0.6.41
+  breakpoint_calling:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/38/78/13878/results/
+    version: 0.8.0
+  count_haps:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/23/91/12391/results/
+    version: v0.7.5
+  hmmcopy:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/86/78/8678/results/
+    version: v0.6.41
+  snv_genotyping:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/42/26/14226/results/
+    version: v0.8.0
+  variant_calling:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/40/84/14084/results/
+    version: 0.8.0
+SA921:
+  alignment:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/85/01/8501/results/
+    version: v0.6.42
+  annotation:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/88/13/8813/results/
+    version: v0.6.41
+  breakpoint_calling:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/38/80/13880/results/
+    version: 0.8.0
+  count_haps:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/23/90/12390/results/
+    version: v0.7.5
+  hmmcopy:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/86/80/8680/results/
+    version: v0.6.41
+  snv_genotyping:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/42/38/14238/results/
+    version: v0.8.0
+  variant_calling:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/40/96/14096/results/
+    version: 0.8.0
+SA922:
+  alignment:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/85/02/8502/results/
+    version: v0.6.42
+  annotation:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/88/14/8814/results/
+    version: v0.6.41
+  breakpoint_calling:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/38/79/13879/results/
+    version: 0.8.0
+  count_haps:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/23/89/12389/results/
+    version: v0.7.5
+  hmmcopy:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/86/79/8679/results/
+    version: v0.6.41
+  snv_genotyping:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/42/25/14225/results/
+    version: v0.8.0
+  variant_calling:
+    result_filepath: /juno/work/shah/isabl_data_lake/analyses/40/83/14083/results/
+    version: 0.8.0
