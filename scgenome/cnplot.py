@@ -57,7 +57,7 @@ def _secondary_clustering(data):
 
 
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', raw=False, max_cn=13):
-    plot_data = cn_data.merge(utils.chrom_idxs)
+    plot_data = cn_data.merge(refgenome.info.chrom_idxs)
     plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
 
     ordering = _secondary_clustering(plot_data.values)
@@ -73,7 +73,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
     chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
     ordered_mat_chrom_idxs = mat_chrom_idxs[np.where(np.array([1] + list(np.diff(mat_chrom_idxs))) != 0)]
-    chrom_names = np.array(utils.chrom_names)[ordered_mat_chrom_idxs]
+    chrom_names = np.array(refgenome.info.chromosomes)[ordered_mat_chrom_idxs]
 
     mat_cluster_ids = plot_data.columns.get_level_values(1).values
     cluster_boundaries = np.array([0] + list(np.where(mat_cluster_ids[1:] != mat_cluster_ids[:-1])[0]) + [plot_data.shape[1] - 1])
@@ -267,7 +267,7 @@ def plot_breakends(ax, breakends, lw=0.5):
 
 
 def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='cluster_id'):
-    plot_data = cn_data.merge(utils.chrom_idxs)
+    plot_data = cn_data.merge(refgenome.info.chrom_idxs)
     plot_data = plot_data.groupby(['chr_index', 'start', cluster_field_name], observed=True)[cn_field_name].median().astype(int)
     plot_data = plot_data.unstack(level=[cluster_field_name]).fillna(0)
     plot_data = plot_data.sort_index(axis=1, level=1)
@@ -297,7 +297,7 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='clus
     im = ax.imshow(plot_data.T, aspect='auto', cmap=get_cn_cmap(plot_data.values), interpolation='none')
 
     ax.set(xticks=chrom_mids)
-    ax.set(xticklabels=utils.chrom_names)
+    ax.set(xticklabels=refgenome.info.chromosomes)
     ax.set(yticks=list(range(len(plot_data.columns.values))))
     ax.set(yticklabels=plot_data.columns.values)
 
