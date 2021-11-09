@@ -254,19 +254,17 @@ def test_local_results(results_directory):
 @cli.command()
 @click.argument('alignment_results_dir')
 @click.argument('hmmcopy_results_dir')
-@click.argument('annotation_results_dir')
-def test_results(alignment_results_dir, hmmcopy_results_dir, annotation_results_dir):
+def test_results(alignment_results_dir, hmmcopy_results_dir):
     results_tables = load_qc_results(
         alignment_results_dir,
         hmmcopy_results_dir,
-        annotation_results_dir,
         sample_ids=None,
         additional_hmmcopy_reads_cols=None,
     )
 
     test_qc_data(results_tables)
 
-    logging.info(f'successfully loaded results from {alignment_results_dir}, {hmmcopy_results_dir}, {annotation_results_dir}')
+    logging.info(f'successfully loaded results from {alignment_results_dir}, {hmmcopy_results_dir}')
 
 
 if __name__ == '__main__':

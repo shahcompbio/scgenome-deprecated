@@ -39,11 +39,13 @@ def load_alignment_results(results_dir):
         dict: pandas.DataFrame tables keyed by table name
     """
 
-    alignment_metrics_filepath = scgenome.loaders.utils.find_results_filepath(
-        results_dir, '_alignment_metrics.csv.gz', analysis_type='alignment')
+    alignment_metrics_filepath = os.path.join(results_dir, 'alignment_metrics.csv.gz')
+    # alignment_metrics_filepath = scgenome.loaders.utils.find_results_filepath(
+    #     results_dir, '_alignment_metrics.csv.gz', analysis_type='alignment')
 
-    gc_metrics_filepath = scgenome.loaders.utils.find_results_filepath(
-        results_dir, '_gc_metrics.csv.gz', analysis_type='alignment')
+    gc_metrics_filepath = os.path.join(results_dir, 'alignment_gc_metrics.csv.gz')
+    # gc_metrics_filepath = scgenome.loaders.utils.find_results_filepath(
+    #     results_dir, '_gc_metrics.csv.gz', analysis_type='alignment')
 
     return load_alignment_files(alignment_metrics_filepath, gc_metrics=gc_metrics_filepath)
 
