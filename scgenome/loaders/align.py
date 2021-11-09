@@ -2,10 +2,12 @@ import os
 from collections import defaultdict
 
 import pandas as pd
-import scgenome.csvutils
 import scgenome.loaders.utils
 import scgenome.utils
 import yaml
+from csverve.core import CsverveInput
+
+
 
 _categorical_cols = [
     'cell_id',
@@ -17,10 +19,10 @@ _categorical_cols = [
 def load_alignment_files(align_metrics, gc_metrics=None):
     results_tables = dict()
 
-    results_tables["align_metrics"] = process_alignment_data(align_metrics, "align_metrics")
+    results_tables["align_metrics"] = process_alignment_data(align_metrics)
 
     if gc_metrics:
-        results_tables["gc_metrics"] = process_alignment_data(gc_metrics, "gc_metrics")
+        results_tables["gc_metrics"] = process_alignment_data(gc_metrics)
 
     scgenome.utils.union_categories(results_tables.values())
 
@@ -46,22 +48,8 @@ def load_alignment_results(results_dir):
     return load_alignment_files(alignment_metrics_filepath, gc_metrics=gc_metrics_filepath)
 
 
-def process_alignment_data(filepath, table_name):
-    csv_input = scgenome.csvutils.CsvInput(filepath)
-
-    dtypes_override = None
-    if table_name == 'align_metrics':
-        dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-        dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
-        dtypes_override = yaml.safe_load(open(dtypes_filename))
-        dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-    elif table_name == 'gc_metrics':
-        dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-        dtypes_filename = os.path.join(dtypes_directory, 'alignment_gc_metrics_defs.yaml')
-        dtypes_override = yaml.safe_load(open(dtypes_filename))
-        dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-
-    data = csv_input.read_csv(dtypes_override=dtypes_override)
+def process_alignment_data(filepath):
+    data = CsverveInput(filepath).read_csv()
 
     data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
     data['library_id'] = [a.split('-')[1] for a in data['cell_id']]

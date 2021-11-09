@@ -5,11 +5,7 @@ import logging
 import collections
 import numpy as np
 
-import dbclients.tantalus
-import datamanagement.transfer_files
-
-from scgenome.loaders.qc import load_qc_data
-from scgenome.db.qc import cache_qc_results
+from scgenome.loaders.qc import load_qc_results
 
 
 LOGGING_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
@@ -47,7 +43,7 @@ dtypes_check = {
         'cell_id': 'category',
         'sample_id': 'category',
         'library_id': 'category',
-        'order': 'float64',
+        'order': 'int64',
         'total_mapped_reads_hmmcopy': 'int64',
         'experimental_condition': 'object',
         'mean_copy': 'float64',
@@ -58,7 +54,7 @@ dtypes_check = {
         'breakpoints': 'int64',
         'cell_call': 'str',
         'cell_id': 'str',
-        'column': 'float64',
+        'column': 'int64',
         'coverage_breadth': 'float64',
         'coverage_depth': 'float64',
         'cv_hmmcopy': 'float64',
@@ -74,7 +70,7 @@ dtypes_check = {
         'fastqscreen_salmon': 'int64',
         'grch37_multihit': 'int64',
         'grch37': 'int64',
-        'img_col': 'float64',
+        'img_col': 'int64',
         'index_i5': 'str',
         'index_i7': 'str',
         'index_sequence': 'str',
@@ -99,14 +95,14 @@ dtypes_check = {
         'multiplier': 'int64',
         'nohit': 'int64',
         'order_corrupt_tree': 'float64',
-        'order': 'float64',
+        'order': 'int64',
         'paired_duplicate_reads': 'int64',
         'paired_mapped_reads': 'int64',
         'percent_duplicate_reads': 'float64',
         'primer_i5': 'str',
         'primer_i7': 'str',
         'quality': 'float64',
-        'row': 'float64',
+        'row': 'int64',
         'salmon_multihit': 'int64',
         'salmon': 'int64',
         'sample_id': 'str',
@@ -253,6 +249,24 @@ def test_cached_multi_ticket(local_cache_directory=None, local_storage_name=None
 @click.argument('results_directory')
 def test_local_results(results_directory):
     test_load_local_qc_data(results_directory)
+
+
+@cli.command()
+@click.argument('alignment_results_dir')
+@click.argument('hmmcopy_results_dir')
+@click.argument('annotation_results_dir')
+def test_results(alignment_results_dir, hmmcopy_results_dir, annotation_results_dir):
+    results_tables = load_qc_results(
+        alignment_results_dir,
+        hmmcopy_results_dir,
+        annotation_results_dir,
+        sample_ids=None,
+        additional_hmmcopy_reads_cols=None,
+    )
+
+    test_qc_data(results_tables)
+
+    logging.info(f'successfully loaded results from {alignment_results_dir}, {hmmcopy_results_dir}, {annotation_results_dir}')
 
 
 if __name__ == '__main__':

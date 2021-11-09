@@ -2,10 +2,11 @@ import os
 from collections import defaultdict
 
 import pandas as pd
-import scgenome.csvutils
 import scgenome.loaders.utils
 import scgenome.utils
 import yaml
+from csverve.core import CsverveInput
+
 
 standard_hmmcopy_reads_cols = [
     'chr',
@@ -36,9 +37,9 @@ def load_hmmcopy_files(
     if additional_reads_cols is not None:
         hmmcopy_reads_cols.extend(additional_reads_cols)
 
-    results_tables["hmmcopy_reads"] = process_hmmcopy_data(hmmcopy_reads, "hmmcopy_reads", usecols=hmmcopy_reads_cols)
-    results_tables["hmmcopy_segs"] = process_hmmcopy_data(hmmcopy_segs, "hmmcopy_segs")
-    results_tables["hmmcopy_metrics"] = process_hmmcopy_data(hmmcopy_metrics, "hmmcopy_metrics")
+    results_tables["hmmcopy_reads"] = process_hmmcopy_data(hmmcopy_reads, usecols=hmmcopy_reads_cols)
+    results_tables["hmmcopy_segs"] = process_hmmcopy_data(hmmcopy_segs)
+    results_tables["hmmcopy_metrics"] = process_hmmcopy_data(hmmcopy_metrics)
 
     # FIXUP: older hmmcopy results have total_mapped_reads instead of total_mapped_reads_hmmcopy
     results_tables['hmmcopy_metrics'] = results_tables['hmmcopy_metrics'].rename(
@@ -80,27 +81,8 @@ def load_hmmcopy_results(
     )
 
 
-def process_hmmcopy_data(filepath, table_name, usecols=None):
-    csv_input = scgenome.csvutils.CsvInput(filepath)
-
-    dtypes_override = None
-    if table_name == 'hmmcopy_metrics':
-        dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-        dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
-        dtypes_override = yaml.safe_load(open(dtypes_filename))
-        dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-    elif table_name == 'hmmcopy_reads':
-        dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-        dtypes_filename = os.path.join(dtypes_directory, 'hmmcopy_reads_defs.yaml')
-        dtypes_override = yaml.safe_load(open(dtypes_filename))
-        dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-    elif table_name == 'hmmcopy_segs':
-        dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-        dtypes_filename = os.path.join(dtypes_directory, 'hmmcopy_segments_defs.yaml')
-        dtypes_override = yaml.safe_load(open(dtypes_filename))
-        dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-
-    data = csv_input.read_csv(usecols=usecols, dtypes_override=dtypes_override)
+def process_hmmcopy_data(filepath, usecols=None):
+    data = CsverveInput(filepath).read_csv()
 
     data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
     data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
