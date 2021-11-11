@@ -38,7 +38,8 @@ configparser==3.5.0
 coreapi==2.3.3
 coreschema==0.0.4
 cryptography==2.8
--e git+https://github.com/mondrian-scwgs/csverve.git@1dd3cde7e461d354a7c91539c09d145ec9f65254#egg=csverve
+#-e git+https://github.com/mondrian-scwgs/csverve.git@412df6a5798c2e0125c1b4d2448b45abba0eacf5#egg=csverve
+csverve=0.2.1
 cycler==0.10.0
 Cython==0.29.22
 decorator==4.4.1
