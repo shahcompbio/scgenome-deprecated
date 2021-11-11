@@ -111,7 +111,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
     return plot_data
 
 
-def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_cn=13, chromosome=None, s=5, squashy=False):
+def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_cn=13, chromosome=None, s=5, squashy=False, rawy=False):
     """ Plot copy number profile on a genome axis
 
     Args:
@@ -124,6 +124,8 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
         max_cn: max copy number for y axis
         chromosome: single chromosome plot
         s: size of scatter points
+        squashy: compress y axis
+        rawy: raw data on y axis
 
     The cn_data table should have the following columns (in addition to value_field_name and
     optionally cn_field_name):
@@ -178,7 +180,7 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
         ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_mid))
         ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.chromosomes))
 
-    if squashy:
+    if squashy and not rawy:
         yticks = np.array([0, 2, 4, 7, 20])
         yticks_squashed = squash_f(yticks)
         ytick_labels = [str(a) for a in yticks]
@@ -186,7 +188,7 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
         ax.set_yticklabels(ytick_labels)
         ax.set_ylim((-0.01, 1.01))
         ax.spines['left'].set_bounds(0, 1)
-    else:
+    elif not rawy:
         ax.set_ylim((-0.05*max_cn, max_cn))
         ax.set_yticks(range(0, int(max_cn) + 1))
         ax.spines['left'].set_bounds(0, max_cn)
@@ -332,7 +334,7 @@ def plot_pca_components(cn_data, n_components=4, plots_prefix=None):
         ax = fig.add_subplot(n_components, 1, idx + 1)
         plot_data = components.iloc[idx].T.rename('component').reset_index()
         plot_cell_cn_profile(
-            ax, plot_data, 'component')
+            ax, plot_data, 'component', rawy=True)
         ax.set_ylabel(f'PCA {idx+1}')
 
     if plots_prefix is not None:
