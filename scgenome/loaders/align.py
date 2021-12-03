@@ -51,8 +51,8 @@ def load_alignment_results(results_dir):
 def process_alignment_data(filepath):
     data = CsverveInput(filepath).read_csv()
 
-    data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
-    data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
+    data['sample_id'] = [a.split('-')[-4] for a in data['cell_id']]
+    data['library_id'] = [a.split('-')[-3] for a in data['cell_id']]
 
     for col in _categorical_cols:
         if col in data:
