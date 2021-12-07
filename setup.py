@@ -8,9 +8,6 @@ setup(name='scgenome',
       packages=find_packages(),
       entry_points={
         'console_scripts': [
-            'cluster_cells = scgenome.scripts.cluster_cells:main',
-            'filter_copynumber = scgenome.scripts.filter_copynumber:main',
-            'generate_copynumber_clone_tree_hac = scgenome.generate_copynumber_clone_tree_hac:main'
         ]
       },
       package_data={'':['data/GRCh37-lite.fa.fai', 'dtypes/*.yaml']},
