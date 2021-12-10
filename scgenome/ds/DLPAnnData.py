@@ -23,7 +23,7 @@ import scgenome.cnfilter
 
 class NotDLPAnnDataType(Exception):
     def __init__(self, reason, message="Not DLP AnnData Type!"):
-        self.reason = salary
+        self.reason = reason
         self.message = message
         super().__init__(f"{self.message} {self.reason}")
 
