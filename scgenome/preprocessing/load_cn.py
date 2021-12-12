@@ -1,74 +1,66 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 import anndata as ad
-import seaborn
-import numpy as np
-import pandas as pd
-import pylab
-import sklearn.preprocessing
-import scipy
 
 import scgenome.loaders.qc
-import scgenome.loaders.utils
-import scgenome.loaders.hmmcopy
-import scgenome.loaders.annotation
-import scgenome.ds
 
-def read_dlp_hmmcopy(hmmcopy_results_dir, annotation_results_dir, additional_hmmcopy_reads_cols=None):
+
+def read_dlp_hmmcopy(alignment_results_dir, hmmcopy_results_dir, annotation_results_dir, sample_ids=None, additional_hmmcopy_reads_cols=None):
     """ Read hmmcopy results from the DLP pipeline.
 
     Parameters
     ------
+    alignment_results_dir (str):
+        dlp pipeline alignment results directory
     hmmcopy_results_dir (str):
         dlp pipeline hmmcopy results directory
     annotation_results_dir (str):
         dlp pipeline annotation results directory
-        
+    sample_ids (list):
+        sample ids to load
+    additional_hmmcopy_reads_cols (list):
+        per bin metrics to load
+
     Returns
     ------
-    DLPAnnData
-        An instantiated DLPAnnData Object.
+    AnnData
+        An instantiated AnnData Object.
     """
-    
-    # Load hmmcopy results
-    hmmcopy_results_dir = scgenome.loaders.utils.find_results_directory(
-        hmmcopy_results_dir, 'hmmcopy')
 
-    hmmcopy_results_tables = scgenome.loaders.hmmcopy.load_hmmcopy_results(
+    results = scgenome.loaders.qc.load_qc_results(
+        alignment_results_dir,
         hmmcopy_results_dir,
-        additional_reads_cols=additional_hmmcopy_reads_cols)
-
-    results_tables = hmmcopy_results_tables
-
-    # Load annotation results
-    annotation_results_dir = scgenome.loaders.utils.find_results_directory(
-        annotation_results_dir, 'annotation')
-
-    annotation_results_tables = scgenome.loaders.annotation.load_annotation_results(annotation_results_dir)
-
-    results_tables.update(annotation_results_tables)
-    
-    # Merge the metrics
-    metrics = results_tables['annotation_metrics'] \
-                .merge(
-                    results_tables['hmmcopy_metrics'],
-                    how="outer",
-                    left_on='cell_id',
-                    right_on='cell_id',
-                    suffixes=("_leftdf", "_rightdf")
-                ) 
-
-    metrics = metrics.loc[:,~df.columns.str.endswith("_rightdf")]
-    metrics = metrics.rename(
-        columns = lambda x:  x.strip("_leftdf") if x.endswith("_leftdf") else x
+        annotation_results_dir,
+        sample_ids=sample_ids,
+        additional_hmmcopy_reads_cols=additional_hmmcopy_reads_cols,
     )
-    metrics = metrics.loc[:,~metrics.columns.duplicated()]
-    
-    dad = DLPAnnData()
-    dad.load_dlp(
-        results_tables['hmmcopy_reads'],
-        metrics
+
+    metrics_data = results['annotation_metrics']
+    cn_data = results['hmmcopy_reads']
+
+    cn_matrix = (
+        cn_data
+            .set_index(['chr', 'start', 'end', 'cell_id'])[['reads', 'copy', 'state']]
+            .unstack(level='cell_id')
+            .transpose())
+
+    bin_data = (
+        cn_data[['chr', 'start', 'end', 'gc', 'map']]
+            .drop_duplicates()
+            .set_index(['chr', 'start', 'end'])
+            .reindex(cn_matrix.loc['reads'].columns))
+
+    cell_data = (
+        metrics_data
+            .set_index(['cell_id'])
+            .reindex(cn_matrix.loc['reads'].index))
+
+    adata = ad.AnnData(
+        cn_matrix.loc['reads'],
+        obs=cell_data,
+        var=bin_data,
+        layers={
+            'copy': cn_matrix.loc['copy'],
+            'state': cn_matrix.loc['state'],
+        },
     )
-    
-    return dad
+
+    return adata
