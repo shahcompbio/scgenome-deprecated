@@ -82,7 +82,7 @@ def load_hmmcopy_results(
 
 
 def process_hmmcopy_data(filepath, usecols=None):
-    data = CsverveInput(filepath).read_csv()
+    data = CsverveInput(filepath).read_csv(usecols=usecols)
 
     data['sample_id'] = [a.split('-')[-4] for a in data['cell_id']]
     data['library_id'] = [a.split('-')[-3] for a in data['cell_id']]
