@@ -46,23 +46,23 @@ def plot_cn_profile(
     TODO: missing return
     """
 
+    cn_data = adata.var
+
     if value_layer_name is not None:
-        values = adata[[obs_id], :].layers[value_layer_name][0]
+        cn_data['value'] = adata[[obs_id], :].layers[value_layer_name][0]
     else:
-        values = adata[[obs_id], :].X[0]
+        cn_data['value'] = adata[[obs_id], :].X[0]
 
-    data = {'value': values}
-
+    cn_field_name = None
     if state_layer_name is not None:
-        data['state'] = adata[[obs_id], :].layers[state_layer_name][0]
+        cn_data['state'] = adata[[obs_id], :].layers[state_layer_name][0]
+        cn_field_name = 'state'
 
     if ax is None:
         ax = plt.gca()
 
-    cn_data = pd.DataFrame(data, index=adata.var.index).reset_index()
-
     scgenome.cnplot.plot_cell_cn_profile(
-        ax, cn_data, 'value', cn_field_name='state', max_cn=max_cn,
+        ax, cn_data, 'value', cn_field_name=cn_field_name, max_cn=max_cn,
         chromosome=chromosome, s=s, squashy=squashy, rawy=rawy)
 
     return ax
