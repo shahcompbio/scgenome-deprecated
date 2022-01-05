@@ -4,6 +4,8 @@ import scipy.spatial.distance as dst
 
 from anndata import AnnData
 
+import scgenome.preprocessing.transform
+
 
 def sort_cells(adata: AnnData, layer_name=None) -> AnnData:
     """ Sort cells by hierarchical clustering on copy number values.
@@ -25,6 +27,8 @@ def sort_cells(adata: AnnData, layer_name=None) -> AnnData:
         X = adata.layers[layer_name]
     else:
         X = adata.X
+
+    X = scgenome.preprocessing.transform.fill_missing(X)
 
     D = dst.squareform(dst.pdist(X, 'cityblock'))
     Y = sch.linkage(D, method='complete')

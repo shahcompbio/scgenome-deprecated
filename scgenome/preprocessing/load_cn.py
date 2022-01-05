@@ -5,8 +5,9 @@ import pyranges as pr
 
 import scgenome.loaders.qc
 
+from anndata import AnnData
 from pyranges import PyRanges
-from typing import Dict, List
+from typing import Dict
 
 
 def read_dlp_hmmcopy(alignment_results_dir, hmmcopy_results_dir, annotation_results_dir, sample_ids=None, additional_hmmcopy_reads_cols=None):
@@ -51,8 +52,9 @@ def read_dlp_hmmcopy(alignment_results_dir, hmmcopy_results_dir, annotation_resu
             .transpose())
 
     bin_data = (
-        cn_data[['bin', 'gc', 'map']]
-            .drop_duplicates()
+        cn_data
+            .drop(['reads', 'copy', 'state'], axis=1)
+            .drop_duplicates(subset=['bin'])
             .set_index(['bin'])
             .reindex(cn_matrix.loc['reads'].columns))
 
@@ -90,7 +92,7 @@ def _add_bin_index(df):
     return df.set_index('bin')
     
 
-def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], **kwargs) -> ad.AnnData:
+def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], **kwargs) -> AnnData:
     """ Count reads in bins from bams
 
     Parameters

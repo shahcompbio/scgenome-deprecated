@@ -101,7 +101,7 @@ def calculate_filter_metrics(
     
     # Copy State Difference Filter
     adata.obsm['copy_state_diff'] = np.absolute(adata.layers['copy'] - adata.layers['state'])
-    adata.obsm['copy_state_diff_mean'] = adata.obsm['copy_state_diff'].mean(axis=1)
+    adata.obsm['copy_state_diff_mean'] = np.nanmean(adata.obsm['copy_state_diff'], axis=1)
 
     adata.obs['filter_copy_state_diff'] = (adata.obsm['copy_state_diff_mean'] < copy_state_diff_threshold)
 

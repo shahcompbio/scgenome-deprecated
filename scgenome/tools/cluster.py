@@ -3,12 +3,14 @@ import sklearn.cluster
 import umap
 import pandas as pd
 import numpy as np
+import anndata as ad
 from natsort import natsorted
 
 from anndata import AnnData
-from pandas import DataFrame
+from typing import Dict
 
 import scgenome.cncluster
+import scgenome.preprocessing.transform
 
 
 def cluster_cells(adata: AnnData, layer_name='copy', method='kmeans') -> AnnData:
@@ -58,16 +60,11 @@ def cluster_cells_kmeans(adata: AnnData, layer_name='copy', min_k=2, max_k=100) 
     else:
         X = adata.X
 
-    # Deal with missing values by assigning the mean value
-    # of each bin to missing values of that bin
-    bin_means = np.nanmean(X, axis=0)
-    bin_means = np.nan_to_num(bin_means, nan=0)
-    bin_means = np.tile(bin_means, (X.shape[0], 1))
-    X[np.where(np.isnan(X))] = bin_means[np.where(np.isnan(X))]
+    X = scgenome.preprocessing.transform.fill_missing(X)
 
     ks = range(min_k, max_k + 1)
 
-    print(f'trying with max k={max_k}')
+    logging.info(f'trying with max k={max_k}')
 
     kmeans = []
     bics = []
@@ -95,3 +92,99 @@ def cluster_cells_kmeans(adata: AnnData, layer_name='copy', min_k=2, max_k=100) 
     )
 
     return adata
+
+
+def aggregate_clusters(
+        adata: AnnData,
+        agg_X: Dict,
+        agg_layers: Dict=None,
+        agg_obs: Dict=None,
+        cluster_col: str='cluster_id') -> AnnData:
+    """ Aggregate copy number by cluster to create cluster CN matrix
+
+    Parameters
+    ----------
+    adata : AnnData
+        copy number data
+    agg_X : Dict
+        [description]
+    agg_layers : Dict, optional
+        [description], by default None
+    agg_obs : Dict, optional
+        [description], by default None
+    cluster_col : str, optional
+        column with cluster ids, by default 'cluster_id'
+
+    Returns
+    -------
+    AnnData
+        aggregsated cluster copy number
+    """
+
+    X = (
+        adata
+            .to_df()
+            .set_index(adata.obs[cluster_col].astype(str))
+            .groupby(level=0)
+            .agg(agg_X)
+            .sort_index())
+
+    layer_data = None
+    if agg_layers is not None:
+        layer_data = {}
+        for layer_name in agg_layers:
+            layer_data[layer_name] = (
+                adata
+                    .to_df(layer=layer_name)
+                    .set_index(adata.obs[cluster_col].astype(str))
+                    .groupby(level=0)
+                    .agg(agg_layers[layer_name])
+                    .sort_index())
+
+    if agg_obs is not None:
+        obs_data = {}
+        for obs_name in agg_obs:
+            obs_data[obs_name] = (
+                adata.obs
+                    .set_index(adata.obs[cluster_col].astype(str))[obs_name]
+                    .groupby(level=0)
+                    .agg(agg_obs[obs_name])
+                    .sort_index())
+        obs_data = pd.DataFrame(obs_data)
+
+    adata = ad.AnnData(
+        X,
+        obs=obs_data,
+        var=adata.var,
+        layers=layer_data,
+    )
+
+    return adata
+
+
+def aggregate_clusters_hmmcopy(adata: AnnData) -> AnnData:
+    """ Aggregate hmmcopy copy number by cluster to create cluster CN matrix
+
+    Parameters
+    ----------
+    adata : AnnData
+        hmmcopy copy number data
+
+    Returns
+    -------
+    AnnData
+        aggregsated cluster copy number
+    """
+
+    agg_X = np.sum
+
+    agg_layers = {
+        'copy': np.nanmean,
+        'state': np.nanmedian,
+    }
+
+    agg_obs = {
+        'total_reads': np.nansum,
+    }
+
+    return aggregate_clusters(adata, agg_X, agg_layers, agg_obs, cluster_col='cluster_id')

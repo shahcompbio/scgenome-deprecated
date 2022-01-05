@@ -46,7 +46,7 @@ def plot_cn_profile(
     TODO: missing return
     """
 
-    cn_data = adata.var
+    cn_data = adata.var.copy()
 
     if value_layer_name is not None:
         cn_data['value'] = adata[[obs_id], :].layers[value_layer_name][0]
@@ -60,6 +60,8 @@ def plot_cn_profile(
 
     if ax is None:
         ax = plt.gca()
+
+    cn_data = cn_data.dropna(subset=['value'])
 
     scgenome.cnplot.plot_cell_cn_profile(
         ax, cn_data, 'value', cn_field_name=cn_field_name, max_cn=max_cn,

@@ -1,36 +1,29 @@
 import numpy as np
 
-from anndata import AnnData
+from numpy import ndarray
 
 
-def fill_missing(adata: AnnData, layer_name=None) -> AnnData:
-    """ Fill missing values.
+def fill_missing(data: ndarray) -> ndarray:
+    """ Fill missing values with means of non-nan values across rows.
 
     Parameters
     ----------
-    adata : AnnData
-        copy number data
-    layer_name : str, optional
-        layer with copy number data to plot, None for X, by default None
+    data : ndarray
+        data to fill
 
     Returns
     -------
-    AnnData
-        copy number data with no missing data in layer `layer_name`
-    """
-
-    if layer_name is not None:
-        X = adata.layers[layer_name]
-    else:
-        X = adata.X
+    ndarray
+        copy of data with missing entries filled 
+    """    
 
     # Deal with missing values by assigning the mean value
     # of each bin to missing values of that bin
-    bin_means = np.nanmean(X, axis=0)
+    data = data.copy()
+    bin_means = np.nanmean(data, axis=0)
     bin_means = np.nan_to_num(bin_means, nan=0)
-    bin_means = np.tile(bin_means, (X.shape[0], 1))
-    X[np.where(np.isnan(X))] = bin_means[np.where(np.isnan(X))]
+    bin_means = np.tile(bin_means, (data.shape[0], 1))
+    data[np.where(np.isnan(data))] = bin_means[np.where(np.isnan(data))]
 
-    return adata
-
+    return data
 
