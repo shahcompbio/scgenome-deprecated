@@ -8,9 +8,10 @@ import scgenome.loaders.qc
 from anndata import AnnData
 from pyranges import PyRanges
 from typing import Dict
+from pandas import DataFrame
 
 
-def read_dlp_hmmcopy(alignment_results_dir, hmmcopy_results_dir, annotation_results_dir, sample_ids=None, additional_hmmcopy_reads_cols=None):
+def read_dlp_hmmcopy(alignment_results_dir, hmmcopy_results_dir, annotation_results_dir, sample_ids=None, additional_hmmcopy_reads_cols=None) -> AnnData:
     """ Read hmmcopy results from the DLP pipeline.
 
     Parameters
@@ -42,6 +43,25 @@ def read_dlp_hmmcopy(alignment_results_dir, hmmcopy_results_dir, annotation_resu
 
     metrics_data = results['annotation_metrics']
     cn_data = results['hmmcopy_reads']
+
+    return convert_dlp_hmmcopy(metrics_data, cn_data)
+
+
+def convert_dlp_hmmcopy(metrics_data: DataFrame, cn_data: DataFrame) -> AnnData:
+    """ Convert hmmcopy pandas dataframes to anndata
+
+    Parameters
+    ----------
+    metrics_data : DataFrame
+        hmmcopy metrics
+    cn_data : DataFrame
+        hmmcopy reads data
+
+    Returns
+    -------
+    AnnData
+        An instantiated AnnData Object.
+    """    
 
     cn_data['bin'] = cn_data['chr'].astype(str) + ':' + cn_data['start'].astype(str) + '-' + cn_data['end'].astype(str)
 
