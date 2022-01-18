@@ -5,14 +5,6 @@ import collections
 from . import refgenome
 
 
-chrom_names = refgenome.info.chromosomes
-
-chrom_idxs = pd.Series(chrom_names)
-chrom_idxs.name = 'chr'
-chrom_idxs.index.name = 'chr_index'
-chrom_idxs = chrom_idxs.reset_index()
-
-
 def union_categories(dfs, cat_cols=None):
     """ Recreate specified categoricals on the union of categories inplace.
 

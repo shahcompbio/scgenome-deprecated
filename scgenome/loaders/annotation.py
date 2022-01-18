@@ -2,10 +2,11 @@ import os
 from collections import defaultdict
 
 import pandas as pd
-import scgenome.csvutils
 import scgenome.loaders.utils
 import scgenome.utils
 import yaml
+from csverve.core import CsverveInput
+
 
 _categorical_cols = [
     'cell_id',
@@ -17,7 +18,7 @@ _categorical_cols = [
 def load_annotation_files(annotation_metrics):
     results_tables = {}
 
-    results_tables['annotation_metrics'] = process_annotation_file(annotation_metrics, 'annotation_metrics')
+    results_tables['annotation_metrics'] = process_annotation_file(annotation_metrics)
 
     scgenome.utils.union_categories(results_tables.values())
 
@@ -42,20 +43,11 @@ def load_annotation_results(
     return load_annotation_files(annotation_metrics_filepath)
 
 
-def process_annotation_file(filepath, table_name):
-    csv_input = scgenome.csvutils.CsvInput(filepath)
+def process_annotation_file(filepath):
+    data = CsverveInput(filepath).read_csv()
 
-    dtypes_override = None
-    if table_name == 'annotation_metrics':
-        dtypes_directory = os.path.join(os.path.dirname(__file__), 'dtypes')
-        dtypes_filename = os.path.join(dtypes_directory, 'metrics_column_defs.yaml')
-        dtypes_override = yaml.safe_load(open(dtypes_filename))
-        dtypes_override = {a['name']: a['dtype'] for a in dtypes_override}
-
-    data = csv_input.read_csv(dtypes_override=dtypes_override)
-
-    data['sample_id'] = [a.split('-')[0] for a in data['cell_id']]
-    data['library_id'] = [a.split('-')[1] for a in data['cell_id']]
+    data['sample_id'] = [a.split('-')[-4] for a in data['cell_id']]
+    data['library_id'] = [a.split('-')[-3] for a in data['cell_id']]
 
     for col in _categorical_cols:
         if col in data:
