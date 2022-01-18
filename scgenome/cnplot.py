@@ -56,11 +56,20 @@ def _secondary_clustering(data):
     return ordering
 
 
-def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', raw=False, max_cn=13):
+def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', secondary_field_name=None, raw=False, max_cn=13, cmap=None):
     plot_data = cn_data.merge(utils.chrom_idxs)
-    plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
 
-    ordering = _secondary_clustering(plot_data.values)
+    if secondary_field_name is not None:
+        plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])
+        plot_data = plot_data[[secondary_field_name, cn_field_name]]
+        plot_data = plot_data.unstack(level=['cell_id', cluster_field_name]).fillna(0)
+        ordering = plot_data[secondary_field_name].values[0]
+
+        plot_data = cn_data.merge(utils.chrom_idxs)
+        plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
+    else:
+        plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
+        ordering = _secondary_clustering(plot_data.values)
     ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
     plot_data = plot_data.T.set_index(ordering, append=True).T
 
@@ -80,8 +89,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     cluster_sizes = cluster_boundaries[1:] - cluster_boundaries[:-1]
     cluster_mids = cluster_boundaries[:-1] + cluster_sizes / 2
 
-    cmap = None
-    if not raw:
+    if not raw and cmap is None:
         cmap = get_cn_cmap(plot_data.values)
 
     im = ax.imshow(plot_data.astype(float).T, aspect='auto', cmap=cmap, interpolation='none')
@@ -95,9 +103,9 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     return plot_data
 
 
-def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_field_name='cluster_id', raw=False, max_cn=13):
+def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_field_name='cluster_id', secondary_field_name=None, raw=False, max_cn=13, cmap=None):
     ax = fig.add_axes([0.1,0.0,0.9,1.])
-    plot_data = plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name, raw=raw, max_cn=max_cn)
+    plot_data = plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name, secondary_field_name=secondary_field_name,raw=raw, max_cn=max_cn, cmap=cmap)
 
     cluster_ids = plot_data.columns.get_level_values(1).values
     color_mat = cncluster.get_cluster_colors(cluster_ids)
@@ -111,7 +119,7 @@ def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_fi
     return plot_data
 
 
-def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_cn=13, chromosome=None, s=5, squashy=False):
+def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_cn=13, chromosome=None, s=5, squashy=False, cmap=None):
     """ Plot copy number profile on a genome axis
 
     Args:
@@ -144,11 +152,18 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
         plot_data[value_field_name] = squash_f(plot_data[value_field_name])
 
     if cn_field_name is not None:
-        ax.scatter(
-            plot_data['start'], plot_data[value_field_name],
-            c=plot_data[cn_field_name], s=s,
-            cmap=get_cn_cmap(plot_data[cn_field_name].astype(int).values),
-        )
+        if cmap is not None:
+            ax.scatter(
+                plot_data['start'], plot_data[value_field_name],
+                c=plot_data[cn_field_name], s=s,
+                cmap=cmap,
+            )
+        else:
+            ax.scatter(
+                plot_data['start'], plot_data[value_field_name],
+                c=plot_data[cn_field_name], s=s,
+                cmap=get_cn_cmap(plot_data[cn_field_name].astype(int).values),
+            )
     else:
         ax.scatter(
             plot_data['start'], plot_data[value_field_name], s=s,
