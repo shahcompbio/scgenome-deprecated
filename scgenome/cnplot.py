@@ -58,7 +58,6 @@ def _secondary_clustering(data):
 
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', secondary_field_name=None, raw=False, max_cn=13, cmap=None):
     plot_data = cn_data.merge(refgenome.info.chrom_idxs)
-    plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
 
     if secondary_field_name is not None:
         plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])
@@ -66,7 +65,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
         plot_data = plot_data.unstack(level=['cell_id', cluster_field_name]).fillna(0)
         ordering = plot_data[secondary_field_name].values[0]
 
-        plot_data = cn_data.merge(utils.chrom_idxs)
+        plot_data = cn_data.merge(refgenome.info.chrom_idxs)
         plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
     else:
         plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
