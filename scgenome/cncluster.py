@@ -144,8 +144,9 @@ def get_cluster_palette(n_col):
     return palette
 
 
-def get_cluster_color_map(cluster_ids):
-    num_colors = len(np.unique(cluster_ids[cluster_ids >= 0]))
+def get_cluster_color_map(cluster_ids, num_colors=None):
+    if num_colors is None:
+        num_colors = len(np.unique(cluster_ids[cluster_ids >= 0]))
     pal = get_cluster_palette(num_colors)
 
     color_map = {}
@@ -165,8 +166,8 @@ def get_cluster_color_map(cluster_ids):
     return color_map
 
 
-def get_cluster_colors(cluster_ids):
-    color_map = get_cluster_color_map(cluster_ids)
+def get_cluster_colors(cluster_ids, num_colors=None):
+    color_map = get_cluster_color_map(cluster_ids, num_colors=num_colors)
 
     color_mat = []
     for cluster_id in cluster_ids:
