@@ -180,7 +180,7 @@ def plot_library_portrait(breakpoint_data, figures_prefix=None):
     num_libraries = len(breakpoint_data['library_id'].unique())
     fig = plt.figure(figsize=(10, 3 * num_libraries))
     for idx, (library_id, library_breakpoints) in enumerate(breakpoint_data.groupby('library_id', observed=True)):
-        breakends = wgs_analysis.plots.rearrangement.create_breakends(
+        breakends = wgs_analysis.algorithms.rearrangement.create_breakends(
             library_breakpoints, data_cols=['rearrangement_type'])
         ax = fig.add_subplot(num_libraries, 1, idx + 1)
         wgs_analysis.plots.rearrangement.chromosome_type_plot(
@@ -193,7 +193,7 @@ def plot_library_portrait(breakpoint_data, figures_prefix=None):
     # Plot adjacent density of breakends across the genome per library
     fig = plt.figure(figsize=(10, 3 * num_libraries))
     for idx, (library_id, library_breakpoints) in enumerate(breakpoint_data.groupby('library_id')):
-        breakends = wgs_analysis.plots.rearrangement.create_breakends(
+        breakends = wgs_analysis.algorithms.rearrangement.create_breakends(
             library_breakpoints)
         breakends['chrom'] = breakends['chromosome']
         breakends['coord'] = breakends['position']

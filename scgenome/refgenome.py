@@ -43,6 +43,7 @@ class RefGenomeInfo(object):
         self.chrom_idxs.index.name = 'chr_index'
         self.chrom_idxs = self.chrom_idxs.reset_index()
 
+
 info = None
 
 
