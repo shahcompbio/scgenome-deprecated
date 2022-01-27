@@ -169,7 +169,6 @@ def get_cluster_color_map(cluster_ids):
 def get_cluster_colors(cluster_ids, color_map=None, return_map=False):
     if color_map is None:
         color_map = get_cluster_color_map(cluster_ids)
-    print('color_map\n', color_map)
 
     color_mat = []
     for cluster_id in cluster_ids:
