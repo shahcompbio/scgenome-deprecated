@@ -8,4 +8,4 @@ def plot_gc_reads(adata, obs_id, *args, **kwargs):
         obs_id (str): cell or clone to plot
     """
 
-
+    raise NotImplementedError

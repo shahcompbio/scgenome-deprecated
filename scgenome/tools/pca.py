@@ -2,11 +2,11 @@
 
 
 def pca_loadings(adata, *args, **kwargs):
-    """ Calculate loadings of PCA decomposition of copy number.
+    """ Calculate loadings of PCA decomposition of a feature matrix.
 
     Args:
-        adata (anndata.AnnData): copy number
+        adata (anndata.AnnData): feature matrix
     """
 
-    # cnplot.plot_pca_components
+    raise NotImplementedError
 
