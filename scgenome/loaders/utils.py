@@ -74,7 +74,7 @@ def find_results_filepath(results_dir, filename_suffix, result_type=None, analys
     Args:
         results_dir (str): pseudobulk results directory
         filename_suffix (str): suffix of requested files
-        result_type (str): suffix of requested files
+        result_type (str): requested result type
 
     KwArgs:
         analysis_type (str): check analysis type
