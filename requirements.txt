@@ -1,6 +1,7 @@
 adal==1.2.2
 adjustText==0.7.3
 alabaster==0.7.12
+anndata==0.7.8
 appnope==0.1.2
 argon2-cffi==20.1.0
 asn1crypto==0.24.0
@@ -21,10 +22,12 @@ backcall==0.1.0
 backports-abc==0.5
 backports.functools-lru-cache==1.5
 backports.shutil-get-terminal-size==1.0.0
+bamread==0.0.11
 bcrypt==3.1.7
 bleach==3.3.0
 bokeh==2.3.1
 brewer2mpl==1.4.1
+cached-property==1.5.2
 -e git+https://github.com/shahcompbio/cell_cycle_classifier.git@5e08e684bc4725fa56bf68249162e8767041631d#egg=cell_cycle_classifier
 certifi==2019.9.11
 cffi==1.13.2
@@ -35,7 +38,7 @@ configparser==3.5.0
 coreapi==2.3.3
 coreschema==0.0.4
 cryptography==2.8
--e git+https://github.com/mondrian-scwgs/csverve.git@412df6a5798c2e0125c1b4d2448b45abba0eacf5#egg=csverve
+-e git+https://github.com/mondrian-scwgs/csverve.git@1dd3cde7e461d354a7c91539c09d145ec9f65254#egg=csverve
 cycler==0.10.0
 Cython==0.29.22
 decorator==4.4.1
@@ -49,6 +52,7 @@ entrypoints==0.3
 enum34==1.1.6
 fire==0.4.0
 funcsigs==1.0.2
+h5py==3.6.0
 hdbscan==0.8.27
 hmmlearn==0.2.5
 idna==2.8
@@ -89,15 +93,18 @@ msrest==0.6.21
 msrestazure==0.6.2
 mypy==0.790
 mypy-extensions==0.4.3
+mysqlclient==2.1.0
+natsort==8.0.0
 nbclient==0.5.3
 nbconvert==6.0.7
 nbformat==5.1.2
+ncls==0.0.63
 nest-asyncio==1.5.1
 networkx==2.4
 notebook==6.2.0
 numba==0.53.0
 numexpr==2.7.3
-numpy==1.19.4
+numpy==1.21.4
 oauthlib==3.1.0
 openapi-codec==1.3.2
 packaging==20.3
@@ -120,6 +127,7 @@ ptyprocess==0.6.0
 py==1.10.0
 pyasn1==0.4.5
 pycparser==2.19
+pyfaidx==0.6.3.1
 Pygments==2.4.2
 PyJWT==1.7.1
 pylint==2.3.1
@@ -127,7 +135,11 @@ PyNaCl==1.3.0
 pynndescent==0.5.2
 pyparsing==2.4.6
 pypeliner==0.5.24
+pyranges==0.0.113
+pyranges-db==0.0.7
+pyrle==0.0.33
 pyrsistent==0.17.3
+pysam==0.18.0
 pytest==6.2.5
 python-dateutil==2.8.1
 pytz==2019.3
@@ -136,7 +148,6 @@ PyYAML==5.1.2
 pyzmq==22.0.3
 qtconsole==5.0.3
 QtPy==1.9.0
--e git+https://github.com/amcpherson/remixt.git@db5e9a4379be6aaf65defd420086bc8bb91a1d09#egg=remixt
 requests==2.22.0
 requests-oauthlib==1.3.0
 requests-toolbelt==0.9.1
@@ -152,12 +163,14 @@ singledispatch==3.4.0.3
 -e git+https://github.com/shahcompbio/sisyphus.git@78c708b1dcf93f85e66b5faaafff581e56880c88#egg=sisyphus
 six==1.13.0
 snowballstemmer==2.1.0
+sorted-nearest==0.0.33
 Sphinx==1.8.5
 sphinxcontrib-serializinghtml==1.1.5
 sphinxcontrib-websupport==1.2.4
 statsmodels==0.12.2
 subprocess32==3.5.3
 tables==3.6.1
+tabulate==0.8.9
 termcolor==1.1.0
 terminado==0.9.3
 testpath==0.4.4
@@ -168,7 +181,7 @@ tqdm==4.31.1
 traitlets==4.3.3
 typed-ast==1.4.3
 typing-extensions==3.7.4.3
-umap-learn==0.5.1
+umap-learn==0.5.2
 uritemplate==3.0.0
 urllib3==1.25.7
 wcwidth==0.1.7
@@ -177,4 +190,5 @@ websocket-client==0.56.0
 -e git+https://github.com/amcpherson/wgs_analysis.git@c73a9bd0268b5e6fb55a8c18a58ac28e5f918482#egg=wgs_analysis
 widgetsnbextension==3.5.1
 wrapt==1.11.1
+xlrd==1.2.0
 zipp==3.4.1
