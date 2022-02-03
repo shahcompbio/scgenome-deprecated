@@ -27,6 +27,10 @@ def find_results_directories(results_dir):
     for manifest_filename in _find_manifest_filenames(results_dir):
         manifest = yaml.safe_load(open(manifest_filename))
 
+        # Kludge: mondrian v1 has name instead of type
+        if 'type' not in manifest['meta']:
+            manifest['meta']['type'] = manifest['meta']['name']
+
         results_type = manifest['meta']['type']
 
         # KLUDGE: 0.3.1 -> v0.3.1
@@ -64,12 +68,13 @@ def get_version(results_dir):
     return manifest['meta']['version']
 
 
-def find_results_filepath(results_dir, filename_suffix, analysis_type=None):
+def find_results_filepath(results_dir, filename_suffix, result_type=None, analysis_type=None):
     """ Get filepaths for libraries and samples by suffix
     
     Args:
         results_dir (str): pseudobulk results directory
         filename_suffix (str): suffix of requested files
+        result_type (str): suffix of requested files
 
     KwArgs:
         analysis_type (str): check analysis type
@@ -84,19 +89,38 @@ def find_results_filepath(results_dir, filename_suffix, analysis_type=None):
     manifest_filename = os.path.join(results_dir, 'metadata.yaml')
     manifest = yaml.safe_load(open(manifest_filename))
 
+    # Kludge: mondrian v1 has name instead of type
+    if 'type' not in manifest['meta']:
+        manifest['meta']['type'] = manifest['meta']['name']
+
     if analysis_type is not None and manifest['meta']['type'] != analysis_type:
         raise Exception(f"expected analysis {analysis_type} and found {manifest['meta']['type']}")
 
-    if packaging.version.parse(manifest['meta']['version']) < packaging.version.parse('v0.5.0'):
-        raise Exception(f"unsupoorted version {manifest['meta']['version']}")
+    # Two formats:
+    #  - filenames for just the names of the files,
+    #  - files for file information keyed by filename.
+    if 'filenames' in manifest:
+        filenames = list(filter(lambda a: a.endswith(filename_suffix), manifest['filenames']))
 
-    filenames = list(filter(lambda a: a.endswith(filename_suffix), manifest['filenames']))
+        if len(filenames) != 1:
+            raise Exception(f'found {len(filenames)} {filename_suffix} files for {results_dir}: {filenames}')
 
-    if len(filenames) != 1:
-        raise Exception(f'found {len(filenames)} {filename_suffix} files for {results_dir}: {filenames}')
+        filename = filenames[0]
+        filepath = os.path.join(results_dir, filename)
 
-    filename = filenames[0]
-    filepath = os.path.join(results_dir, filename)
+    elif 'files' in manifest:
+        assert result_type is not None
+
+        files = list(filter(lambda a: a[1]['result_type'] == result_type and not a[0].endswith('.yaml'), manifest['files'].items()))
+
+        if len(files) != 1:
+            raise Exception(f'found {len(files)} {filename_suffix} files for {results_dir}: {files}')
+
+        filename = files[0][0]
+        filepath = os.path.join(results_dir, filename)
+
+    else:
+        raise ValueError()
 
     return filepath
 

@@ -62,17 +62,14 @@ def load_hmmcopy_results(
         dict: pandas.DataFrame tables keyed by table name
     """
 
-    # hmmcopy_reads_filepath = scgenome.loaders.utils.find_results_filepath(
-    #     results_dir, '_reads.csv.gz', analysis_type='hmmcopy')
-    hmmcopy_reads_filepath = os.path.join(results_dir, 'hmmcopy_reads.csv.gz')
+    hmmcopy_reads_filepath = scgenome.loaders.utils.find_results_filepath(
+        results_dir, '_reads.csv.gz', 'hmmcopy_reads', analysis_type='hmmcopy')
 
-    # hmmcopy_segs_filepath = scgenome.loaders.utils.find_results_filepath(
-    #     results_dir, '_segments.csv.gz', analysis_type='hmmcopy')
-    hmmcopy_segs_filepath = os.path.join(results_dir, 'hmmcopy_segments.csv.gz')
+    hmmcopy_segs_filepath = scgenome.loaders.utils.find_results_filepath(
+        results_dir, '_segments.csv.gz', 'hmmcopy_segments', analysis_type='hmmcopy')
 
-    # hmmcopy_metrics_filepath = scgenome.loaders.utils.find_results_filepath(
-    #     results_dir, '_metrics.csv.gz', analysis_type='hmmcopy')
-    hmmcopy_metrics_filepath = os.path.join(results_dir, 'hmmcopy_metrics.csv.gz')
+    hmmcopy_metrics_filepath = scgenome.loaders.utils.find_results_filepath(
+        results_dir, '_metrics.csv.gz', 'hmmcopy_metrics', analysis_type='hmmcopy')
 
     return load_hmmcopy_files(
         hmmcopy_reads_filepath, hmmcopy_segs_filepath, hmmcopy_metrics_filepath,
