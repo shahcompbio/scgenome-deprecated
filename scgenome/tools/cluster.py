@@ -7,7 +7,7 @@ import anndata as ad
 from natsort import natsorted
 
 from anndata import AnnData
-from typing import Dict
+from typing import Dict, Any
 
 import scgenome.cncluster
 import scgenome.preprocessing.transform
@@ -96,7 +96,7 @@ def cluster_cells_kmeans(adata: AnnData, layer_name='copy', min_k=2, max_k=100) 
 
 def aggregate_clusters(
         adata: AnnData,
-        agg_X: Dict,
+        agg_X: Any,
         agg_layers: Dict=None,
         agg_obs: Dict=None,
         cluster_col: str='cluster_id') -> AnnData:
@@ -106,19 +106,19 @@ def aggregate_clusters(
     ----------
     adata : AnnData
         copy number data
-    agg_X : Dict
-        [description]
+    agg_X : Any
+        function to aggregate X
     agg_layers : Dict, optional
-        [description], by default None
+        functions to aggregate layers keyed by layer names, by default None
     agg_obs : Dict, optional
-        [description], by default None
+        functions to aggregate obs data keyed by obs columns, by default None
     cluster_col : str, optional
         column with cluster ids, by default 'cluster_id'
 
     Returns
     -------
     AnnData
-        aggregsated cluster copy number
+        aggregated cluster copy number
     """
 
     X = (

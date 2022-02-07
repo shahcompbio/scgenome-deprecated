@@ -4,6 +4,7 @@ import anndata as ad
 import pyranges as pr
 
 import scgenome.loaders.qc
+import csverve
 
 from anndata import AnnData
 from pyranges import PyRanges
@@ -47,6 +48,46 @@ def read_dlp_hmmcopy(alignment_results_dir, hmmcopy_results_dir, annotation_resu
     return convert_dlp_hmmcopy(metrics_data, cn_data)
 
 
+def read_dlp_hmmcopy2(reads_filename, metrics_filename, sample_ids=None) -> AnnData:
+    """ Read hmmcopy results from the DLP pipeline.
+
+    Parameters
+    ------
+    reads_filename (str):
+        dlp pipeline reads filename
+    metrics_filename (str):
+        dlp pipeline metrics filename
+    sample_ids (list):
+        sample ids to load
+
+    Returns
+    ------
+    AnnData
+        An instantiated AnnData Object.
+    """
+
+    cn_data = csverve.read_csv(
+        reads_filename,
+        dtype={
+            'cell_id': 'category',
+            'sample_id': 'category',
+            'library_id': 'category',
+            'chr': 'category',
+        })
+
+    metrics_data = csverve.read_csv(
+        metrics_filename,
+        dtype={
+            'cell_id': 'category',
+            'sample_id': 'category',
+            'library_id': 'category',
+        })
+
+    scgenome.utils.union_categories([cn_data, metrics_data])
+
+    return convert_dlp_hmmcopy(metrics_data, cn_data)
+
+
 def convert_dlp_hmmcopy(metrics_data: DataFrame, cn_data: DataFrame) -> AnnData:
     """ Convert hmmcopy pandas dataframes to anndata
 
@@ -61,7 +102,7 @@ def convert_dlp_hmmcopy(metrics_data: DataFrame, cn_data: DataFrame) -> AnnData:
     -------
     AnnData
         An instantiated AnnData Object.
-    """    
+    """
 
     cn_data['bin'] = cn_data['chr'].astype(str) + ':' + cn_data['start'].astype(str) + '-' + cn_data['end'].astype(str)
 
@@ -73,7 +114,7 @@ def convert_dlp_hmmcopy(metrics_data: DataFrame, cn_data: DataFrame) -> AnnData:
 
     bin_data = (
         cn_data
-            .drop(['reads', 'copy', 'state'], axis=1)
+            .drop(['cell_id', 'sample_id', 'library_id', 'reads', 'copy', 'state'], axis=1)
             .drop_duplicates(subset=['bin'])
             .set_index(['bin'])
             .reindex(cn_matrix.loc['reads'].columns))
