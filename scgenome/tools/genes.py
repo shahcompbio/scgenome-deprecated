@@ -89,7 +89,7 @@ def aggregate_genes(
     agg_layers = set(agg_layers)
 
     if agg_var is None:
-        agg_var = set(adata.var.columns.to_list()) - set(['chr', 'start', 'end'])
+        agg_var = set(adata.var.select_dtypes(include=np.number).columns.to_list()) - set(['chr', 'start', 'end'])
     agg_var = set(agg_var)
 
     bins = pr.PyRanges(adata.var.reset_index().rename(columns={
