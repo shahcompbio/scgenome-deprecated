@@ -70,7 +70,7 @@ def cluster_cells_kmeans(adata: AnnData, layer_name='copy', min_k=2, max_k=100) 
     bics = []
     for k in ks:
         logging.info(f'trying with k={k}')
-        model = sklearn.cluster.KMeans(n_clusters=k, init="k-means++").fit(X)
+        model = sklearn.cluster.KMeans(n_clusters=k, init='k-means++', random_state=100).fit(X)
         bic = scgenome.cncluster.compute_bic(model, X)
         kmeans.append(model)
         bics.append(bic)
