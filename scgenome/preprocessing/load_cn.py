@@ -169,13 +169,6 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], **kwargs) -> AnnDa
         binned read counts
     """
 
-    data = bins.df[['Chromosome', 'Start', 'End']]
-    for cell_id, cell_bam in bams.items():
-        bam_data = pr.read_bam(cell_bam, **kwargs)
-        read_counts = bins.count_overlaps(bam_data, overlap_col='reads')
-        data[cell_id] = read_counts.reads.values
-
-
     bin_data = _convert_pyranges(bins)
     bin_data = _add_bin_index(bin_data)
 
@@ -183,7 +176,7 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], **kwargs) -> AnnDa
 
     for cell_id, cell_bam in bams.items():
         logging.info(f"reading {cell_bam}")
-        bam_data = pr.read_bam(cell_bam)
+        bam_data = pr.read_bam(cell_bam, **kwargs)
 
         logging.info(f"count overlaps")
         read_counts = bins.count_overlaps(bam_data, overlap_col='reads')
