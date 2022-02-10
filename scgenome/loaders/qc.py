@@ -45,16 +45,18 @@ def load_qc_files(
 def load_qc_results(
         alignment_results_dir,
         hmmcopy_results_dir,
-        annotation_results_dir,
+        annotation_results_dir=None,
         sample_ids=None,
         additional_hmmcopy_reads_cols=None,
 ):
-    """ Load qc data (align, hmmcopy, annotation)
+    """ Load qc data (align, hmmcopy)
     
     Args:
         alignment_results_dir (str): alignment results directory to load from.
         hmmcopy_results_dir (str): hmmcopy results directory to load from.
-        annotation_results_dir (str): annotation results directory to load from.
+
+    KwArgs:
+        annotation_results_dir (str): annotation results directory to load from. Defaults to None.
         sample_ids (list of str, optional): Set of sample ids to filter for. Defaults to None.
         additional_hmmcopy_reads_cols (list of str, optional): Additional columns to obtain from the reads table. Defaults to None.
     """
@@ -73,12 +75,13 @@ def load_qc_results(
 
     results_tables.update(hmmcopy_results_tables)
 
-    annotation_results_dir = scgenome.loaders.utils.find_results_directory(
-        annotation_results_dir, 'annotation')
+    if annotation_results_dir is not None:
+        annotation_results_dir = scgenome.loaders.utils.find_results_directory(
+            annotation_results_dir, 'annotation')
 
-    annotation_results_tables = scgenome.loaders.annotation.load_annotation_results(annotation_results_dir)
+        annotation_results_tables = scgenome.loaders.annotation.load_annotation_results(annotation_results_dir)
 
-    results_tables.update(annotation_results_tables)
+        results_tables.update(annotation_results_tables)
 
     if sample_ids is not None:
         results_tables = _sample_id_filter(results_tables, sample_ids)
