@@ -151,6 +151,7 @@ def get_cluster_color_map(cluster_ids):
     color_map = {}
 
     cluster_ids = np.sort(np.unique(cluster_ids))
+
     for cluster_id in np.sort(np.unique(cluster_ids)):
         if cluster_id < 0:
             color_map[cluster_id] = (0.75, 0.75, 0.75, 1.0)
@@ -165,12 +166,16 @@ def get_cluster_color_map(cluster_ids):
     return color_map
 
 
-def get_cluster_colors(cluster_ids):
-    color_map = get_cluster_color_map(cluster_ids)
+def get_cluster_colors(cluster_ids, color_map=None, return_map=False):
+    if color_map is None:
+        color_map = get_cluster_color_map(cluster_ids)
 
     color_mat = []
     for cluster_id in cluster_ids:
         color_mat.append(color_map[cluster_id])
+
+    if return_map:
+        return color_mat, color_map 
 
     return color_mat
 
