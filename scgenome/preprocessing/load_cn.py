@@ -153,7 +153,7 @@ def _add_bin_index(df):
     return df.set_index('bin')
     
 
-def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], **kwargs) -> AnnData:
+def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], excluded: PyRanges = None, **kwargs) -> AnnData:
     """ Count reads in bins from bams
 
     Parameters
@@ -162,6 +162,8 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], **kwargs) -> AnnDa
         bins in which to count reads
     bams : Dict[Str]
         bam filenames with cell ids as keys
+    excluded: PyRanges
+        excluded genomic regions to filter reads
 
     Returns
     -------
@@ -177,6 +179,10 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], **kwargs) -> AnnDa
     for cell_id, cell_bam in bams.items():
         logging.info(f"reading {cell_bam}")
         bam_data = pr.read_bam(cell_bam, **kwargs)
+
+        if excluded is not None:
+            logging.info("excluding reads")
+            bam_data = bam_data.intersect(excluded, invert=True)
 
         logging.info(f"count overlaps")
         bam_data = bam_data.intersect(bins, how='containment')
