@@ -179,6 +179,7 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], **kwargs) -> AnnDa
         bam_data = pr.read_bam(cell_bam, **kwargs)
 
         logging.info(f"count overlaps")
+        bam_data = bam_data.intersect(bins, how='containment')
         read_counts = bins.count_overlaps(bam_data, overlap_col='reads')
 
         read_counts = _convert_pyranges(read_counts)
@@ -197,3 +198,4 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], **kwargs) -> AnnDa
     )
 
     return adata
+
