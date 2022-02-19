@@ -205,3 +205,74 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], excluded: PyRanges
 
     return adata
 
+
+def read_medicc2_cn(cn_profiles_filename) -> AnnData:
+    """ Read medicc2 results
+
+    Parameters
+    ----------
+    cn_profiles_filename : str
+        Copy number profiles filename
+    tree_filename : str
+        Newick tree filename
+
+    Returns
+    -------
+    AnnData
+        Medicc CN and tree results.
+    """    
+
+    cn_data = pd.read_csv(
+        cn_profiles_filename,
+        sep='\t',
+        dtype={
+            'chrom': 'category',
+            'sample_id': 'category'
+    })
+
+    cn_data = cn_data.rename(columns={
+        'sample_id': 'cell_id',
+        'chrom': 'chr',
+        'cn': 'state',
+    })
+
+    cn_data['chr'] = cn_data['chr'].str.replace('chr', '')
+    cn_data.loc[cn_data['chr'] == '23', 'chr'] = 'X'
+    cn_data.loc[cn_data['chr'] == '24', 'chr'] = 'Y'
+    cn_data['chr'] = cn_data['chr'].astype('category')
+
+    cn_data['bin'] = cn_data['chr'].astype(str) + ':' + cn_data['start'].astype(str) + '-' + cn_data['end'].astype(str)
+
+    cn_matrix = (
+        cn_data
+            .set_index(['bin', 'cell_id'])[['state', 'is_gain', 'is_loss']]
+            .unstack(level='cell_id')
+            .transpose())
+
+    bin_data = (
+        cn_data[['bin', 'chr', 'start', 'end']]
+            .drop_duplicates(subset=['bin'])
+            .set_index(['bin'])
+            .reindex(cn_matrix.loc['state'].columns))
+
+    cell_data = (
+        cn_data[['cell_id', 'is_wgd', 'is_normal', 'is_clonal']]
+            .drop_duplicates()
+            .set_index(['cell_id'])
+            .reindex(cn_matrix.loc['state'].index))
+
+    cell_data['is_root'] = cell_data.index == 'diploid'
+    cell_data['is_internal'] = cell_data.index.to_series().str.startswith('internal_')
+    cell_data['is_cell'] = (~cell_data['is_root']) & (~cell_data['is_internal'])
+
+    adata = ad.AnnData(
+        cn_matrix.loc['state'],
+        obs=cell_data,
+        var=bin_data,
+        layers={
+            'is_gain': cn_matrix.loc['is_gain'],
+            'is_loss': cn_matrix.loc['is_loss'],
+        },
+    )
+
+    return adata
