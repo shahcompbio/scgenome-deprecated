@@ -287,7 +287,7 @@ def load_snv_annotation_files(
     logging.info(f'snpeff table with shape {snpeff.shape}, memory {snpeff.memory_usage().sum()}')
 
     dbsnp = load_snv_annotation_table(dbsnp_path)
-    dbsnp = dbsnp[['chrom', 'coord', 'ref', 'alt', 'exact_match']].rename(columns={'exact_match': 'is_dbsnp'})
+    dbsnp = dbsnp.query('exact_match == 1')[['chrom', 'coord', 'ref', 'alt']].drop_duplicates().assign(is_dbsnp=1)
     logging.info(f'dbsnp table with shape {dbsnp.shape}, memory {dbsnp.memory_usage().sum()}')
 
     tnc = load_snv_annotation_table(trinuc_path)
