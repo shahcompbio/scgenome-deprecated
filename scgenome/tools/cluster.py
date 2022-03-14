@@ -141,6 +141,7 @@ def aggregate_clusters(
                     .agg(agg_layers[layer_name])
                     .sort_index())
 
+    obs_data = None
     if agg_obs is not None:
         obs_data = {}
         for obs_name in agg_obs:
