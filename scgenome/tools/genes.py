@@ -112,7 +112,7 @@ def aggregate_genes(
 
     var = _segment_width_weighted_mean_var(adata.var[agg_var], intersect)
 
-    gene_data = genes.as_df().drop(['Chromosome', 'Start', 'End'], axis=1).drop_duplicates().set_index('gene_id')
+    gene_data = genes.as_df().drop_duplicates().set_index('gene_id')
     var = var.merge(gene_data, left_index=True, right_index=True, how='left')
 
     adata = ad.AnnData(
