@@ -151,6 +151,11 @@ def aggregate_clusters(
                     .groupby(level=0)
                     .agg(agg_obs[obs_name])
                     .sort_index())
+        obs_data['cluster_size'] = (
+            adata.obs
+                .set_index(adata.obs[cluster_col].astype(str))
+                .groupby(level=0)
+                .size())
         obs_data = pd.DataFrame(obs_data)
 
     adata = ad.AnnData(
