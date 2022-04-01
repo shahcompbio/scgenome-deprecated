@@ -6,27 +6,17 @@ from anndata import AnnData
 
 
 
-def _calc_prop_hom_del(states):
-    cndist, cndist_values = np.unique(states, return_counts=True)
-    cndist_values = cndist_values / cndist_values.sum()
-    if (0 not in cndist) or (0.0 not in cndist):
-        return float(0)
-    return float(cndist_values[0])
-
-
 _default_filters = (
     'filter_quality',
     'filter_reads',
     'filter_copy_state_diff',
     'filter_is_s_phase',
-    'filter_prop_hom_del'
 )
 
 def calculate_filter_metrics(
         adata: AnnData,
         quality_score_threshold=0.75,
         read_count_threshold=500000,
-        prop_hom_del_pval_threshold=0.01,
         copy_state_diff_threshold=1.,
         inplace = False,
     ) -> AnnData:
@@ -40,8 +30,6 @@ def calculate_filter_metrics(
         The minimum quality to set to keep, by default 0.75
     read_count_threshold : int, optional
         The minimum total mapped reads from hmmcopy to set for keeping, by default 500000
-    prop_hom_del_pval_threshold : float, optional
-        Minimum p-value of the proportion of homozygous deletion state to keep, by default 0.01
     copy_state_diff_threshold : [type], optional
         Minimum copy-state difference threshold to set to keep, by default 1.
     inplace : bool, optional
@@ -56,14 +44,11 @@ def calculate_filter_metrics(
     ------
     AnnData.obs.filter_quality
     AnnData.obs.filter_reads
-    AnnData.obs.filter_prop_hom_del
     AnnData.obs.filter_copy_state_diff
     
     If is_s_phase is a property of AnnData
         AnnData.obs.filter_is_s_phase
         
-    AnnData.obs.prop_hom_del
-    AnnData.obs.prop_hom_del_pval
     AnnData.obs.copy_state_diff
     AnnData.obs.copy_state_diff_mean
     """
@@ -74,7 +59,6 @@ def calculate_filter_metrics(
             ndad,
             quality_score_threshold,
             read_count_threshold,
-            prop_hom_del_pval_threshold,
             copy_state_diff_threshold,
             inplace = True,
         )
@@ -89,15 +73,6 @@ def calculate_filter_metrics(
         adata.obs['filter_reads'] = (adata.obs['total_mapped_reads_hmmcopy'] > read_count_threshold)
     else:
         logging.warning("total_mapped_reads_hmmcopy is not in AnnData.obs. Skipping total_mapped_reads_hmmcopy")
-    
-    # Calculate homozygous deletion state
-    adata.obs['prop_hom_del'] = np.apply_along_axis(_calc_prop_hom_del, 1, adata.layers['state'])
-
-    a, b, loc, scale = scipy.stats.beta.fit(adata.obs['prop_hom_del'])
-    adata.obs['prop_hom_del_pval'] = 1.0 - scipy.stats.beta.cdf(
-        adata.obs['prop_hom_del'], a, b, loc, scale)
-    adata.obs['filter_prop_hom_del'] = (adata.obs['prop_hom_del_pval'] > prop_hom_del_pval_threshold)
-    adata.obs['prop_hom_del'].fillna(0.0)
     
     # Copy State Difference Filter
     adata.obsm['copy_state_diff'] = np.absolute(adata.layers['copy'] - adata.layers['state'])
