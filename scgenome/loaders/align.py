@@ -51,6 +51,8 @@ def load_alignment_results(results_dir):
 def process_alignment_data(filepath):
     data = CsverveInput(filepath).read_csv()
 
+    data.query(f"cell_id != 'reference'", inplace=True)
+
     data['sample_id'] = [a.split('-')[-4] for a in data['cell_id']]
     data['library_id'] = [a.split('-')[-3] for a in data['cell_id']]
 
