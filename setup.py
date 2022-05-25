@@ -10,5 +10,5 @@ setup(name='scgenome',
         'console_scripts': [
         ]
       },
-      package_data={'':['data/GRCh37-lite.fa.fai', 'dtypes/*.yaml']},
+      package_data={'':['data/mm10.fa.fai', 'data/GRCh37-lite.fa.fai', 'dtypes/*.yaml']},
     )
