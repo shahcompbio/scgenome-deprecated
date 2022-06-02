@@ -1,5 +1,5 @@
 
-from .cluster import cluster_cells, cluster_cells_kmeans, aggregate_clusters_hmmcopy
+from .cluster import cluster_cells, cluster_cells_kmeans, aggregate_clusters_hmmcopy, aggregate_clusters
 from .pca import pca_loadings
 from .sorting import sort_cells
 from .binfeat import create_bins, count_gc, mean_from_bigwig

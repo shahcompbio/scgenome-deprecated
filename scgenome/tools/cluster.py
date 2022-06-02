@@ -99,7 +99,8 @@ def aggregate_clusters(
         agg_X: Any,
         agg_layers: Dict=None,
         agg_obs: Dict=None,
-        cluster_col: str='cluster_id') -> AnnData:
+        cluster_col: str='cluster_id',
+        cluster_size_col: str='cluster_size') -> AnnData:
     """ Aggregate copy number by cluster to create cluster CN matrix
 
     Parameters
@@ -114,6 +115,8 @@ def aggregate_clusters(
         functions to aggregate obs data keyed by obs columns, by default None
     cluster_col : str, optional
         column with cluster ids, by default 'cluster_id'
+    cluster_size_col : str, optional
+        column that will be set to the size of each cluster, by default 'cluster_size'
 
     Returns
     -------
@@ -141,9 +144,14 @@ def aggregate_clusters(
                     .agg(agg_layers[layer_name])
                     .sort_index())
 
-    obs_data = None
+    obs_data = {}
+    obs_data[cluster_size_col] = (
+        adata.obs
+            .set_index(adata.obs[cluster_col].astype(str))
+            .groupby(level=0)
+            .size())
+
     if agg_obs is not None:
-        obs_data = {}
         for obs_name in agg_obs:
             obs_data[obs_name] = (
                 adata.obs
@@ -151,12 +159,8 @@ def aggregate_clusters(
                     .groupby(level=0)
                     .agg(agg_obs[obs_name])
                     .sort_index())
-        obs_data['cluster_size'] = (
-            adata.obs
-                .set_index(adata.obs[cluster_col].astype(str))
-                .groupby(level=0)
-                .size())
-        obs_data = pd.DataFrame(obs_data)
+
+    obs_data = pd.DataFrame(obs_data)
 
     adata = ad.AnnData(
         X,
