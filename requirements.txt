@@ -144,7 +144,7 @@ pytest==6.2.5
 python-dateutil==2.8.1
 pytz==2019.3
 PyVCF==0.6.8
-PyYAML==5.1.2
+PyYAML==5.4
 pyzmq==22.0.3
 qtconsole==5.0.3
 QtPy==1.9.0
