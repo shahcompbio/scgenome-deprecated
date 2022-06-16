@@ -28,7 +28,6 @@ setup(
         'pyfaidx',
         'pyranges',
         'pysam',
-        'PyVCF',
         'PyYAML',
         'scikit-learn',
         'scipy',
