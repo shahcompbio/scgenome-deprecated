@@ -8,6 +8,7 @@ setup(
     url='https://github.com/shahcompbio/scgenome',
     packages=find_packages(),
     install_requires=[
+        'adjustText',
         'anndata',
         'bamread',
         'bokeh',
