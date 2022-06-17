@@ -26,6 +26,7 @@ setup(
         'numpy',
         'oauthlib',
         'pandas',
+        'pyBigWig',
         'pyfaidx',
         'pyranges',
         'pysam',
