@@ -43,7 +43,7 @@ def plot_cell_cn_matrix(adata: AnnData, layer_name='state', cell_order_fields=No
         X[X > max_cn] = max_cn
 
     # Order the chromosomes
-    chr_start = adata.var.reset_index().merge(scgenome.refgenome.info.chrom_idxs)[['start', 'chr_index']].values
+    chr_start = adata.var.reset_index().merge(scgenome.refgenome.info.chrom_idxs, how='left')[['start', 'chr_index']].values
     genome_ordering = np.lexsort(chr_start.transpose())
 
     # Order the cells if requested
