@@ -206,21 +206,21 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], excluded: PyRanges
     return adata
 
 
-def read_medicc2_cn(cn_profiles_filename) -> AnnData:
+def read_medicc2_cn(cn_profiles_filename, allele_specific: bool = False) -> AnnData:
     """ Read medicc2 results
 
     Parameters
     ----------
     cn_profiles_filename : str
         Copy number profiles filename
-    tree_filename : str
-        Newick tree filename
+    allele_specific : bool, optional
+        _description_, by default False
 
     Returns
     -------
     AnnData
-        Medicc CN and tree results.
-    """    
+        Medicc CN results.
+    """
 
     cn_data = pd.read_csv(
         cn_profiles_filename,
@@ -233,8 +233,15 @@ def read_medicc2_cn(cn_profiles_filename) -> AnnData:
     cn_data = cn_data.rename(columns={
         'sample_id': 'cell_id',
         'chrom': 'chr',
-        'cn': 'state',
     })
+
+    if allele_specific:
+        cn_data['state'] = cn_data['cn_a'] + cn_data['cn_b']
+        cn_fields = ['cn_a', 'cn_b']
+
+    else:
+        cn_data = cn_data.rename(columns={'cn': 'state'})
+        cn_fields = []
 
     cn_data['chr'] = cn_data['chr'].str.replace('chr', '')
     cn_data.loc[cn_data['chr'] == '23', 'chr'] = 'X'
@@ -245,7 +252,7 @@ def read_medicc2_cn(cn_profiles_filename) -> AnnData:
 
     cn_matrix = (
         cn_data
-            .set_index(['bin', 'cell_id'])[['state', 'is_gain', 'is_loss']]
+            .set_index(['bin', 'cell_id'])[cn_fields + ['state', 'is_gain', 'is_loss']]
             .unstack(level='cell_id')
             .transpose())
 
@@ -265,14 +272,19 @@ def read_medicc2_cn(cn_profiles_filename) -> AnnData:
     cell_data['is_internal'] = cell_data.index.to_series().str.startswith('internal_')
     cell_data['is_cell'] = (~cell_data['is_root']) & (~cell_data['is_internal'])
 
+    layers = {
+        'is_gain': cn_matrix.loc['is_gain'],
+        'is_loss': cn_matrix.loc['is_loss'],
+    }
+
+    for field in cn_fields:
+        layers[field] = cn_matrix.loc[field]
+
     adata = ad.AnnData(
         cn_matrix.loc['state'],
         obs=cell_data,
         var=bin_data,
-        layers={
-            'is_gain': cn_matrix.loc['is_gain'],
-            'is_loss': cn_matrix.loc['is_loss'],
-        },
+        layers=layers,
     )
 
     return adata
