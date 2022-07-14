@@ -5,7 +5,6 @@ setup(
     name='scgenome',
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
-    version='0.0.1',
     description='Code for analyzing single cell whole genomes',
     author='Shah Lab',
     url='https://github.com/shahcompbio/scgenome',
