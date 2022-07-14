@@ -1,7 +1,10 @@
 from setuptools import setup, find_packages
+import versioneer
 
 setup(
     name='scgenome',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     version='0.0.1',
     description='Code for analyzing single cell whole genomes',
     author='Shah Lab',
@@ -36,7 +39,7 @@ setup(
         'seaborn',
         'statsmodels',
         'umap-learn',
-        'wgs_analysis @ git+https://github.com/amcpherson/wgs_analysis.git#egg=wgs_analysis',
+        'wgs_analysis',
     ],
     package_data={
         'scgenome': [
