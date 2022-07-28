@@ -460,3 +460,12 @@ bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_loa
 ```
 bsub -Is -R "rusage[mem=50]select[type==CentOS7]" python scgenome/tests/test_load_pseudobulk.py test-cached-single-ticket SC-2373 --local_storage_name juno
 ```
+
+## Pip build
+
+To build with pip and distribute to pypi, use the following commands:
+
+    python setup.py build_ext --force sdist
+    twine upload --repository pypi dist/*
+
+
