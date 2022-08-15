@@ -69,7 +69,7 @@ def aggregate_genes(
     ----------
     adata : AnnData
         copy number data
-    adata : PyRanges
+    genes : PyRanges
         gene data
     agg_layers : List, optional
         list of layers to aggregate, by default None, all layers

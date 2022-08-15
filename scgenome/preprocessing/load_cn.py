@@ -257,13 +257,13 @@ def read_medicc2_cn(cn_profiles_filename, allele_specific: bool = False) -> AnnD
             .transpose())
 
     bin_data = (
-        cn_data[['bin', 'chr', 'start', 'end']]
+        cn_data[['bin', 'chr', 'start', 'end', 'is_normal', 'is_clonal']]
             .drop_duplicates(subset=['bin'])
             .set_index(['bin'])
             .reindex(cn_matrix.loc['state'].columns))
 
     cell_data = (
-        cn_data[['cell_id', 'is_wgd', 'is_normal', 'is_clonal']]
+        cn_data[['cell_id', 'is_wgd']]
             .drop_duplicates()
             .set_index(['cell_id'])
             .reindex(cn_matrix.loc['state'].index))
