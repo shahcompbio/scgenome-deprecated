@@ -104,25 +104,35 @@ def convert_dlp_hmmcopy(metrics_data: DataFrame, cn_data: DataFrame) -> AnnData:
         An instantiated AnnData Object.
     """
 
-    cn_data['bin'] = cn_data['chr'].astype(str) + ':' + cn_data['start'].astype(str) + '-' + cn_data['end'].astype(str)
+    duplicate_cell_ids = cn_data.loc[cn_data[['chr', 'start', 'end', 'cell_id']].duplicated(keep=False), 'cell_id'].unique()
+    if len(duplicate_cell_ids) > 0:
+        raise ValueError(f'cell {duplicate_cell_ids[0]} is duplicated, and {len(duplicate_cell_ids)} others')
 
     cn_matrix = (
         cn_data
-            .set_index(['bin', 'cell_id'])[['reads', 'copy', 'state']]
+            .set_index(['chr', 'start', 'end', 'cell_id'])[['reads', 'copy', 'state']]
             .unstack(level='cell_id')
             .transpose())
 
     bin_data = (
         cn_data
             .drop(['cell_id', 'sample_id', 'library_id', 'reads', 'copy', 'state'], axis=1)
-            .drop_duplicates(subset=['bin'])
-            .set_index(['bin'])
+            .drop_duplicates(subset=['chr', 'start', 'end'])
+            .set_index(['chr', 'start', 'end'], drop=False)
             .reindex(cn_matrix.loc['reads'].columns))
 
     cell_data = (
         metrics_data
             .set_index(['cell_id'])
             .reindex(cn_matrix.loc['reads'].index))
+
+    bin_index = (
+        cn_matrix.columns.get_level_values('chr').astype(str) + ':' +
+        cn_matrix.columns.get_level_values('start').astype(str) + '-' +
+        cn_matrix.columns.get_level_values('end').astype(str))
+
+    cn_matrix.set_axis(bin_index, axis=1, inplace=True)
+    bin_data.set_axis(bin_index, axis=0, inplace=True)
 
     adata = ad.AnnData(
         cn_matrix.loc['reads'],
