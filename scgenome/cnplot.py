@@ -10,6 +10,7 @@ import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as dst
 from sklearn.decomposition import PCA
 from matplotlib.colors import ListedColormap
+from scipy.stats import mode
 
 from scgenome import refgenome
 from scgenome import utils
@@ -62,18 +63,22 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     if secondary_field_name is not None:
         plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])
         plot_data = plot_data[[secondary_field_name, cn_field_name]]
-        plot_data = plot_data.unstack(level=['cell_id', cluster_field_name]).fillna(0)
-        ordering = plot_data[secondary_field_name].values[0]
+        plot_data = plot_data.unstack(level=['cell_id', cluster_field_name])
+        ordering_mat = plot_data[secondary_field_name].values
+        ordering = mode(ordering_mat)[0]
+        ordering = np.reshape(ordering, -1)
 
         plot_data = cn_data.merge(refgenome.info.chrom_idxs)
         plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
     else:
         plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
         ordering = _secondary_clustering(plot_data.values)
+    
     ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
     plot_data = plot_data.T.set_index(ordering, append=True).T
 
     plot_data = plot_data.sort_index(axis=1, level=[1, 2])
+
     if max_cn is not None:
         plot_data[plot_data > max_cn] = max_cn
 
