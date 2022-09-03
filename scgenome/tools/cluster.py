@@ -198,3 +198,54 @@ def aggregate_clusters_hmmcopy(adata: AnnData) -> AnnData:
     }
 
     return aggregate_clusters(adata, agg_X, agg_layers, agg_obs, cluster_col='cluster_id')
+
+
+def compute_umap(
+        adata: AnnData,
+        layer_name: str='copy',
+        n_components: int=2,
+        n_neighbors: int=15,
+        min_dist: float=0.1,
+        metric: str='euclidean',
+    ) -> AnnData:
+    """ Cluster cells by copy number.
+
+    Parameters
+    ----------
+    adata : AnnData
+        copy number data
+    layer_name : str, optional
+        layer with copy number data on which to perform umap dimensionality
+        reduction, None for X, by default 'copy'
+    n_components : int
+        umap n_components param
+    n_neighbors : int
+        umap n_neighbors param
+    min_dist : float
+        umap min_dist param
+
+    Returns
+    -------
+    AnnData
+        copy number data with additional `umap_1`, `umap_2` columns
+    """
+
+    if layer_name is not None:
+        X = adata.layers[layer_name]
+    else:
+        X = adata.X
+
+    X = scgenome.preprocessing.transform.fill_missing(X)
+
+    embedding = umap.UMAP(
+        n_neighbors=n_neighbors,
+        min_dist=min_dist,
+        n_components=n_components,
+        metric=metric,
+        random_state=42,
+    ).fit_transform(X)
+
+    adata.obs['UMAP1'] = embedding[:, 0]
+    adata.obs['UMAP2'] = embedding[:, 1]
+
+    return adata
