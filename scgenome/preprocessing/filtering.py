@@ -125,7 +125,7 @@ def filter_cells(
     for filter_option in filters:
         if filter_option not in adata.obs.columns:
             logging.warning(
-                f"WARNING: {filter_option} is not found! ",
+                f"WARNING: {filter_option} is not found! "
                 "Skipping. Are you sure `scgenome.pp.calculate_filter_metrics` has been called?"
             )
             continue
