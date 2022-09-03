@@ -5,3 +5,4 @@
 venv
 sourceme
 build
+__pycache__/
