@@ -2,7 +2,7 @@
 
 scgenome is scalable python toolkit for analyzing single-cell whole genome
 data built on [anndata](https://anndata.readthedocs.io) and inspired by
-`scanpy <https://scanpy.readthedocs.io>`.  scgenome includes preprocessing,
+[scanpy](https://scanpy.readthedocs.io).  scgenome includes preprocessing,
 visualization, and clustering functionality and can be used to analyze
 copy number, allele specific copy number, SNV and breakpoint features.
 
