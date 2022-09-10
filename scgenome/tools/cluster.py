@@ -80,7 +80,7 @@ def cluster_cells_kmeans(adata: AnnData, layer_name='copy', min_k=2, max_k=100) 
 
     model = kmeans[opt_k]
 
-    adata.obs['cluster_id'] = model.labels_
+    adata.obs['cluster_id'] = pd.Series(model.labels_, index=adata.obs.index, dtype='category')
 
     # store information on the clustering parameters
     adata.uns['kmeans'] = {}
