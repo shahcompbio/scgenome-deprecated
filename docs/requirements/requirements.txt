@@ -1,0 +1,8 @@
+Cython
+sphinx==5.1.1
+nbsphinx
+sphinx_gallery
+myst_parser
+sphinx_autodoc_typehints
+scanpydoc
+sphinx-rtd-theme

@@ -17,23 +17,24 @@ def read_dlp_hmmcopy(alignment_results_dir, hmmcopy_results_dir, annotation_resu
     """ Read hmmcopy results from the DLP pipeline.
 
     Parameters
-    ------
-    alignment_results_dir (str):
+    ----------
+    alignment_results_dir : str
         dlp pipeline alignment results directory
-    hmmcopy_results_dir (str):
+    hmmcopy_results_dir : str
         dlp pipeline hmmcopy results directory
-    annotation_results_dir (str):
+    annotation_results_dir : str
         dlp pipeline annotation results directory
-    sample_ids (list):
+    sample_ids : list
         sample ids to load
-    additional_hmmcopy_reads_cols (list):
+    additional_hmmcopy_reads_cols : list
         per bin metrics to load
 
     Returns
-    ------
+    -------
     AnnData
         An instantiated AnnData Object.
     """
+
 
     results = scgenome.loaders.qc.load_qc_results(
         alignment_results_dir,
@@ -53,7 +54,7 @@ def read_dlp_hmmcopy2(reads_filename, metrics_filename, sample_ids=None) -> AnnD
     """ Read hmmcopy results from the DLP pipeline.
 
     Parameters
-    ------
+    ----------
     reads_filename (str):
         dlp pipeline reads filename
     metrics_filename (str):
@@ -62,7 +63,7 @@ def read_dlp_hmmcopy2(reads_filename, metrics_filename, sample_ids=None) -> AnnD
         sample ids to load
 
     Returns
-    ------
+    -------
     AnnData
         An instantiated AnnData Object.
     """
@@ -246,7 +247,7 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], excluded: PyRanges
     ----------
     bins : pyranges.PyRanges
         bins in which to count reads
-    bams : Dict[Str]
+    bams : Dict[str]
         bam filenames with cell ids as keys
     excluded: PyRanges
         excluded genomic regions to filter reads

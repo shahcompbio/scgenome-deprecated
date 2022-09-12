@@ -43,6 +43,18 @@ def plot_cn_profile(
     rawy : bool, optional
         raw data on y axis, by default False
 
+    Examples
+    -------
+
+    >>> import scgenome
+    >>> print('heelp')
+
+    .. plot::
+        :context: close-figs
+
+        import matplotlib.pyplot as plt
+        plt.plot()
+
     TODO: missing return
     """
 
