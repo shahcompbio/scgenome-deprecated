@@ -1,0 +1,23 @@
+version: 0.2
+
+env:
+  variables:
+    PYPI_TOKEN: $PYPI_TOKEN
+phases:
+  pre_build:
+    commands:
+      - docker login quay.io -u $QUAY_USR --password $QUAY_PSW
+      - VERSION=`git describe --tags $(git rev-list --tags --max-count=1)`
+  build:
+    commands:
+      - pip install pip wheel twine nose
+      - python setup.py sdist bdist_wheel
+      - docker build --build-arg VERSION=$VERSION -t quay.io/mondrianscwgs/scgenome:$VERSION .
+#      - docker run -v $PWD:$PWD -w $PWD quay.io/mondrianscwgs/scgenome:$VERSION nosetests
+  post_build:
+    commands:
+      - if [ $CODEBUILD_BUILD_SUCCEEDING = 1 ]; then twine upload --skip-existing -u shahcompbio -p $PYPI_TOKEN dist/*; fi
+      - if [ $CODEBUILD_BUILD_SUCCEEDING = 1 ]; then docker push quay.io/mondrianscwgs/scgenome:$VERSION ; fi
+
+
+

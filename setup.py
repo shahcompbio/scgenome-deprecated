@@ -39,6 +39,9 @@ setup(
         'statsmodels',
         'umap-learn',
         'wgs_analysis',
+        'nose',
+        'biopython',
+        'pypeliner'
     ],
     package_data={
         'scgenome': [
