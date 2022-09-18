@@ -8,7 +8,7 @@ import csverve
 
 from anndata import AnnData
 from pyranges import PyRanges
-from typing import Dict
+from typing import Dict, Sequence
 from pandas import DataFrame
 
 
@@ -88,6 +88,85 @@ def read_dlp_hmmcopy2(reads_filename, metrics_filename, sample_ids=None) -> AnnD
     return convert_dlp_hmmcopy(metrics_data, cn_data)
 
 
+def create_cn_anndata(
+        cn_data: DataFrame,
+        X_column: Sequence[str],
+        layers_columns: Sequence[str],
+        cell_metrics_data: DataFrame=None,
+        bin_metrics_data: DataFrame=None,
+    ) -> AnnData:
+    """ Convert hmmcopy pandas dataframes to anndata
+
+    Parameters
+    ----------
+    cn_data : DataFrame
+        copy number data per cell in long format
+    X_column : Sequence[str]
+        column of cn_data to use for X
+    layers_columns : Sequence[str]
+        columns of cn_data to use for lauers
+    cell_metrics_data : DataFrame, optional
+        per cell metrics data, by default None
+    bin_metrics_data : DataFrame, optional
+        per bin metrics data, by default None
+
+    Returns
+    -------
+    AnnData
+        An instantiated AnnData Object.
+
+    Raises
+    ------
+    ValueError
+        duplicate data or otherwise incompatible inputs
+    """
+    if cell_metrics_data is None:
+        cell_metrics_data = cn_data[['cell_id']].drop_duplicates()
+
+    if bin_metrics_data is None:
+        bin_metrics_data = cn_data[['chr', 'start', 'end']].drop_duplicates()
+
+    duplicate_cell_ids = cn_data.loc[cn_data[['chr', 'start', 'end', 'cell_id']].duplicated(keep=False), 'cell_id'].unique()
+    if len(duplicate_cell_ids) > 0:
+        raise ValueError(f'cell {duplicate_cell_ids[0]} is duplicated, and {len(duplicate_cell_ids)} others')
+
+    assert not cell_metrics_data.duplicated(subset=['cell_id']).any()
+    assert not bin_metrics_data.duplicated(subset=['chr', 'start', 'end']).any()
+
+    cn_matrix = (
+        cn_data
+            .set_index(['chr', 'start', 'end', 'cell_id'])[layers_columns + [X_column]]
+            .unstack(level='cell_id')
+            .transpose())
+
+    bin_data = (
+        bin_metrics_data
+            .set_index(['chr', 'start', 'end'], drop=False)
+            .reindex(cn_matrix.loc[X_column].columns))
+
+    cell_data = (
+        cell_metrics_data
+            .set_index(['cell_id'])
+            .reindex(cn_matrix.loc[X_column].index))
+
+    bin_index = (
+        cn_matrix.columns.get_level_values('chr').astype(str) + ':' +
+        cn_matrix.columns.get_level_values('start').astype(str) + '-' +
+        cn_matrix.columns.get_level_values('end').astype(str))
+
+    cn_matrix.set_axis(bin_index, axis=1, inplace=True)
+    bin_data.set_axis(bin_index, axis=0, inplace=True)
+
+    adata = ad.AnnData(
+        cn_matrix.loc[X_column],
+        obs=cell_data,
+        var=bin_data,
+        layers={a: cn_matrix.loc[a] for a in layers_columns},
+    )
+
+    return adata
+
+
 def convert_dlp_hmmcopy(metrics_data: DataFrame, cn_data: DataFrame) -> AnnData:
     """ Convert hmmcopy pandas dataframes to anndata
 
@@ -104,47 +183,43 @@ def convert_dlp_hmmcopy(metrics_data: DataFrame, cn_data: DataFrame) -> AnnData:
         An instantiated AnnData Object.
     """
 
-    duplicate_cell_ids = cn_data.loc[cn_data[['chr', 'start', 'end', 'cell_id']].duplicated(keep=False), 'cell_id'].unique()
-    if len(duplicate_cell_ids) > 0:
-        raise ValueError(f'cell {duplicate_cell_ids[0]} is duplicated, and {len(duplicate_cell_ids)} others')
+    return create_cn_anndata(
+        cn_data[['cell_id', 'chr', 'start', 'end', 'reads', 'copy', 'state']],
+        layers_columns = ['copy', 'state'],
+        X_column = 'reads',
+        cell_metrics_data=metrics_data,
+        bin_metrics_data=cn_data[['chr', 'start', 'end', 'gc']].drop_duplicates())
 
-    cn_matrix = (
-        cn_data
-            .set_index(['chr', 'start', 'end', 'cell_id'])[['reads', 'copy', 'state']]
-            .unstack(level='cell_id')
-            .transpose())
 
-    bin_data = (
-        cn_data
-            .drop(['cell_id', 'sample_id', 'library_id', 'reads', 'copy', 'state'], axis=1)
-            .drop_duplicates(subset=['chr', 'start', 'end'])
-            .set_index(['chr', 'start', 'end'], drop=False)
-            .reindex(cn_matrix.loc['reads'].columns))
+def convert_dlp_signals(hscn: DataFrame, metrics_data: DataFrame) -> AnnData:
+    """ Convert signals pandas dataframes to anndata
 
-    cell_data = (
-        metrics_data
-            .set_index(['cell_id'])
-            .reindex(cn_matrix.loc['reads'].index))
+    Parameters
+    ----------
+    hscn : DataFrame
+        signals reads data
 
-    bin_index = (
-        cn_matrix.columns.get_level_values('chr').astype(str) + ':' +
-        cn_matrix.columns.get_level_values('start').astype(str) + '-' +
-        cn_matrix.columns.get_level_values('end').astype(str))
+    Returns
+    -------
+    AnnData
+        An instantiated AnnData Object.
+    """
+    hscn['state_a'] = hscn['state_AS_phased'].str.split('|', expand=True)[0].astype(float)
+    hscn['state_b'] = hscn['state_AS_phased'].str.split('|', expand=True)[1].astype(float)
 
-    cn_matrix.set_axis(bin_index, axis=1, inplace=True)
-    bin_data.set_axis(bin_index, axis=0, inplace=True)
+    layers_columns = [
+        'copy', 'state',
+        'alleleA', 'alleleB', 'BAF',
+        'Maj', 'Min',
+        'state_a', 'state_b',
+    ]
 
-    adata = ad.AnnData(
-        cn_matrix.loc['reads'],
-        obs=cell_data,
-        var=bin_data,
-        layers={
-            'copy': cn_matrix.loc['copy'],
-            'state': cn_matrix.loc['state'],
-        },
+    return create_cn_anndata(
+        hscn,
+        layers_columns=layers_columns,
+        X_column='totalcounts',
+        cell_metrics_data=metrics_data,
     )
-
-    return adata
 
 
 def _convert_pyranges(r):
