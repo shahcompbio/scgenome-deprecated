@@ -16,7 +16,7 @@ phases:
 #      - docker run -v $PWD:$PWD -w $PWD quay.io/mondrianscwgs/scgenome:$VERSION nosetests
   post_build:
     commands:
-      - if [ $CODEBUILD_BUILD_SUCCEEDING = 1 ]; then twine upload --skip-existing -u shahcompbio -p $PYPI_TOKEN dist/*; fi
+      - if [ $CODEBUILD_BUILD_SUCCEEDING = 1 ]; then twine upload --skip-existing -u __token__ -p $PYPI_TOKEN dist/*; fi
       - if [ $CODEBUILD_BUILD_SUCCEEDING = 1 ]; then docker push quay.io/mondrianscwgs/scgenome:$VERSION ; fi
 
 

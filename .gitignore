@@ -1,4 +1,5 @@
 .snakemake
+dist
 *.pyc
 *.egg-info
 *.ipynb_checkpoints
