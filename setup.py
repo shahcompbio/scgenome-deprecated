@@ -13,6 +13,7 @@ setup(
         'adjustText',
         'anndata',
         'bamread',
+        'biopython',
         'bokeh',
         'brewer2mpl',
         'Click',
@@ -23,6 +24,7 @@ setup(
         'jupyter',
         'lda',
         'matplotlib',
+        'nose',
         'numba',
         'numexpr',
         'numpy',
@@ -39,9 +41,6 @@ setup(
         'statsmodels',
         'umap-learn',
         'wgs_analysis',
-        'nose',
-        'biopython',
-        'pypeliner'
     ],
     package_data={
         'scgenome': [
