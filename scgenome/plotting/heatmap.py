@@ -79,7 +79,14 @@ def plot_cell_cn_matrix(adata: AnnData, layer_name='state', cell_order_fields=No
     return ax
 
 
-def plot_cell_cn_matrix_clusters_fig(adata: AnnData, layer_name='state', fig=None, raw=False, max_cn=13):
+def plot_cell_cn_matrix_clusters_fig(
+        adata: AnnData,
+        layer_name='state',
+        cell_order_fields=None,
+        annotation_field='cluster_id',
+        fig=None,
+        raw=False,
+        max_cn=13):
     """ Plot a copy number matrix
 
     Parameters
@@ -88,6 +95,10 @@ def plot_cell_cn_matrix_clusters_fig(adata: AnnData, layer_name='state', fig=Non
         copy number data
     layer_name : str, optional
         layer with copy number data to plot, None for X, by default 'state'
+    cell_order_fields : list, optional
+        columns of obs on which to sort cells, by default None
+    annotation_field : str
+        column of obs to use as an annotation colorbar, by default 'cluster_id'
     fig : [type], optional
         existing figure to plot into, by default None
     raw : bool, optional
@@ -101,10 +112,11 @@ def plot_cell_cn_matrix_clusters_fig(adata: AnnData, layer_name='state', fig=Non
 
     ax = fig.add_axes([0.1,0.0,0.9,1.])
     plot_cell_cn_matrix(
-        adata, layer_name=layer_name, cell_order_fields=['cluster_id', 'cell_order'],
+        adata, layer_name=layer_name,
+        cell_order_fields=cell_order_fields,
         ax=ax, raw=raw, max_cn=max_cn)
 
-    cluster_ids = adata.obs.sort_values(['cluster_id', 'cell_order'])['cluster_id'].sort_values().values
+    cluster_ids = adata.obs.sort_values(cell_order_fields)[annotation_field].values
     color_mat = scgenome.cncluster.get_cluster_colors(cluster_ids)
 
     ax = fig.add_axes([0.0,0.0,0.05,1.])
@@ -114,4 +126,3 @@ def plot_cell_cn_matrix_clusters_fig(adata: AnnData, layer_name='state', fig=Non
     ax.set_yticks([])
 
     return fig
-
