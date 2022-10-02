@@ -22,7 +22,17 @@ def map_annotations_to_colors(annotation, cmap):
     return color_mat, color_map
 
 
-def plot_tree_cn(tree, adata, chrom_segments=True, layer_name=None, obs_annotation=None, obs_cmap=None, var_label=None):
+def plot_tree_cn(
+        tree,
+        adata,
+        chrom_segments=True,
+        layer_name=None,
+        obs_annotation=None,
+        obs_cmap=None,
+        var_label=None,
+        fig=None,
+        raw=False,
+        max_cn=13):
     """ Plot a tree aligned to a CN values matrix heatmap
 
     Parameters
@@ -41,8 +51,17 @@ def plot_tree_cn(tree, adata, chrom_segments=True, layer_name=None, obs_annotati
         color map for cell annotations, by default None
     var_label : str, optional
         column of adata.var to use for heatmap var labels, by default None use index
+    fig : matplotlib.figure.Figure, optional
+        existing figure to plot into, by default None
+    raw : bool, optional
+        raw plotting, no integer color map, by default False
+    max_cn : int, optional
+        clip cn at max value, by default 13
     """    
     
+    if fig is None:
+        fig = plt.figure(figsize=(16, 12), dpi=150)
+
     # Add phylogenetic ordering to anndata obs
     cell_ids = []
     for a in tree.get_terminals():
@@ -51,8 +70,6 @@ def plot_tree_cn(tree, adata, chrom_segments=True, layer_name=None, obs_annotati
     adata.obs['phylo_order'] = None
     for idx, _ in adata.obs.iterrows():
         adata.obs.loc[idx, 'phylo_order'] = cell_ids.index(idx)
-    
-    fig = plt.figure(figsize=(16, 12), dpi=150)
 
     gs = gridspec.GridSpec(1, 3, width_ratios=(0.4, 0.58, 0.02))
 
@@ -74,8 +91,8 @@ def plot_tree_cn(tree, adata, chrom_segments=True, layer_name=None, obs_annotati
             layer_name=layer_name,
             cell_order_fields=('phylo_order',),
             ax=ax,
-            raw=False,
-            max_cn=13,
+            raw=raw,
+            max_cn=max_cn,
         )
 
     else:
@@ -117,3 +134,4 @@ def plot_tree_cn(tree, adata, chrom_segments=True, layer_name=None, obs_annotati
 
     plt.subplots_adjust(left=0.065, right=0.97, top=0.96, bottom=0.065, wspace=0.01)
 
+    return fig
