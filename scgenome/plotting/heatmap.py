@@ -19,7 +19,7 @@ def plot_cell_cn_matrix(adata: AnnData, layer_name='state', cell_order_fields=No
         layer with copy number data to plot, None for X, by default 'state'
     cell_order_fields : list, optional
         columns of obs on which to sort cells, by default None
-    ax : [type], optional
+    ax : matplotlib.axes.Axes, optional
         existing axis to plot into, by default None
     raw : bool, optional
         raw plotting, no integer color map, by default False
@@ -99,7 +99,7 @@ def plot_cell_cn_matrix_clusters_fig(
         columns of obs on which to sort cells, by default None
     annotation_field : str
         column of obs to use as an annotation colorbar, by default 'cluster_id'
-    fig : [type], optional
+    fig : matplotlib.figure.Figure, optional
         existing figure to plot into, by default None
     raw : bool, optional
         raw plotting, no integer color map, by default False
