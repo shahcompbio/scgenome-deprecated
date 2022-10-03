@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+import numpy as np
 import anndata as ad
 import pyranges as pr
 
@@ -357,6 +358,8 @@ def read_medicc2_cn(cn_profiles_filename, allele_specific: bool = False) -> AnnD
     cell_data['is_internal'] = cell_data.index.to_series().str.startswith('internal_')
     cell_data['is_cell'] = (~cell_data['is_root']) & (~cell_data['is_internal'])
 
+    X = cn_matrix.loc['state'].astype(np.float32)
+
     layers = {
         'is_gain': cn_matrix.loc['is_gain'],
         'is_loss': cn_matrix.loc['is_loss'],
@@ -365,8 +368,13 @@ def read_medicc2_cn(cn_profiles_filename, allele_specific: bool = False) -> AnnD
     for field in cn_fields:
         layers[field] = cn_matrix.loc[field]
 
+    X.index = X.index.astype(str)
+    cell_data.index = cell_data.index.astype(str)
+    for field in layers:
+        layers[field].index = layers[field].index.astype(str)
+
     adata = ad.AnnData(
-        cn_matrix.loc['state'],
+        X,
         obs=cell_data,
         var=bin_data,
         layers=layers,

@@ -33,9 +33,9 @@ def plot_cell_cn_matrix(adata: AnnData, layer_name='state', cell_order_fields=No
         ax = plt.gca()
 
     if layer_name is not None:
-        X = adata.layers[layer_name]
+        X = adata.layers[layer_name].copy()
     else:
-        X = adata.X
+        X = adata.X.copy()
 
     X = np.nan_to_num(X, nan=0)
 
