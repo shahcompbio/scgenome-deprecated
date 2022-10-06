@@ -1,5 +1,9 @@
 # scgenome: single cell whole genome analysis in python
 
+![codebuild](https://codebuild.us-east-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiSTVXZ3NyZWVSejMrd2JRd25GUTJnUmMwclFqd0t0ajNzbWk4dWlld3N4UHVYZzUzUzJkVUVPQmloZUZzbWNGM2lwWUlVN1hDMnBmandJZWdENU5GUjlrPSIsIml2UGFyYW1ldGVyU3BlYyI6IjM2UTFWbjRyUmx0VXlMWUgiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
+
+![Documentation Status](https://readthedocs.org/projects/scgenome/badge/?version=latest)
+
 scgenome is scalable python toolkit for analyzing single-cell whole genome
 data built on [anndata](https://anndata.readthedocs.io) and inspired by
 [scanpy](https://scanpy.readthedocs.io).  scgenome includes preprocessing,
