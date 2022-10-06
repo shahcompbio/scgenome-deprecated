@@ -39,12 +39,14 @@ def calculate_filter_metrics(
     -------
     AnnData
         AnnData with modified obs if not inplace, otherise, None
-    
-    Properties Changed
-    ------
-    AnnData.obs.filter_quality
-    AnnData.obs.filter_reads
-    AnnData.obs.filter_copy_state_diff
+
+    Note
+    ----
+
+    The following properties are changed:
+    - AnnData.obs.filter_quality
+    - AnnData.obs.filter_reads
+    - AnnData.obs.filter_copy_state_diff
     
     If is_s_phase is a property of AnnData
         AnnData.obs.filter_is_s_phase

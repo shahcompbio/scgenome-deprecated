@@ -4,6 +4,9 @@ import numpy as np
 
 from anndata import AnnData
 
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+
 import scgenome.cnplot
 import scgenome.refgenome
 
@@ -26,7 +29,10 @@ def plot_cell_cn_matrix(adata: AnnData, layer_name='state', cell_order_fields=No
     max_cn : int, optional
         clip cn at max value, by default 13
 
-    TODO: missing return
+    Returns
+    -------
+    Axes
+        Plot axes object
     """    
 
     if ax is None:
@@ -105,7 +111,12 @@ def plot_cell_cn_matrix_clusters_fig(
         raw plotting, no integer color map, by default False
     max_cn : int, optional
         clip cn at max value, by default 13
-    """    
+
+    Returns
+    -------
+    Figure
+        Plot figure object
+    """
 
     if fig is None:
         fig = plt.figure()

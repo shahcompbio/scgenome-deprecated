@@ -45,3 +45,12 @@ To build with pip and distribute to pypi, use the following commands:
     twine upload --repository pypi dist/*
 
 
+
+## Build documentation
+
+```
+pip install -r docs/requirements/requirements.txt
+pip install scgenome
+cd docs
+make html
+```

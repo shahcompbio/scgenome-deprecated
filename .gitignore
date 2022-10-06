@@ -6,4 +6,5 @@ dist
 venv
 sourceme
 build
+dist
 __pycache__/

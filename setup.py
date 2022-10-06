@@ -17,7 +17,7 @@ setup(
         'bokeh',
         'brewer2mpl',
         'Click',
-        'csverve',
+        'csverve>=0.3.1',
         'hdbscan',
         'hmmlearn',
         'ipython',
@@ -41,6 +41,11 @@ setup(
         'statsmodels',
         'umap-learn',
         'wgs_analysis',
+        'nose',
+        'biopython',
+        'pypeliner',
+        'joblib==1.1.0',
+        'sphinx==5.1.1'
     ],
     package_data={
         'scgenome': [
