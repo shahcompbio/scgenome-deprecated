@@ -15,6 +15,10 @@ class RefGenomeInfo(object):
             self.chromosomes = [str(a) for a in range(1, 23)] + ['X', 'Y']
             self.genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/GRCh37-lite.fa.fai')
 
+        elif version == 'grch38':
+            self.chromosomes = [f'chr{a}' for a in range(1, 23)] + ['chrX', 'chrY']
+            self.genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/GRCh38.fa.fai')
+
         elif version == 'mm10':
             self.chromosomes = [str(a) for a in range(1, 20)] + ['X', 'Y']
             self.genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/mm10.fa.fai')
