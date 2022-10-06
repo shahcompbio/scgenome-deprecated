@@ -91,7 +91,7 @@ def read_dlp_hmmcopy2(reads_filename, metrics_filename, sample_ids=None) -> AnnD
 
 def create_cn_anndata(
         cn_data: DataFrame,
-        X_column: Sequence[str],
+        X_column: str,
         layers_columns: Sequence[str],
         cell_metrics_data: DataFrame=None,
         bin_metrics_data: DataFrame=None,
@@ -102,7 +102,7 @@ def create_cn_anndata(
     ----------
     cn_data : DataFrame
         copy number data per cell in long format
-    X_column : Sequence[str]
+    X_column : str
         column of cn_data to use for X
     layers_columns : Sequence[str]
         columns of cn_data to use for lauers
