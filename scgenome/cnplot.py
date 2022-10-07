@@ -309,7 +309,7 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='clus
     chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [plot_data.shape[0] - 1])
     chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
     chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
-    chromosomes = refgenome.info.chromosome_info.loc[refgenome.info.chromosome_info['chr_index'].isin(mat_chrom_idxs), 'chr'].values
+    chromosomes = refgenome.info.chromosome_info.set_index('chr_index').loc[np.unique(mat_chrom_idxs), 'chr_plot']
 
     ax = fig.add_axes([0.125,1.,0.875,1.])
     im = ax.imshow(plot_data.T, aspect='auto', cmap=get_cn_cmap(plot_data.values), interpolation='none')
