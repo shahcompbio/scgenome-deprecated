@@ -134,35 +134,47 @@ def create_cn_anndata(
     assert not cell_metrics_data.duplicated(subset=['cell_id']).any()
     assert not bin_metrics_data.duplicated(subset=['chr', 'start', 'end']).any()
 
-    cn_matrix = (
+    X = (
         cn_data
-            .set_index(['chr', 'start', 'end', 'cell_id'])[layers_columns + [X_column]]
+            .set_index(['chr', 'start', 'end', 'cell_id'])[X_column]
             .unstack(level='cell_id')
             .transpose())
+
+    chr_start_end_index = X.columns
+    bin_index = (
+        X.columns.get_level_values('chr').astype(str) + ':' +
+        X.columns.get_level_values('start').astype(str) + '-' +
+        X.columns.get_level_values('end').astype(str))
+
+    X = X.set_axis(bin_index, axis=1, copy=False)
+
+    layers = {}
+    for layer_name in layers_columns:
+        layers[layer_name] = (
+            cn_data
+                .set_index(['chr', 'start', 'end', 'cell_id'])[layer_name]
+                .unstack(level='cell_id')
+                .transpose()
+                .reindex(index=X.index, columns=chr_start_end_index)
+                .set_axis(bin_index, axis=1, copy=False))
 
     bin_data = (
         bin_metrics_data
             .set_index(['chr', 'start', 'end'], drop=False)
-            .reindex(cn_matrix.loc[X_column].columns))
+            .reindex(index=chr_start_end_index)
+            .set_axis(bin_index, axis=0))
 
     cell_data = (
         cell_metrics_data
             .set_index(['cell_id'])
-            .reindex(cn_matrix.loc[X_column].index))
-
-    bin_index = (
-        cn_matrix.columns.get_level_values('chr').astype(str) + ':' +
-        cn_matrix.columns.get_level_values('start').astype(str) + '-' +
-        cn_matrix.columns.get_level_values('end').astype(str))
-
-    cn_matrix.set_axis(bin_index, axis=1, inplace=True)
-    bin_data.set_axis(bin_index, axis=0, inplace=True)
+            .reindex(X.index))
 
     adata = ad.AnnData(
-        cn_matrix.loc[X_column],
+        X,
+        dtype=X.dtypes[0],
         obs=cell_data,
         var=bin_data,
-        layers={a: cn_matrix.loc[a] for a in layers_columns},
+        layers=layers,
     )
 
     return adata

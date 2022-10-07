@@ -57,7 +57,7 @@ def _secondary_clustering(data):
 
 
 def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', secondary_field_name=None, raw=False, max_cn=13, cmap=None):
-    plot_data = cn_data.merge(refgenome.info.chrom_idxs)
+    plot_data = cn_data.merge(refgenome.info.chromosome_info[['chr', 'chr_index']])
 
     if secondary_field_name is not None:
         plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])
@@ -65,7 +65,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
         plot_data = plot_data.unstack(level=['cell_id', cluster_field_name]).fillna(0)
         ordering = plot_data[secondary_field_name].values[0]
 
-        plot_data = cn_data.merge(refgenome.info.chrom_idxs)
+        plot_data = cn_data.merge(refgenome.info.chromosome_info[['chr', 'chr_index']])
         plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
     else:
         plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
@@ -82,7 +82,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
     chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
     ordered_mat_chrom_idxs = mat_chrom_idxs[np.where(np.array([1] + list(np.diff(mat_chrom_idxs))) != 0)]
-    chrom_names = np.array(refgenome.info.chromosomes)[ordered_mat_chrom_idxs]
+    chrom_names = np.array(refgenome.info.plot_chromosomes)[ordered_mat_chrom_idxs]
 
     mat_cluster_ids = plot_data.columns.get_level_values(1).values
     cluster_boundaries = np.array([0] + list(np.where(mat_cluster_ids[1:] != mat_cluster_ids[:-1])[0]) + [plot_data.shape[1] - 1])
@@ -186,14 +186,14 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
         ax.set_xlim((chromosome_start, chromosome_end))
 
     else:
-        ax.set_xlim((-0.5, refgenome.info.chromosome_end.max()))
+        ax.set_xlim((-0.5, refgenome.info.chromosome_info['chromosome_end'].max()))
         ax.set_xlabel('chromosome')
-        ax.set_xticks([0] + list(refgenome.info.chromosome_end.values))
+        ax.set_xticks([0] + list(refgenome.info.chromosome_info['chromosome_end'].values))
         ax.set_xticklabels([])
         ax.xaxis.tick_bottom()
         ax.yaxis.tick_left()
-        ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_mid))
-        ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.chromosomes))
+        ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(refgenome.info.chromosome_info['chromosome_mid']))
+        ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(refgenome.info.plot_chromosomes))
 
     if squashy and not rawy:
         yticks = np.array([0, 2, 4, 7, 20])
@@ -284,7 +284,7 @@ def plot_breakends(ax, breakends, lw=0.5):
 
 
 def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='cluster_id'):
-    plot_data = cn_data.merge(refgenome.info.chrom_idxs)
+    plot_data = cn_data.merge(refgenome.info.chromosome_info[['chr', 'chr_index']])
     plot_data = plot_data.groupby(['chr_index', 'start', cluster_field_name], observed=True)[cn_field_name].median().astype(int)
     plot_data = plot_data.unstack(level=[cluster_field_name]).fillna(0)
     plot_data = plot_data.sort_index(axis=1, level=1)
@@ -309,7 +309,7 @@ def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='clus
     chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [plot_data.shape[0] - 1])
     chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
     chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
-    chromosomes = refgenome.info.chrom_idxs.loc[refgenome.info.chrom_idxs['chr_index'].isin(mat_chrom_idxs), 'chr'].values
+    chromosomes = refgenome.info.chromosome_info.loc[refgenome.info.chromosome_info['chr_index'].isin(mat_chrom_idxs), 'chr'].values
 
     ax = fig.add_axes([0.125,1.,0.875,1.])
     im = ax.imshow(plot_data.T, aspect='auto', cmap=get_cn_cmap(plot_data.values), interpolation='none')
