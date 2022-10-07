@@ -49,7 +49,7 @@ def plot_cell_cn_matrix(adata: AnnData, layer_name='state', cell_order_fields=No
         X[X > max_cn] = max_cn
 
     # Order the chromosomes
-    chr_start = adata.var.reset_index().merge(scgenome.refgenome.info.chrom_idxs, how='left')[['start', 'chr_index']].values
+    chr_start = adata.var.reset_index().merge(scgenome.refgenome.info.chromosome_info[['chr', 'chr_index']], how='left')[['start', 'chr_index']].values
     genome_ordering = np.lexsort(chr_start.transpose())
 
     # Order the cells if requested
@@ -74,7 +74,7 @@ def plot_cell_cn_matrix(adata: AnnData, layer_name='state', cell_order_fields=No
     chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
     chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
     ordered_mat_chrom_idxs = mat_chrom_idxs[np.where(np.array([1] + list(np.diff(mat_chrom_idxs))) != 0)]
-    chrom_names = np.array(scgenome.refgenome.info.chromosomes)[ordered_mat_chrom_idxs]
+    chrom_names = np.array(scgenome.refgenome.info.plot_chromosomes)[ordered_mat_chrom_idxs]
 
     ax.set(xticks=chrom_mids)
     ax.set(xticklabels=chrom_names)

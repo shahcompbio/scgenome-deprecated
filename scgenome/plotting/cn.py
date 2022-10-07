@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 from anndata import AnnData
 
@@ -61,13 +62,13 @@ def plot_cn_profile(
     cn_data = adata.var.copy()
 
     if value_layer_name is not None:
-        cn_data['value'] = adata[[obs_id], :].layers[value_layer_name][0]
+        cn_data['value'] = np.array(adata[[obs_id], :].layers[value_layer_name][0])
     else:
-        cn_data['value'] = adata[[obs_id], :].X[0]
+        cn_data['value'] = np.array(adata[[obs_id], :].X[0])
 
     cn_field_name = None
     if state_layer_name is not None:
-        cn_data['state'] = adata[[obs_id], :].layers[state_layer_name][0]
+        cn_data['state'] = np.array(adata[[obs_id], :].layers[state_layer_name][0])
         cn_field_name = 'state'
 
     if ax is None:
