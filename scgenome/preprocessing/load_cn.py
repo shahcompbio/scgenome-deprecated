@@ -140,6 +140,7 @@ def create_cn_anndata(
             .set_index(['chr', 'start', 'end', 'cell_id'])[X_column]
             .unstack(level='cell_id')
             .transpose())
+    X.index = X.index.astype(str)
 
     chr_start_end_index = X.columns
     bin_index = (
@@ -158,6 +159,7 @@ def create_cn_anndata(
                 .transpose()
                 .reindex(index=X.index, columns=chr_start_end_index)
                 .set_axis(bin_index, axis=1, copy=False))
+        layers[layer_name].index = layers[layer_name].index.astype(str)
 
     bin_data = (
         bin_metrics_data
@@ -169,6 +171,7 @@ def create_cn_anndata(
         cell_metrics_data
             .set_index(['cell_id'])
             .reindex(X.index))
+    cell_data.index = cell_data.index.astype(str)
 
     adata = ad.AnnData(
         X,
