@@ -45,10 +45,10 @@ Coming Soon
 
 To build with pip and distribute to pypi, use the following commands:
 
-    python setup.py build_ext --force sdist
-    twine upload --repository pypi dist/*
-
-
+```
+python setup.py build_ext --force sdist
+twine upload --repository pypi dist/*
+```
 
 ## Build documentation
 
