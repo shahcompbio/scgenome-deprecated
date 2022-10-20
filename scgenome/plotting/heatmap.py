@@ -33,6 +33,17 @@ def plot_cell_cn_matrix(adata: AnnData, layer_name='state', cell_order_fields=No
     -------
     Axes
         Plot axes object
+
+    Examples
+    -------
+
+    .. plot::
+        :context: close-figs
+
+        import scgenome
+        adata = scgenome.datasets.OV2295_HMMCopy_reduced()
+        scgenome.pl.plot_cell_cn_matrix(adata)
+
     """    
 
     if ax is None:
@@ -116,6 +127,7 @@ def plot_cell_cn_matrix_clusters_fig(
     -------
     Figure
         Plot figure object
+
     """
 
     if fig is None:
