@@ -53,8 +53,9 @@ def plot_cn_profile(
     .. plot::
         :context: close-figs
 
-        import matplotlib.pyplot as plt
-        plt.plot()
+        import scgenome
+        adata = scgenome.datasets.OV2295_HMMCopy_reduced()
+        scgenome.pl.plot_cn_profile(adata, 'SA922-A90554B-R27-C43', value_layer_name='copy', state_layer_name='state')
 
     TODO: missing return
     """

@@ -49,9 +49,9 @@ setup(
     ],
     package_data={
         'scgenome': [
-            'data/mm10.fa.fai',
-            'data/GRCh37-lite.fa.fai',
+            'data/*',
             'dtypes/*.yaml',
+            'datasets/data/*'
         ],
     },
 )
