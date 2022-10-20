@@ -44,7 +44,7 @@ def plot_cell_cn_matrix(adata: AnnData, layer_name='state', cell_order_fields=No
         adata = scgenome.datasets.OV2295_HMMCopy_reduced()
         scgenome.pl.plot_cell_cn_matrix(adata)
 
-    """    
+    """
 
     if ax is None:
         ax = plt.gca()

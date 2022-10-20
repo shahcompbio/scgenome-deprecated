@@ -47,9 +47,6 @@ def plot_cn_profile(
     Examples
     -------
 
-    >>> import scgenome
-    >>> print('heelp')
-
     .. plot::
         :context: close-figs
 

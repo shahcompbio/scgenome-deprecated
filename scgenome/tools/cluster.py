@@ -53,6 +53,28 @@ def cluster_cells_kmeans(adata: AnnData, layer_name='copy', min_k=2, max_k=100) 
     -------
     AnnData
         copy number data with additional `cluster_id` column
+
+    Examples
+    -------
+
+    >>> import scgenome
+    >>> import anndata as ad
+    >>> import numpy as np
+    >>> adata = ad.AnnData(np.array([
+    ...    [3, 3, 3, 6, 6],
+    ...    [1, 1, 1, 2, 2],
+    ...    [1, 22, 1, 2, 2],
+    ...    [1, 3, 3, 5, 5],
+    ... ]).astype(np.float32))
+    >>> adata = scgenome.tl.cluster_cells_kmeans(adata, layer_name=None, max_k=3)
+    >>> adata.obs['cluster_id']
+    0    0
+    1    2
+    2    1
+    3    0
+    Name: cluster_id, dtype: category
+    Categories (3, int64): [0, 1, 2]
+
     """
 
     if layer_name is not None:
