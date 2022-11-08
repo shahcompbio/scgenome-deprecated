@@ -293,9 +293,11 @@ def read_bam_bin_counts(bins: PyRanges, bams: Dict[str, str], excluded: PyRanges
         read_counts = _convert_pyranges(read_counts)
         read_counts = _add_bin_index(read_counts)
 
-        cn_matrix[cell_id] = read_counts['reads']
+        assert (read_counts.index == bin_data.index).all()
 
-    cn_matrix = pd.DataFrame(cn_matrix)
+        cn_matrix[cell_id] = read_counts['reads'].values.copy()
+
+    cn_matrix = pd.DataFrame(cn_matrix, index=bin_data.index)
 
     cell_data = pd.DataFrame({'cell_id': cn_matrix.columns.values}).set_index('cell_id')
 
