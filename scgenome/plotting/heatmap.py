@@ -209,7 +209,7 @@ def plot_cell_cn_matrix_clusters_fig(
         layer with copy number data to plot, None for X, by default 'state'
     cell_order_fields : list, optional
         columns of obs on which to sort cells, by default None
-    annotation_field : str
+    annotation_fields : list, optional
         column of obs to use as an annotation colorbar, by default 'cluster_id'
     fig : matplotlib.figure.Figure, optional
         existing figure to plot into, by default None
@@ -249,10 +249,10 @@ def plot_cell_cn_matrix_clusters_fig(
 
     axes = fig_main.subplots(
         nrows=1, ncols=len(width_ratios), sharey=True, width_ratios=width_ratios,
-        gridspec_kw=dict(hspace=0.01, wspace=0.01))
+        squeeze=False, gridspec_kw=dict(hspace=0.01, wspace=0.01))[0]
 
     axes_legends = fig_legends.subplots(
-        nrows=1, ncols=1+len(annotation_fields))
+        nrows=1, ncols=1+len(annotation_fields), squeeze=False)[0]
     for ax in axes_legends:
         ax.set_axis_off()
 
