@@ -134,8 +134,8 @@ def plot_cell_cn_matrix(
     ordered_mat_chrom_idxs = mat_chrom_idxs[np.where(np.array([1] + list(np.diff(mat_chrom_idxs))) != 0)]
     chrom_names = np.array(scgenome.refgenome.info.plot_chromosomes)[ordered_mat_chrom_idxs]
 
-    ax.set(xticks=chrom_mids)
-    ax.set(xticklabels=chrom_names)
+    ax.set_xticks(chrom_mids)
+    ax.set_xticklabels(chrom_names, fontsize='6')
 
     if show_cell_ids:
         ax.set(yticks=range(len(adata.obs.index)))
@@ -155,8 +155,8 @@ def plot_cell_cn_matrix(
             patches.append(Patch(facecolor=h, edgecolor=h))
         legend = ax_legend.legend(patches, states, ncol=3,
             frameon=True, loc=2, bbox_to_anchor=(0., 1.),
-            facecolor='white', edgecolor='white', fontsize='6',
-            title='Copy Number', title_fontsize='8')
+            facecolor='white', edgecolor='white', fontsize='4',
+            title='Copy Number', title_fontsize='6')
 
     return {
         'ax': ax,
@@ -188,6 +188,56 @@ def map_catagorigal_colors(values, cmap_name=None):
         value_colors[values == l, :] = c
 
     return level_colors, value_colors
+
+
+def _plot_categorical_annotation(values, ax, ax_legend, title):
+        level_colors, value_colors = map_catagorigal_colors(values)
+
+        im = ax.imshow(value_colors, aspect='auto', interpolation='none')
+
+        levels = []
+        patches = []
+        for s, h in level_colors.items():
+            levels.append(s)
+            patches.append(Patch(facecolor=h, edgecolor=h))
+        legend = ax_legend.legend(patches, levels, ncol=3,
+            frameon=True, loc=2, bbox_to_anchor=(0., 1.),
+            facecolor='white', edgecolor='white', fontsize='4',
+            title=title, title_fontsize='6')
+
+        ax.grid(False)
+        ax.set_xticks([0.], [title], rotation=90, fontsize='6')
+        ax.set_yticks([])
+
+        annotation_info = {}
+        annotation_info = {}
+        annotation_info['ax'] = ax
+        annotation_info['im'] = im
+        annotation_info['ax_legend'] = ax_legend
+        annotation_info['legend'] = legend
+
+        return annotation_info
+
+
+def _plot_continuous_annotation(values, ax, ax_legend, title):
+
+    im = ax.imshow(values, aspect='auto', interpolation='none', cmap='Reds')
+
+    ax.grid(False)
+    ax.set_xticks([0.], [title], rotation=90, fontsize='6')
+    ax.set_yticks([])
+
+    ax_legend.grid(False)
+    ax_legend.set_xticks([])
+    ax_legend.set_yticks([])
+
+    axins = ax_legend.inset_axes([0.5, 0.1, 0.05, 0.6])
+
+    cbar = plt.colorbar(im, cax=axins)
+    axins.set_title(title, fontsize='6')
+    cbar.ax.tick_params(labelsize='4')
+
+    return {}
 
 
 def plot_cell_cn_matrix_clusters_fig(
@@ -233,10 +283,11 @@ def plot_cell_cn_matrix_clusters_fig(
 
         import scgenome
         adata = scgenome.datasets.OV2295_HMMCopy_reduced()
+
         g = scgenome.pl.plot_cell_cn_matrix_clusters_fig(
             adata,
             cell_order_fields=['cell_order'],
-            annotation_fields=['cluster_id', 'sample_id'])
+            annotation_fields=['cluster_id', 'sample_id', 'quality'])
 
     """
 
@@ -244,17 +295,21 @@ def plot_cell_cn_matrix_clusters_fig(
         fig = plt.figure()
 
     fig_main, fig_legends = fig.subfigures(nrows=2, ncols=1, height_ratios=[5, 1], squeeze=True)
+    fig_legends.patch.set_alpha(0.0)
 
-    width_ratios = [1] + [0.02] * len(annotation_fields)
+    width_ratios = [1] + [0.005] + [0.02] * len(annotation_fields)
 
     axes = fig_main.subplots(
         nrows=1, ncols=len(width_ratios), sharey=True, width_ratios=width_ratios,
-        squeeze=False, gridspec_kw=dict(hspace=0.01, wspace=0.01))[0]
+        squeeze=False, gridspec_kw=dict(hspace=0.02, wspace=0.02))[0]
+    axes[1].set_axis_off()
 
     axes_legends = fig_legends.subplots(
         nrows=1, ncols=1+len(annotation_fields), squeeze=False)[0]
     for ax in axes_legends:
         ax.set_axis_off()
+        ax.set_alpha(0.0)
+        ax.patch.set_alpha(0.0)
 
     ax = axes[0]
     ax_legend = axes_legends[0]
@@ -268,31 +323,14 @@ def plot_cell_cn_matrix_clusters_fig(
 
     annotation_info = {}
 
-    for ax, ax_legend, annotation_field in zip(axes[1:], axes_legends[1:], annotation_fields):
-        values = adata.obs[[annotation_field]].values
-        level_colors, value_colors = map_catagorigal_colors(values)
+    for ax, ax_legend, annotation_field in zip(axes[2:], axes_legends[1:], annotation_fields):
+        if adata.obs[annotation_field].dtype.name in ('category', 'object'):
+            values = adata.obs[[annotation_field]].values
+            annotation_info[annotation_field] = _plot_categorical_annotation(values, ax, ax_legend, annotation_field)
 
-        im = ax.imshow(value_colors, aspect='auto', interpolation='none')
-
-        levels = []
-        patches = []
-        for s, h in level_colors.items():
-            levels.append(s)
-            patches.append(Patch(facecolor=h, edgecolor=h))
-        legend = ax_legend.legend(patches, levels, ncol=3,
-            frameon=True, loc=2, bbox_to_anchor=(0., 1.),
-            facecolor='white', edgecolor='white', fontsize='6',
-            title=annotation_field, title_fontsize='8')
-
-        ax.grid(False)
-        ax.set_xticks([0.], [annotation_field], rotation=90)
-        ax.set_yticks([])
-
-        annotation_info[annotation_field] = {}
-        annotation_info[annotation_field]['ax'] = ax
-        annotation_info[annotation_field]['im'] = im
-        annotation_info[annotation_field]['ax_legend'] = ax_legend
-        annotation_info[annotation_field]['legend'] = legend
+        else:
+            values = adata.obs[[annotation_field]].values
+            annotation_info[annotation_field] = _plot_continuous_annotation(values, ax, ax_legend, annotation_field)
 
     return {
         'fig': fig,
