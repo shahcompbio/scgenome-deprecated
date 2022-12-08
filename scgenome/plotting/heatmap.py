@@ -153,7 +153,8 @@ def plot_cell_cn_matrix(
         for s, h in color_reference.items():
             states.append(s)
             patches.append(Patch(facecolor=h, edgecolor=h))
-        legend = ax_legend.legend(patches, states, ncol=3,
+        ncol = min(3, int(len(states)**(1/2)))
+        legend = ax_legend.legend(patches, states, ncol=ncol,
             frameon=True, loc=2, bbox_to_anchor=(0., 1.),
             facecolor='white', edgecolor='white', fontsize='4',
             title='Copy Number', title_fontsize='6')
@@ -200,7 +201,8 @@ def _plot_categorical_annotation(values, ax, ax_legend, title):
         for s, h in level_colors.items():
             levels.append(s)
             patches.append(Patch(facecolor=h, edgecolor=h))
-        legend = ax_legend.legend(patches, levels, ncol=3,
+        ncol = min(3, int(len(levels)**(1/2)))
+        legend = ax_legend.legend(patches, levels, ncol=ncol,
             frameon=True, loc=2, bbox_to_anchor=(0., 1.),
             facecolor='white', edgecolor='white', fontsize='4',
             title=title, title_fontsize='6')
