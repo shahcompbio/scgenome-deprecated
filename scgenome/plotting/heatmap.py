@@ -193,33 +193,33 @@ def map_catagorigal_colors(values, cmap_name=None):
 
 
 def _plot_categorical_annotation(values, ax, ax_legend, title):
-        level_colors, value_colors = map_catagorigal_colors(values)
+    level_colors, value_colors = map_catagorigal_colors(values)
 
-        im = ax.imshow(value_colors, aspect='auto', interpolation='none')
+    im = ax.imshow(value_colors, aspect='auto', interpolation='none')
 
-        levels = []
-        patches = []
-        for s, h in level_colors.items():
-            levels.append(s)
-            patches.append(Patch(facecolor=h, edgecolor=h))
-        ncol = min(3, int(len(levels)**(1/2)))
-        legend = ax_legend.legend(patches, levels, ncol=ncol,
-            frameon=True, loc=2, bbox_to_anchor=(0., 1.),
-            facecolor='white', edgecolor='white', fontsize='4',
-            title=title, title_fontsize='6')
+    levels = []
+    patches = []
+    for s, h in level_colors.items():
+        levels.append(s)
+        patches.append(Patch(facecolor=h, edgecolor=h))
+    ncol = min(3, int(len(levels)**(1/2)))
+    legend = ax_legend.legend(patches, levels, ncol=ncol,
+        frameon=True, loc=2, bbox_to_anchor=(0., 1.),
+        facecolor='white', edgecolor='white', fontsize='4',
+        title=title, title_fontsize='6')
 
-        ax.grid(False)
-        ax.set_xticks([0.], [title], rotation=90, fontsize='6')
-        ax.tick_params(axis='y', left=False, right=False)
+    ax.grid(False)
+    ax.set_xticks([0.], [title], rotation=90, fontsize='6')
+    ax.tick_params(axis='y', left=False, right=False)
 
-        annotation_info = {}
-        annotation_info = {}
-        annotation_info['ax'] = ax
-        annotation_info['im'] = im
-        annotation_info['ax_legend'] = ax_legend
-        annotation_info['legend'] = legend
+    annotation_info = {}
+    annotation_info = {}
+    annotation_info['ax'] = ax
+    annotation_info['im'] = im
+    annotation_info['ax_legend'] = ax_legend
+    annotation_info['legend'] = legend
 
-        return annotation_info
+    return annotation_info
 
 
 def _plot_continuous_annotation(values, ax, ax_legend, title):
