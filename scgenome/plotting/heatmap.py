@@ -141,6 +141,7 @@ def plot_cell_cn_matrix(
         ax.set(yticks=range(len(adata.obs.index)))
         ax.set(yticklabels=adata.obs.index.values)
     else:
+        ax.set(yticks=[])
         ax.set(yticklabels=[])
 
     for val in chrom_boundaries[:-1]:
@@ -209,7 +210,7 @@ def _plot_categorical_annotation(values, ax, ax_legend, title):
 
         ax.grid(False)
         ax.set_xticks([0.], [title], rotation=90, fontsize='6')
-        ax.set_yticks([])
+        ax.tick_params(axis='y', left=False, right=False)
 
         annotation_info = {}
         annotation_info = {}
@@ -227,7 +228,7 @@ def _plot_continuous_annotation(values, ax, ax_legend, title):
 
     ax.grid(False)
     ax.set_xticks([0.], [title], rotation=90, fontsize='6')
-    ax.set_yticks([])
+    ax.tick_params(axis='y', left=False, right=False)
 
     ax_legend.grid(False)
     ax_legend.set_xticks([])
