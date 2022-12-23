@@ -44,7 +44,7 @@ setup(
         'nose',
         'biopython',
         'pypeliner',
-        'joblib==1.1.0',
+        'joblib==1.2.0',
         'sphinx==5.1.1'
     ],
     package_data={
