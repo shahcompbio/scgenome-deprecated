@@ -20,7 +20,7 @@ setup(
         'csverve>=0.3.1',
         'hdbscan',
         'hmmlearn',
-        'ipython',
+        'ipython!=8.7.0',
         'jupyter',
         'lda',
         'matplotlib',
