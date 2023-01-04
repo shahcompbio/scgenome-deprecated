@@ -1,34 +1,9 @@
 import pyfaidx
 import pyBigWig
 import numba
-import pyranges as pr
 import numpy as np
 
 import scgenome.refgenome
-
-
-def create_bins(binsize):
-    """ Create a regular binning of the genome
-
-    Parameters
-    ----------
-    binsize : int
-        length of bins
-
-    Returns
-    -------
-    pyrange.PyRanges
-        regular bins tiled across the genome
-    """    
-    
-    chromsizes = scgenome.refgenome.info.chromosome_info[['chr', 'chromosome_length']].rename(
-        columns={'chr': 'Chromosome', 'chromosome_length': 'End'}).assign(Start=0)[['Chromosome', 'Start', 'End']]
-
-    chromsizes = pr.PyRanges(chromsizes)
-
-    bins = pr.gf.tile_genome(chromsizes, binsize)
-
-    return bins
 
 
 def _chromosome_count_gc(data, **kwargs):
