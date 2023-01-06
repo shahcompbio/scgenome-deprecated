@@ -125,7 +125,7 @@ Copy number profiles and heatmaps
 
    pl.plot_cn_profile
    pl.plot_cell_cn_matrix
-   pl.plot_cell_cn_matrix_clusters_fig
+   pl.plot_cell_cn_matrix_fig
    pl.plot_gc_reads
 
 Phylogenetics

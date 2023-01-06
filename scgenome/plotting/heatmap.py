@@ -12,30 +12,7 @@ import matplotlib.cm
 
 import scgenome.cnplot
 import scgenome.refgenome
-
-
-# TODO: refactor color functionality elsewhere
-color_reference = {
-    0:'#3182BD',
-    1:'#9ECAE1',
-    2:'#CCCCCC',
-    3:'#FDCC8A',
-    4:'#FC8D59',
-    5:'#E34A33',
-    6:'#B30000',
-    7:'#980043',
-    8:'#DD1C77',
-    9:'#DF65B0',
-    10:'#C994C7',
-    11:'#D4B9DA',
-}
-
-
-def hex_to_rgb(h):
-    if h is None:
-        return np.array((0, 0, 0), dtype=int)
-    h = h.lstrip('#')
-    return np.array(tuple(np.uint8(int(h[i:i+2], 16)) for i in (0, 2 ,4)), dtype=int)
+from . import cn_colors
 
 
 def plot_cell_cn_matrix(
@@ -43,7 +20,6 @@ def plot_cell_cn_matrix(
         layer_name='state',
         cell_order_fields=(),
         ax=None,
-        ax_legend=None,
         raw=False,
         max_cn=13,
         show_cell_ids=False):
@@ -117,11 +93,7 @@ def plot_cell_cn_matrix(
 
     cmap = None
     if not raw:
-        X_colors = np.zeros(X.shape + (3,), dtype=int)
-        X_colors[X < 0, :] = 0
-        X_colors[X > max(color_reference.keys()), :] = max(color_reference.keys())
-        for state, hex in color_reference.items():
-            X_colors[X == state, :] = hex_to_rgb(hex)
+        X_colors = cn_colors.map_cn_colors(X)
         im = ax.imshow(X_colors, aspect='auto', cmap=cmap, interpolation='none')
 
     else:
@@ -147,24 +119,9 @@ def plot_cell_cn_matrix(
     for val in chrom_boundaries[:-1]:
         ax.axvline(x=val, linewidth=1, color='black', zorder=100)
 
-    legend = None
-    if ax_legend is not None:
-        states = []
-        patches = []
-        for s, h in color_reference.items():
-            states.append(s)
-            patches.append(Patch(facecolor=h, edgecolor=h))
-        ncol = min(3, int(len(states)**(1/2)))
-        legend = ax_legend.legend(patches, states, ncol=ncol,
-            frameon=True, loc=2, bbox_to_anchor=(0., 1.),
-            facecolor='white', edgecolor='white', fontsize='4',
-            title='Copy Number', title_fontsize='6')
-
     return {
         'ax': ax,
-        'ax_legend': ax_legend,
         'im': im,
-        'legend': legend,
         'adata': adata,
     }
 
@@ -243,7 +200,7 @@ def _plot_continuous_annotation(values, ax, ax_legend, title):
     return {}
 
 
-def plot_cell_cn_matrix_clusters_fig(
+def plot_cell_cn_matrix_fig(
         adata: AnnData,
         layer_name='state',
         cell_order_fields=(),
@@ -287,7 +244,7 @@ def plot_cell_cn_matrix_clusters_fig(
         import scgenome
         adata = scgenome.datasets.OV2295_HMMCopy_reduced()
 
-        g = scgenome.pl.plot_cell_cn_matrix_clusters_fig(
+        g = scgenome.pl.plot_cell_cn_matrix_fig(
             adata,
             cell_order_fields=['cell_order'],
             annotation_fields=['cluster_id', 'sample_id', 'quality'])
@@ -319,8 +276,9 @@ def plot_cell_cn_matrix_clusters_fig(
     g = plot_cell_cn_matrix(
         adata, layer_name=layer_name,
         cell_order_fields=cell_order_fields,
-        ax=ax, ax_legend=ax_legend, raw=raw, max_cn=max_cn,
+        ax=ax, raw=raw, max_cn=max_cn,
         show_cell_ids=show_cell_ids)
+    cn_colors.cn_legend(ax_legend)
 
     adata = g['adata']
 

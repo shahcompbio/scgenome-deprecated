@@ -3,7 +3,8 @@ Gallery
 
 Plotting examples:
 
-	1. `heatmap plots notebook <notebooks/heatmap.ipynb>`_ 
+	1. `Copy Number Heatmaps <notebooks/heatmap.ipynb>`_ 
+	2. `Cell Copy Number Profiles <notebooks/cell_plotting.ipynb>`_ 
 
 
 .. toctree::
@@ -11,3 +12,4 @@ Plotting examples:
    :maxdepth: 3
 
    notebooks/heatmap.ipynb
+   notebooks/cell_plotting.ipynb
