@@ -40,7 +40,7 @@ def pca_loadings(adata: AnnData, layer=None, n_components=None, random_state=100
         data = adata.layers[layer]
 
     pca = sklearn.decomposition.PCA(n_components=n_components, random_state=random_state)
-    pca.fit(scgenome.preprocessing.transform.fill_missing(data))
+    transformed = pca.fit_transform(scgenome.preprocessing.transform.fill_missing(data))
 
     var = adata.var.copy()
     var['pca_mean'] = pca.mean_
@@ -51,6 +51,11 @@ def pca_loadings(adata: AnnData, layer=None, n_components=None, random_state=100
         'pca_explained_variance_ratio': pca.explained_variance_ratio_,
         'pca_singular_values': pca.singular_values_,
     }).set_index('component')
+
+    transformed = pd.DataFrame(
+        transformed,
+        index=adata.obs.index,
+        columns=obs.index)
 
     uns = {
         'pca': {
@@ -65,6 +70,7 @@ def pca_loadings(adata: AnnData, layer=None, n_components=None, random_state=100
                 'n_samples': pca.n_samples_,
                 'noise_variance': pca.noise_variance_,
                 'n_features_in': pca.n_features_in_,
+                'transformed': transformed,
             }
         }
     }
