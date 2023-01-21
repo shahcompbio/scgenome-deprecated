@@ -91,13 +91,13 @@ def plot_cell_cn_matrix(
     if max_cn is not None:
         X[X > max_cn] = max_cn
 
-    cmap = None
     if not raw:
         X_colors = cn_colors.map_cn_colors(X)
-        im = ax.imshow(X_colors, aspect='auto', cmap=cmap, interpolation='none')
+        im = ax.imshow(X_colors, aspect='auto', interpolation='none')
 
     else:
-        im = sns.heatmap(X, ax=ax, cbar=False)
+        cmap = matplotlib.cm.get_cmap('viridis')
+        im = ax.imshow(X, aspect='auto', cmap=cmap, interpolation='none')
 
     mat_chrom_idxs = chr_start[genome_ordering][:, 1]
     chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [mat_chrom_idxs.shape[0] - 1])
@@ -112,6 +112,7 @@ def plot_cell_cn_matrix(
     if show_cell_ids:
         ax.set(yticks=range(len(adata.obs.index)))
         ax.set(yticklabels=adata.obs.index.values)
+        ax.tick_params(axis='y', labelrotation=0)
     else:
         ax.set(yticks=[])
         ax.set(yticklabels=[])
