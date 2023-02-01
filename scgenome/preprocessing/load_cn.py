@@ -143,10 +143,11 @@ def create_cn_anndata(
     X.index = X.index.astype(str)
 
     chr_start_end_index = X.columns
-    bin_index = (
+    bin_index = pd.Series(
         X.columns.get_level_values('chr').astype(str) + ':' +
         X.columns.get_level_values('start').astype(str) + '-' +
-        X.columns.get_level_values('end').astype(str))
+        X.columns.get_level_values('end').astype(str),
+        name='bin')
 
     X = X.set_axis(bin_index, axis=1, copy=False)
 
