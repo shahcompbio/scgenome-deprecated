@@ -2,6 +2,7 @@ import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import pandas as pd
 
 from anndata import AnnData
 
@@ -204,12 +205,13 @@ def _plot_continuous_annotation(values, ax, ax_legend, title):
 def plot_cell_cn_matrix_fig(
         adata: AnnData,
         layer_name='state',
-        cell_order_fields=(),
-        annotation_fields=(),
+        cell_order_fields=None,
+        annotation_fields=None,
         fig=None,
         raw=False,
         max_cn=13,
-        show_cell_ids=False):
+        show_cell_ids=False,
+        show_subsets=False):
     """ Plot a copy number matrix
 
     Parameters
@@ -230,6 +232,8 @@ def plot_cell_cn_matrix_fig(
         clip cn at max value, by default 13
     show_cell_ids : bool, optional
         show cell ids on heatmap axis, by default False
+    show_subsets : bool, optional
+        show subset/superset categoricals to allow identification of cell sets
 
     Returns
     -------
@@ -255,10 +259,22 @@ def plot_cell_cn_matrix_fig(
     if fig is None:
         fig = plt.figure()
 
+    if cell_order_fields is None:
+        cell_order_fields = []
+
+    if annotation_fields is None:
+        annotation_fields = []
+
+    # Account for additional annotation fields that will be added after plotting the matrix
+    # when we are adding annotation fields to identify cells as per show_subsets
+    num_annotations = len(annotation_fields)
+    if show_subsets:
+        num_annotations += 2
+
     fig_main, fig_legends = fig.subfigures(nrows=2, ncols=1, height_ratios=[5, 1], squeeze=True)
     fig_legends.patch.set_alpha(0.0)
 
-    width_ratios = [1] + [0.005] + [0.02] * len(annotation_fields)
+    width_ratios = [1] + [0.005] + [0.02] * num_annotations
 
     axes = fig_main.subplots(
         nrows=1, ncols=len(width_ratios), sharey=True, width_ratios=width_ratios,
@@ -266,7 +282,7 @@ def plot_cell_cn_matrix_fig(
     axes[1].set_axis_off()
 
     axes_legends = fig_legends.subplots(
-        nrows=1, ncols=1+len(annotation_fields), squeeze=False)[0]
+        nrows=1, ncols=1+num_annotations, squeeze=False)[0]
     for ax in axes_legends:
         ax.set_axis_off()
         ax.set_alpha(0.0)
@@ -282,6 +298,12 @@ def plot_cell_cn_matrix_fig(
     cn_colors.cn_legend(ax_legend)
 
     adata = g['adata']
+
+    if show_subsets:
+        adata.obs['subset'] = pd.Series(np.mod(np.floor_divide(range(adata.shape[0]), 40), 5), index=adata.obs.index, dtype='category')
+        adata.obs['superset'] = pd.Series(np.floor_divide(range(adata.shape[0]), 200), index=adata.obs.index, dtype='category')
+        annotation_fields.append('superset')
+        annotation_fields.append('subset')
 
     annotation_info = {}
 
