@@ -7,7 +7,8 @@ import anndata as ad
 from natsort import natsorted
 
 from anndata import AnnData
-from typing import Dict, Any
+from typing import Dict, Any, Union
+from collections.abc import Iterable
 
 import scgenome.cncluster
 import scgenome.preprocessing.transform
@@ -35,7 +36,7 @@ def cluster_cells(adata: AnnData, layer_name='copy', method='kmeans') -> AnnData
         cluster_cells_kmeans(adata, layer_name=layer_name)
 
 
-def cluster_cells_kmeans(adata: AnnData, layer_name='copy', min_k=2, max_k=100) -> AnnData:
+def cluster_cells_kmeans(adata: AnnData, layer_name: Union[None, str, Iterable[Union[None,str]]]='copy', min_k=2, max_k=100) -> AnnData:
     """ Cluster cells by copy number using kmeans.
 
     Parameters
@@ -76,11 +77,16 @@ def cluster_cells_kmeans(adata: AnnData, layer_name='copy', min_k=2, max_k=100) 
     Categories (3, int64): [0, 1, 2]
 
     """
+    def __get_layer(layer_name):
+        if layer_name is not None:
+            return np.array(adata.layers[layer_name])
+        else:
+            return np.array(adata.X)
 
-    if layer_name is not None:
-        X = adata.layers[layer_name]
-    else:
-        X = adata.X
+    if isinstance(layer_name, str):
+        X = __get_layer(layer_name)
+    elif isinstance(layer_name, Iterable):
+        X = np.concatenate([__get_layer(l) for l in layer_name], axis=1)
 
     X = scgenome.preprocessing.transform.fill_missing(X)
 
@@ -97,12 +103,14 @@ def cluster_cells_kmeans(adata: AnnData, layer_name='copy', min_k=2, max_k=100) 
         kmeans.append(model)
         bics.append(bic)
 
-    opt_k = np.array(bics).argmax()
+    opt_k_idx = np.array(bics).argmax()
+    opt_k = ks[opt_k_idx]
     logging.info(f'selected k={opt_k}')
 
-    model = kmeans[opt_k]
+    model = kmeans[opt_k_idx]
 
     adata.obs['cluster_id'] = pd.Series(model.labels_, index=adata.obs.index, dtype='category')
+    adata.obs['cluster_size'] = adata.obs.groupby('cluster_id')['cluster_id'].transform('size')
 
     # store information on the clustering parameters
     adata.uns['kmeans'] = {}
