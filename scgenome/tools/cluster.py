@@ -1,5 +1,7 @@
 import logging
 import sklearn.cluster
+import sklearn.mixture
+import sklearn.preprocessing
 import umap
 import pandas as pd
 import numpy as np
@@ -14,7 +16,32 @@ import scgenome.cncluster
 import scgenome.preprocessing.transform
 
 
-def cluster_cells(adata: AnnData, layer_name='copy', method='kmeans') -> AnnData:
+def _kmeans_bic(X, k):
+    model = sklearn.cluster.KMeans(n_clusters=k, init='k-means++', random_state=100).fit(X)
+    bic = scgenome.cncluster.compute_bic(model, X)
+    labels = model.labels_
+
+    return labels, bic
+
+
+def _gmm_diag_bic(X, k):
+    model = sklearn.mixture.GaussianMixture(n_components=k, covariance_type='diag', init_params='kmeans')
+    labels = model.fit_predict(X)
+    bic = model.bic(X)
+
+    return labels, bic
+
+
+def cluster_cells(
+        adata: AnnData,
+        layer_name: Union[None, str, Iterable[Union[None,str]]]='copy',
+        method: str='kmeans_bic',
+        min_k: int=2,
+        max_k: int=100,
+        cell_ids: Iterable[str]=None,
+        bin_ids: Iterable[str]=None,
+        standardize: bool=False,
+    ) -> AnnData:
     """ Cluster cells by copy number.
 
     Parameters
@@ -24,36 +51,21 @@ def cluster_cells(adata: AnnData, layer_name='copy', method='kmeans') -> AnnData
     layer_name : str, optional
         layer with copy number data to plot, None for X, by default 'state'
     method : str, optional
-        clustering method, by default 'kmeans'
-
-    Returns
-    -------
-    AnnData
-        copy number data with additional `cluster_id` column
-    """
-
-    if method == 'kmeans':
-        cluster_cells_kmeans(adata, layer_name=layer_name)
-
-
-def cluster_cells_kmeans(adata: AnnData, layer_name: Union[None, str, Iterable[Union[None,str]]]='copy', min_k=2, max_k=100) -> AnnData:
-    """ Cluster cells by copy number using kmeans.
-
-    Parameters
-    ----------
-    adata : AnnData
-        copy number data
-    layer_name : str, optional
-        layer with copy number data to plot, None for X, by default 'state'
+        clustering method, by default 'kmeans_bic'
     min_k : int, optional
         minimum number of clusters, by default 2
     max_k : int, optional
         maximum number of clusters, by default 100
-
+    cell_ids : str, optional
+        subset of cells to cluster, by default None
+    bin_ids : str, optional
+        subset of bins to cluster, by default None
+    standarize : bool
+        standardize the data prior to outlier detection, by default False
     Returns
     -------
     AnnData
-        copy number data with additional `cluster_id` column
+        copy number data with additional `cluster_id` and `cluster_size` columns
 
     Examples
     -------
@@ -77,6 +89,95 @@ def cluster_cells_kmeans(adata: AnnData, layer_name: Union[None, str, Iterable[U
     Categories (3, int64): [0, 1, 2]
 
     """
+    if cell_ids is None:
+        cell_ids = adata.obs.index
+
+    if bin_ids is None:
+        bin_ids = adata.var.index
+
+    def __get_layer(layer_name):
+        if layer_name is not None:
+            return np.array(adata[cell_ids, bin_ids].layers[layer_name])
+        else:
+            return np.array(adata[cell_ids, bin_ids].X)
+
+    if isinstance(layer_name, str):
+        X = __get_layer(layer_name)
+    elif isinstance(layer_name, Iterable):
+        X = np.concatenate([__get_layer(l) for l in layer_name], axis=1)
+
+    X = scgenome.preprocessing.transform.fill_missing(X)
+    
+    if standardize:
+        X = sklearn.preprocessing.StandardScaler().fit_transform(X)
+
+    ks = range(min_k, max_k + 1)
+
+    logging.info(f'trying with max k={max_k}')
+
+    labels = []
+    criterias = []
+    for k in ks:
+        logging.info(f'trying with k={k}')
+        if method == 'kmeans_bic':
+            label, criteria = _kmeans_bic(X, k)
+        elif method == 'gmm_diag_bic':
+            label, criteria = _gmm_diag_bic(X, k)
+        else:
+            raise ValueError(f'unrecognized method {method}')
+        labels.append(label)
+        criterias.append(criteria)
+
+    opt_k_idx = np.array(criterias).argmax()
+    opt_k = ks[opt_k_idx]
+    opt_label = labels[opt_k_idx]
+    logging.info(f'selected k={opt_k}')
+    
+    adata.obs['cluster_id'] = '-1'
+    adata.obs.loc[cell_ids, 'cluster_id'] = pd.Series(opt_label, index=adata.obs.loc[cell_ids].index).astype('str').astype('category')
+    adata.obs['cluster_size'] = adata.obs.groupby('cluster_id')['cluster_id'].transform('size')
+
+    # store information on the clustering parameters
+    adata.uns['clustering'] = {}
+    adata.uns['clustering']['params'] = dict(
+        method=method,
+        opt_k=opt_k,
+        min_k=min_k,
+        max_k=max_k,
+        layer_name=layer_name,
+        cell_ids=cell_ids,
+        bin_ids=bin_ids,
+        standardize=standardize,
+    )
+
+    return adata
+
+
+def detect_outliers(
+        adata: AnnData,
+        layer_name: Union[None, str, Iterable[Union[None,str]]]='copy',
+        method: str='isolation_forest',
+        standarize: bool=False,
+    ) -> AnnData:
+    """ Detect outlier cells by copy number.
+
+    Parameters
+    ----------
+    adata : AnnData
+        copy number data
+    layer_name : str, optional
+        layer with copy number data to use for outlier detection, None for X, by default 'copy'
+    method : str, optional
+        outlier method, by default 'isolation_forest'
+    standarize : bool
+        standardize the data prior to outlier detection, by default False
+
+    Returns
+    -------
+    AnnData
+        copy number data with additional `is_outlier` column
+
+    """
     def __get_layer(layer_name):
         if layer_name is not None:
             return np.array(adata.layers[layer_name])
@@ -90,35 +191,26 @@ def cluster_cells_kmeans(adata: AnnData, layer_name: Union[None, str, Iterable[U
 
     X = scgenome.preprocessing.transform.fill_missing(X)
 
-    ks = range(min_k, max_k + 1)
+    if standarize:
+        X = sklearn.preprocessing.StandardScaler().fit_transform(X)
 
-    logging.info(f'trying with max k={max_k}')
+    if method == 'isolation_forest':
+        model = sklearn.ensemble.IsolationForest()
+        is_outlier = (model.fit_predict(X) == -1) * 1
+    elif method == 'local_outlier_factor':
+        model = sklearn.neighbors.LocalOutlierFactor()
+        is_outlier = (model.fit_predict(X) == -1) * 1
+    else:
+        raise ValueError(f'unknown method {method}')
 
-    kmeans = []
-    bics = []
-    for k in ks:
-        logging.info(f'trying with k={k}')
-        model = sklearn.cluster.KMeans(n_clusters=k, init='k-means++', random_state=100).fit(X)
-        bic = scgenome.cncluster.compute_bic(model, X)
-        kmeans.append(model)
-        bics.append(bic)
-
-    opt_k_idx = np.array(bics).argmax()
-    opt_k = ks[opt_k_idx]
-    logging.info(f'selected k={opt_k}')
-
-    model = kmeans[opt_k_idx]
-
-    adata.obs['cluster_id'] = pd.Series(model.labels_, index=adata.obs.index, dtype='category')
-    adata.obs['cluster_size'] = adata.obs.groupby('cluster_id')['cluster_id'].transform('size')
+    adata.obs['is_outlier'] = pd.Series(is_outlier, index=adata.obs.index, dtype='category')
 
     # store information on the clustering parameters
-    adata.uns['kmeans'] = {}
-    adata.uns['kmeans']['params'] = dict(
-        opt_k=opt_k,
-        min_k=min_k,
-        max_k=max_k,
+    adata.uns['outliers'] = {}
+    adata.uns['outliers']['params'] = dict(
+        method='isolation_forest',
         layer_name=layer_name,
+        standarize=standarize,
     )
 
     return adata
@@ -192,8 +284,13 @@ def aggregate_clusters(
 
     obs_data = pd.DataFrame(obs_data)
 
+    dtypes = X.dtypes.unique()
+    assert len(dtypes) == 1
+    dtype = dtypes[0]
+
     adata = ad.AnnData(
         X,
+        dtype=dtype,
         obs=obs_data,
         var=adata.var,
         layers=layer_data,
