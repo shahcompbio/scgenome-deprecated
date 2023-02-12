@@ -148,8 +148,8 @@ def cluster_cells(
         min_k=min_k,
         max_k=max_k,
         layer_name=layer_name,
-        cell_ids=cell_ids,
-        bin_ids=bin_ids,
+        cell_ids=np.array(cell_ids),
+        bin_ids=np.array(bin_ids),
         standardize=standardize,
     )
 
