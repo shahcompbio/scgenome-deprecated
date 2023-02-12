@@ -23,6 +23,8 @@ def plot_cell_cn_matrix(
         ax=None,
         raw=False,
         max_cn=13,
+        vmin=None,
+        vmax=None,
         show_cell_ids=False):
     """ Plot a copy number matrix
 
@@ -40,6 +42,8 @@ def plot_cell_cn_matrix(
         raw plotting, no integer color map, by default False
     max_cn : int, optional
         clip cn at max value, by default 13
+    vmin, vmax : float, optional
+        for raw=True, vmin and vmax define the data range that the colormap covers, see `matplotlib.pyplot.imshow`
     show_cell_ids : bool, optional
         show cell ids on heatmap axis, by default False
 
@@ -94,11 +98,11 @@ def plot_cell_cn_matrix(
 
     if not raw:
         X_colors = cn_colors.map_cn_colors(X)
-        im = ax.imshow(X_colors, aspect='auto', interpolation='none')
+        im = ax.imshow(X_colors, aspect='auto', interpolation='none', vmin=vmin, vmax=vmax)
 
     else:
         cmap = matplotlib.cm.get_cmap('viridis')
-        im = ax.imshow(X, aspect='auto', cmap=cmap, interpolation='none')
+        im = ax.imshow(X, aspect='auto', cmap=cmap, interpolation='none', vmin=vmin, vmax=vmax)
 
     mat_chrom_idxs = chr_start[genome_ordering][:, 1]
     chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [mat_chrom_idxs.shape[0] - 1])
@@ -172,11 +176,29 @@ def _plot_categorical_annotation(values, ax, ax_legend, title):
     ax.tick_params(axis='y', left=False, right=False)
 
     annotation_info = {}
-    annotation_info = {}
     annotation_info['ax'] = ax
     annotation_info['im'] = im
     annotation_info['ax_legend'] = ax_legend
     annotation_info['legend'] = legend
+
+    return annotation_info
+
+
+def _plot_continuous_legend(ax_legend, im, title):
+    ax_legend.grid(False)
+    ax_legend.set_xticks([])
+    ax_legend.set_yticks([])
+
+    axins = ax_legend.inset_axes([0.5, 0.1, 0.05, 0.8])
+
+    cbar = plt.colorbar(im, cax=axins)
+    axins.set_title(title, fontsize='6')
+    cbar.ax.tick_params(labelsize='4')
+
+    annotation_info = {}
+    annotation_info['ax_legend'] = ax_legend
+    annotation_info['axins'] = axins
+    annotation_info['cbar'] = cbar
 
     return annotation_info
 
@@ -189,17 +211,12 @@ def _plot_continuous_annotation(values, ax, ax_legend, title):
     ax.set_xticks([0.], [title], rotation=90, fontsize='6')
     ax.tick_params(axis='y', left=False, right=False)
 
-    ax_legend.grid(False)
-    ax_legend.set_xticks([])
-    ax_legend.set_yticks([])
+    annotation_info = _plot_continuous_legend(ax_legend, im, title)
 
-    axins = ax_legend.inset_axes([0.5, 0.1, 0.05, 0.6])
+    annotation_info['ax'] = ax
+    annotation_info['im'] = im
 
-    cbar = plt.colorbar(im, cax=axins)
-    axins.set_title(title, fontsize='6')
-    cbar.ax.tick_params(labelsize='4')
-
-    return {}
+    return annotation_info
 
 
 def plot_cell_cn_matrix_fig(
@@ -209,6 +226,8 @@ def plot_cell_cn_matrix_fig(
         annotation_fields=None,
         fig=None,
         raw=False,
+        vmin=None,
+        vmax=None,
         max_cn=13,
         show_cell_ids=False,
         show_subsets=False):
@@ -228,6 +247,8 @@ def plot_cell_cn_matrix_fig(
         existing figure to plot into, by default None
     raw : bool, optional
         raw plotting, no integer color map, by default False
+    vmin, vmax : float, optional
+        for raw=True, vmin and vmax define the data range that the colormap covers, see `matplotlib.pyplot.imshow`
     max_cn : int, optional
         clip cn at max value, by default 13
     show_cell_ids : bool, optional
@@ -293,13 +314,22 @@ def plot_cell_cn_matrix_fig(
     g = plot_cell_cn_matrix(
         adata, layer_name=layer_name,
         cell_order_fields=cell_order_fields,
-        ax=ax, raw=raw, max_cn=max_cn,
-        show_cell_ids=show_cell_ids)
-    cn_colors.cn_legend(ax_legend)
+        ax=ax, raw=raw, vmin=vmin, vmax=vmax,
+        max_cn=max_cn, show_cell_ids=show_cell_ids)
 
     adata = g['adata']
+    im = g['im']
+
+    if not raw:
+        legend_info = {'ax_legend': ax_legend}
+        legend_info['legend'] = cn_colors.cn_legend(ax_legend, title=layer_name)
+
+    else:
+        legend_info = _plot_continuous_legend(ax_legend, im, layer_name)
 
     if show_subsets:
+        # Need to copy the adata to avoid modifying a view
+        adata = adata.copy()
         adata.obs['subset'] = pd.Series(np.mod(np.floor_divide(range(adata.shape[0]), 40), 5), index=adata.obs.index, dtype='category')
         adata.obs['superset'] = pd.Series(np.floor_divide(range(adata.shape[0]), 200), index=adata.obs.index, dtype='category')
         annotation_fields.append('superset')
@@ -320,5 +350,7 @@ def plot_cell_cn_matrix_fig(
         'fig': fig,
         'axes': axes,
         'adata': adata,
+        'im': im,
+        'legend_info': legend_info,
         'annotation_info': annotation_info,
     }
