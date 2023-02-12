@@ -95,6 +95,9 @@ def cluster_cells(
     if bin_ids is None:
         bin_ids = adata.var.index
 
+    min_k = min(adata.shape[0], min_k)
+    max_k = min(adata.shape[0], max_k)
+
     def __get_layer(layer_name):
         if layer_name is not None:
             return np.array(adata[cell_ids, bin_ids].layers[layer_name])
