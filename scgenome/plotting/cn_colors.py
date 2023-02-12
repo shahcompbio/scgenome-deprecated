@@ -48,7 +48,7 @@ def map_cn_colors(X: ndarray) -> ndarray:
     return X_colors
 
 
-def cn_legend(ax, frameon=True, loc=2, bbox_to_anchor=(0., 1.)):
+def cn_legend(ax, frameon=True, loc=2, bbox_to_anchor=(0., 1.), title='Copy Number'):
     """ Display a legend for copy number state colors
 
     Parameters
@@ -78,7 +78,7 @@ def cn_legend(ax, frameon=True, loc=2, bbox_to_anchor=(0., 1.)):
     legend = ax.legend(patches, states, ncol=ncol,
         frameon=frameon, loc=loc, bbox_to_anchor=bbox_to_anchor,
         facecolor='white', edgecolor='white', fontsize='4',
-        title='Copy Number', title_fontsize='6')
+        title=title, title_fontsize='6')
     legend.set_zorder(level=200)
 
     return legend
