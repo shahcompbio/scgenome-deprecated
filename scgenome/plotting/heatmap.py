@@ -180,6 +180,8 @@ def _plot_categorical_annotation(values, ax, ax_legend, title):
     annotation_info['im'] = im
     annotation_info['ax_legend'] = ax_legend
     annotation_info['legend'] = legend
+    annotation_info['level_colors'] = level_colors
+    annotation_info['value_colors'] = value_colors
 
     return annotation_info
 
