@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import pandas as pd
+import Bio.Phylo
 
 from anndata import AnnData
 
@@ -113,6 +114,7 @@ def plot_cell_cn_matrix(
 
     ax.set_xticks(chrom_mids)
     ax.set_xticklabels(chrom_names, fontsize='6')
+    ax.set_xlabel('chromosome', fontsize=8)
 
     if show_cell_ids:
         ax.set(yticks=range(len(adata.obs.index)))
@@ -224,6 +226,7 @@ def _plot_continuous_annotation(values, ax, ax_legend, title):
 def plot_cell_cn_matrix_fig(
         adata: AnnData,
         layer_name='state',
+        tree=None,
         cell_order_fields=None,
         annotation_fields=None,
         fig=None,
@@ -241,6 +244,8 @@ def plot_cell_cn_matrix_fig(
         copy number data
     layer_name : str, optional
         layer with copy number data to plot, None for X, by default 'state'
+    tree : Bio.Phylo.BaseTree.Tree, optional
+        phylogenetic tree
     cell_order_fields : list, optional
         columns of obs on which to sort cells, by default None
     annotation_fields : list, optional
@@ -288,6 +293,28 @@ def plot_cell_cn_matrix_fig(
     if annotation_fields is None:
         annotation_fields = []
 
+    if tree is not None:
+        if cell_order_fields is not None and len(cell_order_fields) > 0:
+            raise ValueError('cannot provide cell_order_fields and tree')
+
+        # Add phylogenetic ordering to anndata obs
+        cell_ids = []
+        for a in tree.get_terminals():
+            cell_ids.append(a.name)
+
+        adata.obs['phylo_order'] = -1
+        for idx, _ in adata.obs.iterrows():
+            adata.obs.loc[idx, 'phylo_order'] = cell_ids.index(idx)
+
+        cell_order_fields = ['phylo_order']
+        num_phylo = 1
+        tree_ax_idx = 0
+        heatmap_ax_idx = 1
+
+    else:
+        num_phylo = 0
+        heatmap_ax_idx = 0
+
     # Account for additional annotation fields that will be added after plotting the matrix
     # when we are adding annotation fields to identify cells as per show_subsets
     num_annotations = len(annotation_fields)
@@ -297,12 +324,14 @@ def plot_cell_cn_matrix_fig(
     fig_main, fig_legends = fig.subfigures(nrows=2, ncols=1, height_ratios=[5, 1], squeeze=True)
     fig_legends.patch.set_alpha(0.0)
 
-    width_ratios = [1] + [0.005] + [0.02] * num_annotations
+    width_ratios = [0.5] * num_phylo + [1] + [0.005] + [0.02] * num_annotations
 
     axes = fig_main.subplots(
         nrows=1, ncols=len(width_ratios), sharey=True, width_ratios=width_ratios,
         squeeze=False, gridspec_kw=dict(hspace=0.02, wspace=0.02))[0]
-    axes[1].set_axis_off()
+
+    # Turn off axis on 'gap' axis
+    axes[heatmap_ax_idx + 1].set_axis_off()
 
     axes_legends = fig_legends.subplots(
         nrows=1, ncols=1+num_annotations, squeeze=False)[0]
@@ -311,12 +340,26 @@ def plot_cell_cn_matrix_fig(
         ax.set_alpha(0.0)
         ax.patch.set_alpha(0.0)
 
-    ax = axes[0]
+    if tree is not None:
+        # Plot phylogenetic tree
+        tree_ax = axes[tree_ax_idx]
+        tree_ax.spines['top'].set_visible(False)
+        tree_ax.spines['right'].set_visible(False)
+        tree_ax.spines['bottom'].set_visible(True)
+        tree_ax.spines['left'].set_visible(False)
+        with plt.rc_context({'lines.linewidth': 0.5}):
+            Bio.Phylo.draw(tree, label_func=lambda a: '', axes=tree_ax, do_show=False)
+        tree_ax.tick_params(axis='x', labelsize=6)
+        tree_ax.set_xlabel('branch length', fontsize=8)
+        tree_ax.set_ylabel('')
+        tree_ax.set_yticks([])
+
+    heatmap_ax = axes[heatmap_ax_idx]
     ax_legend = axes_legends[0]
     g = plot_cell_cn_matrix(
         adata, layer_name=layer_name,
         cell_order_fields=cell_order_fields,
-        ax=ax, raw=raw, vmin=vmin, vmax=vmax,
+        ax=heatmap_ax, raw=raw, vmin=vmin, vmax=vmax,
         max_cn=max_cn, show_cell_ids=show_cell_ids)
 
     adata = g['adata']
@@ -339,7 +382,7 @@ def plot_cell_cn_matrix_fig(
 
     annotation_info = {}
 
-    for ax, ax_legend, annotation_field in zip(axes[2:], axes_legends[1:], annotation_fields):
+    for ax, ax_legend, annotation_field in zip(axes[heatmap_ax_idx+2:], axes_legends[1:], annotation_fields):
         if adata.obs[annotation_field].dtype.name in ('category', 'object'):
             values = adata.obs[[annotation_field]].values
             annotation_info[annotation_field] = _plot_categorical_annotation(values, ax, ax_legend, annotation_field)
