@@ -196,8 +196,8 @@ def load_consensus_breakpoint_files(destruct_filepath, lumpy_filepath, destruct_
         lumpy_breakpoints, destruct_breakpoints, window_size=200)
 
     matched_destruct_predictions = (
-        destruct_lumpy_matches[['target_id']].drop_duplicates()
-        .rename(columns={'target_id': 'prediction_id'}))
+        destruct_lumpy_matches[['target_prediction_id']].drop_duplicates()
+        .rename(columns={'target_prediction_id': 'prediction_id'}))
 
     # Filter destruct by lumpy matches
     destruct_breakpoints = destruct_breakpoints.merge(matched_destruct_predictions)
