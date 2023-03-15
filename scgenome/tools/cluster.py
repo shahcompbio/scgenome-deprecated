@@ -104,10 +104,12 @@ def cluster_cells(
         else:
             return np.array(adata[cell_ids, bin_ids].X)
 
-    if isinstance(layer_name, str):
+    if isinstance(layer_name, (str, type(None))):
         X = __get_layer(layer_name)
     elif isinstance(layer_name, Iterable):
         X = np.concatenate([__get_layer(l) for l in layer_name], axis=1)
+    else:
+        raise ValueError(f'layer_name was {layer_name}')
 
     X = scgenome.preprocessing.transform.fill_missing(X)
     
