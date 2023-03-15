@@ -42,7 +42,7 @@ def plot_cell_cn_matrix(
     raw : bool, optional
         raw plotting, no integer color map, by default False
     max_cn : int, optional
-        clip cn at max value, by default 13
+        clip cn at max value, raw=False only, by default 13
     vmin, vmax : float, optional
         for raw=True, vmin and vmax define the data range that the colormap covers, see `matplotlib.pyplot.imshow`
     show_cell_ids : bool, optional
@@ -94,7 +94,7 @@ def plot_cell_cn_matrix(
 
     X = np.nan_to_num(X, nan=0)
 
-    if max_cn is not None:
+    if not raw and max_cn is not None:
         X[X > max_cn] = max_cn
 
     if not raw:
