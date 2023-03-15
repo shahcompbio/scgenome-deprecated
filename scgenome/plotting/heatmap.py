@@ -157,7 +157,7 @@ def map_catagorigal_colors(values, cmap_name=None):
     return level_colors, value_colors
 
 
-def _plot_categorical_annotation(values, ax, ax_legend, title):
+def _plot_categorical_annotation(values, ax, ax_legend, title, horizontal=False):
     level_colors, value_colors = map_catagorigal_colors(values)
 
     im = ax.imshow(value_colors, aspect='auto', interpolation='none')
@@ -174,8 +174,12 @@ def _plot_categorical_annotation(values, ax, ax_legend, title):
         title=title, title_fontsize='6')
 
     ax.grid(False)
-    ax.set_xticks([0.], [title], rotation=90, fontsize='6')
-    ax.tick_params(axis='y', left=False, right=False)
+    if horizontal:
+        ax.set_yticks([0.], [title], rotation=0, fontsize='6')
+        ax.tick_params(axis='x', left=False, right=False)
+    else:
+        ax.set_xticks([0.], [title], rotation=90, fontsize='6')
+        ax.tick_params(axis='y', left=False, right=False)
 
     annotation_info = {}
     annotation_info['ax'] = ax
@@ -207,13 +211,17 @@ def _plot_continuous_legend(ax_legend, im, title):
     return annotation_info
 
 
-def _plot_continuous_annotation(values, ax, ax_legend, title):
+def _plot_continuous_annotation(values, ax, ax_legend, title, horizontal=False):
 
     im = ax.imshow(values, aspect='auto', interpolation='none', cmap='Reds')
 
     ax.grid(False)
-    ax.set_xticks([0.], [title], rotation=90, fontsize='6')
-    ax.tick_params(axis='y', left=False, right=False)
+    if horizontal:
+        ax.set_yticks([0.], [title], rotation=0, fontsize='6')
+        ax.tick_params(axis='x', left=False, right=False)
+    else:
+        ax.set_xticks([0.], [title], rotation=90, fontsize='6')
+        ax.tick_params(axis='y', left=False, right=False)
 
     annotation_info = _plot_continuous_legend(ax_legend, im, title)
 
@@ -229,6 +237,7 @@ def plot_cell_cn_matrix_fig(
         tree=None,
         cell_order_fields=None,
         annotation_fields=None,
+        var_annotation_fields=None,
         fig=None,
         raw=False,
         vmin=None,
@@ -293,6 +302,9 @@ def plot_cell_cn_matrix_fig(
     if annotation_fields is None:
         annotation_fields = []
 
+    if var_annotation_fields is None:
+        var_annotation_fields = []
+
     if tree is not None:
         if cell_order_fields is not None and len(cell_order_fields) > 0:
             raise ValueError('cannot provide cell_order_fields and tree')
@@ -309,11 +321,14 @@ def plot_cell_cn_matrix_fig(
         cell_order_fields = ['phylo_order']
         num_phylo = 1
         tree_ax_idx = 0
-        heatmap_ax_idx = 1
+        heatmap_ax_col_idx = 1
 
     else:
         num_phylo = 0
-        heatmap_ax_idx = 0
+        heatmap_ax_col_idx = 0
+
+    # Account for number of var annotations above heatmap
+    heatmap_ax_row_idx = len(var_annotation_fields) + 1
 
     # Account for additional annotation fields that will be added after plotting the matrix
     # when we are adding annotation fields to identify cells as per show_subsets
@@ -321,20 +336,37 @@ def plot_cell_cn_matrix_fig(
     if show_subsets:
         num_annotations += 2
 
+    num_var_annotations = len(var_annotation_fields)
+
     fig_main, fig_legends = fig.subfigures(nrows=2, ncols=1, height_ratios=[5, 1], squeeze=True)
     fig_legends.patch.set_alpha(0.0)
 
     width_ratios = [0.5] * num_phylo + [1] + [0.005] + [0.02] * num_annotations
+    height_ratios = [0.02] * num_var_annotations + [0.01] + [1]
 
     axes = fig_main.subplots(
-        nrows=1, ncols=len(width_ratios), sharey=True, width_ratios=width_ratios,
-        squeeze=False, gridspec_kw=dict(hspace=0.02, wspace=0.02))[0]
+        nrows=len(height_ratios), ncols=len(width_ratios),
+        width_ratios=width_ratios, height_ratios=height_ratios,
+        squeeze=False, gridspec_kw=dict(hspace=0.02, wspace=0.02))
 
-    # Turn off axis on 'gap' axis
-    axes[heatmap_ax_idx + 1].set_axis_off()
+    # Turn off axes for all annotation rows and columns
+    for ax in axes[:heatmap_ax_row_idx, :].flatten():
+        ax.set_axis_off()
+    for ax in axes[:, heatmap_ax_col_idx+1:].flatten():
+        ax.set_axis_off()
+
+    # Re-enable axes and remove ticks for row annotations
+    for ax in axes[heatmap_ax_row_idx, heatmap_ax_col_idx+2:].flatten():
+        ax.set_axis_on()
+        ax.set_yticks([])
+
+    # Re-enable axes and remove ticks for column annotations
+    for ax in axes[:heatmap_ax_row_idx-1, heatmap_ax_col_idx].flatten():
+        ax.set_axis_on()
+        ax.set_xticks([])
 
     axes_legends = fig_legends.subplots(
-        nrows=1, ncols=1+num_annotations, squeeze=False)[0]
+        nrows=1, ncols=1+num_annotations+num_var_annotations, squeeze=False)[0]
     for ax in axes_legends:
         ax.set_axis_off()
         ax.set_alpha(0.0)
@@ -342,7 +374,7 @@ def plot_cell_cn_matrix_fig(
 
     if tree is not None:
         # Plot phylogenetic tree
-        tree_ax = axes[tree_ax_idx]
+        tree_ax = axes[heatmap_ax_row_idx, tree_ax_idx]
         tree_ax.spines['top'].set_visible(False)
         tree_ax.spines['right'].set_visible(False)
         tree_ax.spines['bottom'].set_visible(True)
@@ -354,7 +386,7 @@ def plot_cell_cn_matrix_fig(
         tree_ax.set_ylabel('')
         tree_ax.set_yticks([])
 
-    heatmap_ax = axes[heatmap_ax_idx]
+    heatmap_ax = axes[heatmap_ax_row_idx, heatmap_ax_col_idx]
     ax_legend = axes_legends[0]
     g = plot_cell_cn_matrix(
         adata, layer_name=layer_name,
@@ -382,7 +414,7 @@ def plot_cell_cn_matrix_fig(
 
     annotation_info = {}
 
-    for ax, ax_legend, annotation_field in zip(axes[heatmap_ax_idx+2:], axes_legends[1:], annotation_fields):
+    for ax, ax_legend, annotation_field in zip(axes[heatmap_ax_row_idx, heatmap_ax_col_idx+2:], axes_legends[1:], annotation_fields):
         if adata.obs[annotation_field].dtype.name in ('category', 'object'):
             values = adata.obs[[annotation_field]].values
             annotation_info[annotation_field] = _plot_categorical_annotation(values, ax, ax_legend, annotation_field)
@@ -390,6 +422,15 @@ def plot_cell_cn_matrix_fig(
         else:
             values = adata.obs[[annotation_field]].values
             annotation_info[annotation_field] = _plot_continuous_annotation(values, ax, ax_legend, annotation_field)
+
+    for ax, ax_legend, annotation_field in zip(axes[:, heatmap_ax_col_idx], axes_legends[1+len(annotation_fields):], var_annotation_fields):
+        if adata.var[annotation_field].dtype.name in ('category', 'object'):
+            values = adata.var[[annotation_field]].copy().values.T
+            annotation_info[annotation_field] = _plot_categorical_annotation(values, ax, ax_legend, annotation_field, horizontal=True)
+
+        else:
+            values = adata.var[[annotation_field]].copy().values.T
+            annotation_info[annotation_field] = _plot_continuous_annotation(values, ax, ax_legend, annotation_field, horizontal=True)
 
     return {
         'fig': fig,
