@@ -2,8 +2,10 @@ import pyfaidx
 import pyBigWig
 import numba
 import numpy as np
+import pandas as pd
 
 import scgenome.refgenome
+import scgenome.tools.ranges
 
 
 def _chromosome_count_gc(data, **kwargs):
@@ -48,6 +50,40 @@ def count_gc(bins, genome_fasta, column_name='gc', proportion=False):
         data = data.assign(column_name, lambda df: df[column_name] / (df['End'] - df['Start']))
 
     return data
+
+
+def add_cyto_giemsa_stain(bins):
+    """ Add bin specific giesma stain values
+
+    Parameters
+    ----------
+    bins : pandas.DataFrame
+        dataframe with columns 'chr', 'start', 'end' for which to add giesma stain values
+
+    Returns
+    -------
+    pandas.DataFrame
+        output dataframe with columns 'chr', 'start', 'end' and additional column for giesma stain values
+    """    
+
+    bins_pr = scgenome.tools.ranges.dataframe_to_pyranges(bins.rename_axis('_index').reset_index())
+    cyto_pr = scgenome.tools.ranges.dataframe_to_pyranges(scgenome.refgenome.info.cytobands)
+
+    intersect_1 = bins_pr.intersect(cyto_pr)
+    intersect_2 = cyto_pr.intersect(bins_pr)
+
+    intersect = pd.merge(
+        scgenome.tools.ranges.pyranges_to_dataframe(intersect_1),
+        scgenome.tools.ranges.pyranges_to_dataframe(intersect_2))
+
+    intersect['_width'] = intersect['end'] - intersect['start'] + 1
+
+    selected = intersect.sort_values('_width').drop_duplicates(['_index'], keep='last').set_index('_index')
+
+    cols = ['cyto_band_name', 'cyto_band_giemsa_stain']
+    bins = bins.merge(selected[cols], left_index=True, right_index=True, how='left')
+
+    return bins
 
 
 @numba.jit(nopython=True)

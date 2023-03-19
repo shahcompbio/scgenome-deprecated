@@ -134,21 +134,34 @@ def plot_cell_cn_matrix(
     }
 
 
-def map_catagorigal_colors(values, cmap_name=None):
+def map_catagorigal_colors(values, level_colors=None, cmap_name=None):
     levels = np.unique(values)
     n_levels = len(levels)
 
-    if cmap_name is None:
-        if n_levels <= 10:
-            cmap_name = 'tab10'
-        elif n_levels <= 20:
-            cmap_name = 'tab20'
-        else:
-            cmap_name = 'hsv'
+    assert level_colors is None or cmap_name is None, 'cmap_name not necessary if specifying level_colors'
 
-    cmap = matplotlib.cm.get_cmap(cmap_name)
+    if level_colors is None:
+        if cmap_name is None:
+            if n_levels <= 10:
+                cmap_name = 'tab10'
+            elif n_levels <= 20:
+                cmap_name = 'tab20'
+            else:
+                cmap_name = 'hsv'
 
-    level_colors = dict(zip(levels, cmap(np.linspace(0, 1, n_levels))))
+        cmap = matplotlib.cm.get_cmap(cmap_name)
+
+        level_colors = dict(zip(levels, cmap(np.linspace(0, 1, n_levels))))
+
+    else:
+        for l, c in level_colors.items():
+            if isinstance(c, str) and c.startswith('#'):
+                # Convert to rgba 0-1
+                # TODO: refactor colors
+                c = c.lstrip('#')
+                c = np.array(tuple(np.uint8(int(c[i:i+2], 16)) for i in (0, 2 ,4)) + (255,), dtype=int)
+                c = c / 255.
+                level_colors[l] = c
 
     value_colors = np.zeros(values.shape + (4,))
     for l, c in level_colors.items():
@@ -157,8 +170,24 @@ def map_catagorigal_colors(values, cmap_name=None):
     return level_colors, value_colors
 
 
-def _plot_categorical_annotation(values, ax, ax_legend, title, horizontal=False):
-    level_colors, value_colors = map_catagorigal_colors(values)
+# Adapted from: https://github.com/bernatgel/karyoploteR/blob/master/R/color.R
+cyto_band_giemsa_stain_colors = {
+    'gneg': '#FFFFFF',
+    'gpos25': '#C8C8C8',
+    # 'gpos33': '#D2D2D2',
+    'gpos50': '#C8C8C8',
+    # 'gpos66': '#A0A0A0',
+    'gpos75': '#828282',
+    'gpos100': '#000000',
+    'gpos': '#000000',
+    'stalk': '#647FA4', # repetitive areas
+    'acen': '#D92F27', # centromeres
+    'gvar': '#DCACAC', # previously '#DCDCDC'
+}
+
+
+def _plot_categorical_annotation(values, ax, ax_legend, title, horizontal=False, cmap_name=None, colors=None):
+    level_colors, value_colors = map_catagorigal_colors(values, level_colors=colors, cmap_name=cmap_name)
 
     im = ax.imshow(value_colors, aspect='auto', interpolation='none')
 
@@ -424,7 +453,11 @@ def plot_cell_cn_matrix_fig(
             annotation_info[annotation_field] = _plot_continuous_annotation(values, ax, ax_legend, annotation_field)
 
     for ax, ax_legend, annotation_field in zip(axes[:, heatmap_ax_col_idx], axes_legends[1+len(annotation_fields):], var_annotation_fields):
-        if adata.var[annotation_field].dtype.name in ('category', 'object', 'bool'):
+        if annotation_field == 'cyto_band_giemsa_stain': # Special handling for cyto band
+            values = adata.var[[annotation_field]].copy().values.T
+            annotation_info[annotation_field] = _plot_categorical_annotation(values, ax, ax_legend, annotation_field, horizontal=True, colors=cyto_band_giemsa_stain_colors)
+
+        elif adata.var[annotation_field].dtype.name in ('category', 'object', 'bool'):
             values = adata.var[[annotation_field]].copy().values.T
             annotation_info[annotation_field] = _plot_categorical_annotation(values, ax, ax_legend, annotation_field, horizontal=True)
 

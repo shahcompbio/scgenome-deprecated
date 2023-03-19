@@ -11,22 +11,37 @@ def read_chromosome_lengths(genome_fasta_index):
     return chromosome_lengths
 
 
+def read_cytobands(cyto_filename, remove_chr_prefix=False):
+    cytobands = pd.read_csv(
+        cyto_filename, sep='\t',
+        names=['chr', 'start', 'end', 'cyto_band_name', 'cyto_band_giemsa_stain'])
+    if remove_chr_prefix:
+        cytobands['chr'] = cytobands['chr'].str.replace('^chr', '', regex=True)
+    return cytobands
+
+
 class RefGenomeInfo(object):
     def __init__(self, version):
         if version == 'hg19':
             self.chromosomes = [str(a) for a in range(1, 23)] + ['X', 'Y']
             self.plot_chromosomes = [str(a) for a in range(1, 23)] + ['X', 'Y']
             self.genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/hg19.fa.fai')
+            self.cyto_filename = pkg_resources.resource_filename('scgenome', 'data/hg19_cytoBand.txt.gz')
+            self.cytobands = read_cytobands(self.cyto_filename, remove_chr_prefix=True)
 
         elif version == 'grch38':
             self.chromosomes = [f'chr{a}' for a in range(1, 23)] + ['chrX', 'chrY']
             self.plot_chromosomes = [str(a) for a in range(1, 23)] + ['X', 'Y']
             self.genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/grch38.fa.fai')
+            self.cyto_filename = pkg_resources.resource_filename('scgenome', 'data/grch38_cytoBand.txt.gz')
+            self.cytobands = read_cytobands(self.cyto_filename, remove_chr_prefix=False)
 
         elif version == 'mm10':
             self.chromosomes = [str(a) for a in range(1, 20)] + ['X', 'Y']
             self.plot_chromosomes = [str(a) for a in range(1, 20)] + ['X', 'Y']
             self.genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/mm10.fa.fai')
+            self.cyto_filename = pkg_resources.resource_filename('scgenome', 'data/mm10_cytoBand.txt.gz')
+            self.cytobands = read_cytobands(self.cyto_filename, remove_chr_prefix=True)
 
         else:
             raise ValueError()
