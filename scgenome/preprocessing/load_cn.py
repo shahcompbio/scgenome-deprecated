@@ -206,7 +206,7 @@ def convert_dlp_hmmcopy(metrics_data: DataFrame, cn_data: DataFrame) -> AnnData:
         layers_columns = ['copy', 'state'],
         X_column = 'reads',
         cell_metrics_data=metrics_data,
-        bin_metrics_data=cn_data[['chr', 'start', 'end', 'gc']].drop_duplicates())
+        bin_metrics_data=cn_data[['chr', 'start', 'end', 'gc']].drop_duplicates(subset=['chr', 'start', 'end']))
 
 
 def convert_dlp_signals(hscn: DataFrame, metrics_data: DataFrame) -> AnnData:
