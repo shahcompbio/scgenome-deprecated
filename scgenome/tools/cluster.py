@@ -200,7 +200,7 @@ def detect_outliers(
         X = sklearn.preprocessing.StandardScaler().fit_transform(X)
 
     if method == 'isolation_forest':
-        model = sklearn.ensemble.IsolationForest()
+        model = sklearn.ensemble.IsolationForest(random_state=100)
         is_outlier = (model.fit_predict(X) == -1) * 1
     elif method == 'local_outlier_factor':
         model = sklearn.neighbors.LocalOutlierFactor()
