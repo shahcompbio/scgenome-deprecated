@@ -25,7 +25,7 @@ def _kmeans_bic(X, k):
 
 
 def _gmm_diag_bic(X, k):
-    model = sklearn.mixture.GaussianMixture(n_components=k, covariance_type='diag', init_params='kmeans')
+    model = sklearn.mixture.GaussianMixture(n_components=k, covariance_type='diag', init_params='kmeans', random_state=100)
     labels = model.fit_predict(X)
     bic = model.bic(X)
 
