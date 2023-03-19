@@ -415,7 +415,7 @@ def plot_cell_cn_matrix_fig(
     annotation_info = {}
 
     for ax, ax_legend, annotation_field in zip(axes[heatmap_ax_row_idx, heatmap_ax_col_idx+2:], axes_legends[1:], annotation_fields):
-        if adata.obs[annotation_field].dtype.name in ('category', 'object'):
+        if adata.obs[annotation_field].dtype.name in ('category', 'object', 'bool'):
             values = adata.obs[[annotation_field]].values
             annotation_info[annotation_field] = _plot_categorical_annotation(values, ax, ax_legend, annotation_field)
 
@@ -424,7 +424,7 @@ def plot_cell_cn_matrix_fig(
             annotation_info[annotation_field] = _plot_continuous_annotation(values, ax, ax_legend, annotation_field)
 
     for ax, ax_legend, annotation_field in zip(axes[:, heatmap_ax_col_idx], axes_legends[1+len(annotation_fields):], var_annotation_fields):
-        if adata.var[annotation_field].dtype.name in ('category', 'object'):
+        if adata.var[annotation_field].dtype.name in ('category', 'object', 'bool'):
             values = adata.var[[annotation_field]].copy().values.T
             annotation_info[annotation_field] = _plot_categorical_annotation(values, ax, ax_legend, annotation_field, horizontal=True)
 
