@@ -223,7 +223,7 @@ def detect_outliers(
 
 def aggregate_clusters(
         adata: AnnData,
-        agg_X: Any,
+        agg_X: Any=None,
         agg_layers: Dict=None,
         agg_obs: Dict=None,
         cluster_col: str='cluster_id',
@@ -235,7 +235,7 @@ def aggregate_clusters(
     adata : AnnData
         copy number data
     agg_X : Any
-        function to aggregate X
+        function to aggregate X, by default None
     agg_layers : Dict, optional
         functions to aggregate layers keyed by layer names, by default None
     agg_obs : Dict, optional
@@ -251,13 +251,21 @@ def aggregate_clusters(
         aggregated cluster copy number
     """
 
-    X = (
-        adata
-            .to_df()
-            .set_index(adata.obs[cluster_col].astype(str))
-            .groupby(level=0)
-            .agg(agg_X)
-            .sort_index())
+    if agg_X is not None:
+        X = (
+            adata
+                .to_df()
+                .set_index(adata.obs[cluster_col].astype(str))
+                .groupby(level=0)
+                .agg(agg_X)
+                .sort_index())
+        dtypes = X.dtypes.unique()
+        assert len(dtypes) == 1
+        dtype = dtypes[0]
+
+    else:
+        X = None
+        dtype = None
 
     layer_data = None
     if agg_layers is not None:
@@ -288,10 +296,6 @@ def aggregate_clusters(
                     .sort_index())
 
     obs_data = pd.DataFrame(obs_data)
-
-    dtypes = X.dtypes.unique()
-    assert len(dtypes) == 1
-    dtype = dtypes[0]
 
     adata = ad.AnnData(
         X,
