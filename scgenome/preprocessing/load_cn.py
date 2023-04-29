@@ -357,7 +357,13 @@ def read_medicc2_cn(cn_profiles_filename, allele_specific: bool = False) -> AnnD
 
     cn_matrix = (
         cn_data
-            .set_index(['bin', 'cell_id'])[cn_fields + ['state', 'is_gain', 'is_loss']]
+            .set_index(['bin', 'cell_id'])[cn_fields + ['state']]
+            .unstack(level='cell_id')
+            .transpose())
+
+    loss_gain_matrix = (
+        cn_data
+            .set_index(['bin', 'cell_id'])[['is_gain', 'is_loss']]
             .unstack(level='cell_id')
             .transpose())
 
@@ -380,8 +386,8 @@ def read_medicc2_cn(cn_profiles_filename, allele_specific: bool = False) -> AnnD
     X = cn_matrix.loc['state'].astype(np.float32)
 
     layers = {
-        'is_gain': cn_matrix.loc['is_gain'],
-        'is_loss': cn_matrix.loc['is_loss'],
+        'is_gain': loss_gain_matrix.loc['is_gain'],
+        'is_loss': loss_gain_matrix.loc['is_loss'],
     }
 
     for field in cn_fields:
