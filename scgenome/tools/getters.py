@@ -37,7 +37,10 @@ def get_obs_data(
         assert layer_name not in data, f'layer {layer_name} also in .var'
         layer_data = adata[obs_id].to_df(layer_name).T
         assert len(layer_data.columns) == 1
-        layer_data.columns = [layer_name]
+        if layer_name is not None:
+            layer_data.columns = [layer_name]
+        else:
+            layer_data.columns = ['_X']
         data = data.merge(layer_data, left_index=True, right_index=True, how='left')
     
     return data
