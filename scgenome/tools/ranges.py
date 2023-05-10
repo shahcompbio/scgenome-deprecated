@@ -207,6 +207,7 @@ def rebin(adata: AnnData, target_bins: DataFrame, outer_join: bool=False, agg_X=
     """
     bins = adata.var.rename_axis('bin').reset_index()[['chr', 'start', 'end', 'bin']]
 
+    target_bins = target_bins.copy()
     target_bins['target_bin'] = (
         target_bins['chr'].astype(str) + ':' +
         target_bins['start'].astype(str) + '-' +
