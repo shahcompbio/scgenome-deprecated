@@ -131,7 +131,7 @@ def plot_cell_cn_matrix(
         ax.set(yticklabels=[])
 
     for val in chrom_boundaries[:-1]:
-        ax.axvline(x=val, linewidth=1, color='black', zorder=100)
+        ax.axvline(x=val, linewidth=0.5, color='black', zorder=100)
 
     return {
         'ax': ax,
