@@ -26,6 +26,7 @@ def plot_cell_cn_matrix(
         max_cn=13,
         vmin=None,
         vmax=None,
+        cmap=None,
         show_cell_ids=False):
     """ Plot a copy number matrix
 
@@ -45,6 +46,8 @@ def plot_cell_cn_matrix(
         clip cn at max value, raw=False only, by default 13
     vmin, vmax : float, optional
         for raw=True, vmin and vmax define the data range that the colormap covers, see `matplotlib.pyplot.imshow`
+    cmap : str, optional
+        matplotlib colormap name, only used if raw=True
     show_cell_ids : bool, optional
         show cell ids on heatmap axis, by default False
 
@@ -67,6 +70,9 @@ def plot_cell_cn_matrix(
 
     if ax is None:
         ax = plt.gca()
+
+    if cmap is None:
+        cmap = 'viridis'
 
     # Order the chromosomes
     chr_start = adata.var.reset_index().merge(scgenome.refgenome.info.chromosome_info[['chr', 'chr_index']], how='left')
@@ -102,7 +108,7 @@ def plot_cell_cn_matrix(
         im = ax.imshow(X_colors, aspect='auto', interpolation='none', vmin=vmin, vmax=vmax)
 
     else:
-        cmap = matplotlib.cm.get_cmap('viridis')
+        cmap = matplotlib.cm.get_cmap(cmap)
         im = ax.imshow(X, aspect='auto', cmap=cmap, interpolation='none', vmin=vmin, vmax=vmax)
 
     mat_chrom_idxs = chr_start[genome_ordering][:, 1]
@@ -271,6 +277,7 @@ def plot_cell_cn_matrix_fig(
         raw=False,
         vmin=None,
         vmax=None,
+        cmap=None,
         max_cn=13,
         show_cell_ids=False,
         show_subsets=False):
@@ -294,6 +301,8 @@ def plot_cell_cn_matrix_fig(
         raw plotting, no integer color map, by default False
     vmin, vmax : float, optional
         for raw=True, vmin and vmax define the data range that the colormap covers, see `matplotlib.pyplot.imshow`
+    cmap : str, optional
+        matplotlib colormap name, only used if raw=True
     max_cn : int, optional
         clip cn at max value, by default 13
     show_cell_ids : bool, optional
@@ -420,7 +429,7 @@ def plot_cell_cn_matrix_fig(
     g = plot_cell_cn_matrix(
         adata, layer_name=layer_name,
         cell_order_fields=cell_order_fields,
-        ax=heatmap_ax, raw=raw, vmin=vmin, vmax=vmax,
+        ax=heatmap_ax, raw=raw, vmin=vmin, vmax=vmax, cmap=cmap,
         max_cn=max_cn, show_cell_ids=show_cell_ids)
 
     adata = g['adata']
