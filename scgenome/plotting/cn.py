@@ -79,3 +79,53 @@ def plot_cn_profile(
         chromosome=chromosome, s=s, squashy=squashy, rawy=rawy)
 
     return ax
+
+
+def plot_var_profile(adata, value_field_name, cn_field_name=None, ax=None, max_cn=12, chromosome=None, s=5, squashy=False, rawy=False):
+    """Plot scatter points of copy number across the genome or a chromosome.
+
+    Parameters
+    ----------
+    adata : AnnData
+        copy number data
+    value_field_name : str, optional
+        var field with values for y axis, None for X, by default None
+    cn_field_name : str, optional
+        var field with states for colors, None for no color by state, by default None
+    ax : [type], optional
+        existing axis to plot into, by default None
+    max_cn : int, optional
+        max copy number for y axis, by default 13
+    chromosome : [type], optional
+        single chromosome plot, by default None
+    s : int, optional
+        size of scatter points, by default 5
+    squashy : bool, optional
+        compress y axis, by default False
+    rawy : bool, optional
+        raw data on y axis, by default False
+
+    Examples
+    -------
+
+    .. plot::
+        :context: close-figs
+
+        import scgenome
+        adata = scgenome.datasets.OV2295_HMMCopy_reduced()
+        scgenome.pl.plot_var_profile(adata[:, adata.var['gc'] > 0], 'gc', rawy=True)
+
+    TODO: missing return
+    """
+
+    data = adata.var.copy()
+
+    if ax is None:
+        ax = plt.gca()
+
+    scgenome.cnplot.plot_cell_cn_profile(
+        ax, data, value_field_name, cn_field_name=cn_field_name, max_cn=max_cn,
+        chromosome=chromosome, s=s, squashy=squashy, rawy=rawy)
+
+    return ax
+
