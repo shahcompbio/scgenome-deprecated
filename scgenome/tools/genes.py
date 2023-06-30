@@ -6,7 +6,7 @@ import numpy as np
 from pandas import DataFrame
 from anndata import AnnData
 from pyranges import PyRanges
-from collections.abc import Iterable
+from typing import Iterable
 
 
 def read_ensemble_genes_gtf(gtf_filename) -> PyRanges:

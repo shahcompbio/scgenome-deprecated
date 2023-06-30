@@ -9,8 +9,7 @@ import anndata as ad
 from natsort import natsorted
 
 from anndata import AnnData
-from typing import Dict, Any, Union
-from collections.abc import Iterable
+from typing import Dict, Any, Union, Iterable
 
 import scgenome.cncluster
 import scgenome.preprocessing.transform

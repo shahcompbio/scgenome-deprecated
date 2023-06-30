@@ -5,8 +5,7 @@ import sklearn.preprocessing
 import pandas as pd
 
 from anndata import AnnData
-from collections.abc import Iterable
-from typing import Union, Any, Dict
+from typing import Union, Any, Dict, Iterable
 
 import scgenome.preprocessing.transform
 

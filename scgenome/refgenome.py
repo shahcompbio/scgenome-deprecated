@@ -3,72 +3,73 @@ import pandas as pd
 import pkg_resources
 
 
-def read_chromosome_lengths(genome_fasta_index):
-    chromosome_lengths = pd.read_csv(
-        genome_fasta_index, sep='\t',
-        header=None, names=['chr', 'chromosome_length', 'V3', 'V4', 'V5'])
-    chromosome_lengths = chromosome_lengths[['chr', 'chromosome_length']]
-    return chromosome_lengths
+class RefGenome(object):
+    def __init__(self, genome_version='hg19'):
+        assert genome_version in ['hg19', 'grch38', 'mm10']
+        self.genome_version = genome_version
 
+    def chromosomes(self):
+        chromosomes = [str(a) for a in range(1, 23)] + ['X', 'Y']
+        if self.genome_version == 'grch38':
+            chromosomes = [f'chr{v}' for v in chromosomes]
+        return chromosomes
 
-def read_cytobands(cyto_filename, remove_chr_prefix=False):
-    cytobands = pd.read_csv(
-        cyto_filename, sep='\t',
-        names=['chr', 'start', 'end', 'cyto_band_name', 'cyto_band_giemsa_stain'])
-    if remove_chr_prefix:
-        cytobands['chr'] = cytobands['chr'].str.replace('^chr', '', regex=True)
-    return cytobands
+    def plot_chromosomes(self):
+        return [str(a) for a in range(1, 23)] + ['X', 'Y']
 
+    def cytobands(self):
+        filepath = pkg_resources.resource_filename(
+            'scgenome', f'data/{self.genome_version}_cytoBand.txt.gz'
 
-class RefGenomeInfo(object):
-    def __init__(self, version):
-        if version == 'hg19':
-            self.chromosomes = [str(a) for a in range(1, 23)] + ['X', 'Y']
-            self.plot_chromosomes = [str(a) for a in range(1, 23)] + ['X', 'Y']
-            self.genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/hg19.fa.fai')
-            self.cyto_filename = pkg_resources.resource_filename('scgenome', 'data/hg19_cytoBand.txt.gz')
-            self.cytobands = read_cytobands(self.cyto_filename, remove_chr_prefix=True)
+        )
+        cytobands = pd.read_csv(
+            filepath, sep='\t',
+            names=['chr', 'start', 'end', 'cyto_band_name', 'cyto_band_giemsa_stain']
+        )
 
-        elif version == 'grch38':
-            self.chromosomes = [f'chr{a}' for a in range(1, 23)] + ['chrX', 'chrY']
-            self.plot_chromosomes = [str(a) for a in range(1, 23)] + ['X', 'Y']
-            self.genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/grch38.fa.fai')
-            self.cyto_filename = pkg_resources.resource_filename('scgenome', 'data/grch38_cytoBand.txt.gz')
-            self.cytobands = read_cytobands(self.cyto_filename, remove_chr_prefix=False)
+        if not self.genome_version == 'grch38':
+            cytobands['chr'] = cytobands['chr'].str.replace('^chr', '', regex=True)
+        return cytobands
 
-        elif version == 'mm10':
-            self.chromosomes = [str(a) for a in range(1, 20)] + ['X', 'Y']
-            self.plot_chromosomes = [str(a) for a in range(1, 20)] + ['X', 'Y']
-            self.genome_fasta_index = pkg_resources.resource_filename('scgenome', 'data/mm10.fa.fai')
-            self.cyto_filename = pkg_resources.resource_filename('scgenome', 'data/mm10_cytoBand.txt.gz')
-            self.cytobands = read_cytobands(self.cyto_filename, remove_chr_prefix=True)
+    def chromosome_info(self):
+        filepath = pkg_resources.resource_filename('scgenome', f'data/{self.genome_version}.fa.fai')
 
-        else:
-            raise ValueError()
-
-        self.chromosome_info = read_chromosome_lengths(self.genome_fasta_index)
+        chromosome_info = pd.read_csv(
+            filepath,
+            sep='\t',
+            header=None,
+            names=['chr', 'chromosome_length', 'V3', 'V4', 'V5']
+        )
+        chromosome_info = chromosome_info[['chr', 'chromosome_length']]
 
         # Subset and order according to list of chromosomes
-        self.chromosome_info = self.chromosome_info.set_index('chr').loc[self.chromosomes].reset_index()
-        self.chromosome_info['chr_index'] = range(self.chromosome_info.shape[0])
+        chromosome_info = chromosome_info.set_index('chr').loc[self.chromosomes()].reset_index()
+        chromosome_info['chr_index'] = range(chromosome_info.shape[0])
 
         # Add plotting names of chromosomes
-        self.chromosome_info['chr_plot'] = self.plot_chromosomes
+        chromosome_info['chr_plot'] = self.plot_chromosomes()
 
         # Add start end and mid
-        self.chromosome_info['chromosome_end'] = np.cumsum(self.chromosome_info['chromosome_length'])
-        self.chromosome_info['chromosome_start'] = self.chromosome_info['chromosome_end'].shift(1)
-        self.chromosome_info.loc[self.chromosome_info.index[0], 'chromosome_start'] = 0
-        self.chromosome_info['chromosome_start'] = self.chromosome_info['chromosome_start'].astype(int)
-        self.chromosome_info['chromosome_mid'] = (self.chromosome_info['chromosome_start'] + self.chromosome_info['chromosome_end']) // 2
+        chromosome_info['chromosome_end'] = np.cumsum(chromosome_info['chromosome_length'])
+        chromosome_info['chromosome_start'] = chromosome_info['chromosome_end'].shift(1)
+        chromosome_info.loc[chromosome_info.index[0], 'chromosome_start'] = 0
+        chromosome_info['chromosome_start'] = chromosome_info['chromosome_start'].astype(int)
+        chromosome_info['chromosome_mid'] = (chromosome_info['chromosome_start'] + chromosome_info[
+            'chromosome_end']) // 2
+
+        return chromosome_info
 
 
-info = None
+def chromosome_info(genome_version='hg19'):
+    return RefGenome(genome_version=genome_version).chromosome_info()
 
 
-def set_genome_version(version):
-    global info
-    info = RefGenomeInfo(version)
+def cytobands(genome_version='hg19'):
+    return RefGenome(genome_version=genome_version).cytobands()
 
-set_genome_version('hg19')
 
+def chromosomes(genome_version='hg19'):
+    return RefGenome(genome_version=genome_version).chromosomes()
+
+def plot_chromosomes(genome_version='hg19'):
+    return RefGenome(genome_version=genome_version).plot_chromosomes()

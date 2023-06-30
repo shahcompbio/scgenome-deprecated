@@ -1,29 +1,27 @@
-import logging
-import matplotlib
-import seaborn
 import random
-import scipy
-import pandas as pd
-import numpy as np
+
+import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scipy
 import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as dst
-from sklearn.decomposition import PCA
+import seaborn
 from matplotlib.colors import ListedColormap
-
 from scgenome import refgenome
-from scgenome import utils
-from scgenome import cncluster
+from sklearn.decomposition import PCA
 
 
 def hex_to_rgb(h):
     if h is None:
         return np.array((0, 0, 0))
     h = h.lstrip('#')
-    return np.array(tuple(np.uint8(int(h[i:i+2], 16)) for i in (0, 2 ,4)))
+    return np.array(tuple(np.uint8(int(h[i:i + 2], 16)) for i in (0, 2, 4)))
 
 
-color_reference = {0:'#3182BD', 1:'#9ECAE1', 2:'#CCCCCC', 3:'#FDCC8A', 4:'#FC8D59', 5:'#E34A33', 6:'#B30000', 7:'#980043', 8:'#DD1C77', 9:'#DF65B0', 10:'#C994C7', 11:'#D4B9DA'}
+color_reference = {0: '#3182BD', 1: '#9ECAE1', 2: '#CCCCCC', 3: '#FDCC8A', 4: '#FC8D59', 5: '#E34A33', 6: '#B30000',
+                   7: '#980043', 8: '#DD1C77', 9: '#DF65B0', 10: '#C994C7', 11: '#D4B9DA'}
 
 
 def get_cn_cmap(cn_data):
@@ -32,7 +30,7 @@ def get_cn_cmap(cn_data):
     assert min_cn - cn_data.min() == 0
     assert max_cn - cn_data.max() == 0
     color_list = []
-    for cn in range(min_cn, max_cn+1):
+    for cn in range(min_cn, max_cn + 1):
         if cn > max(color_reference.keys()):
             cn = max(color_reference.keys())
         color_list.append(color_reference[cn])
@@ -56,70 +54,8 @@ def _secondary_clustering(data):
     return ordering
 
 
-def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', secondary_field_name=None, raw=False, max_cn=13, cmap=None):
-    plot_data = cn_data.merge(refgenome.info.chromosome_info[['chr', 'chr_index']])
-
-    if secondary_field_name is not None:
-        plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])
-        plot_data = plot_data[[secondary_field_name, cn_field_name]]
-        plot_data = plot_data.unstack(level=['cell_id', cluster_field_name]).fillna(0)
-        ordering = plot_data[secondary_field_name].values[0]
-
-        plot_data = cn_data.merge(refgenome.info.chromosome_info[['chr', 'chr_index']])
-        plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
-    else:
-        plot_data = plot_data.set_index(['chr_index', 'start', 'cell_id', cluster_field_name])[cn_field_name].unstack(level=['cell_id', cluster_field_name]).fillna(0)
-        ordering = _secondary_clustering(plot_data.values)
-    ordering = pd.Series(ordering, index=plot_data.columns, name='cell_order')
-    plot_data = plot_data.T.set_index(ordering, append=True).T
-
-    plot_data = plot_data.sort_index(axis=1, level=[1, 2])
-    if max_cn is not None:
-        plot_data[plot_data > max_cn] = max_cn
-
-    mat_chrom_idxs = plot_data.index.get_level_values(0).values
-    chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [plot_data.shape[0] - 1])
-    chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
-    chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
-    ordered_mat_chrom_idxs = mat_chrom_idxs[np.where(np.array([1] + list(np.diff(mat_chrom_idxs))) != 0)]
-    chrom_names = np.array(refgenome.info.plot_chromosomes)[ordered_mat_chrom_idxs]
-
-    mat_cluster_ids = plot_data.columns.get_level_values(1).values
-    cluster_boundaries = np.array([0] + list(np.where(mat_cluster_ids[1:] != mat_cluster_ids[:-1])[0]) + [plot_data.shape[1] - 1])
-    cluster_sizes = cluster_boundaries[1:] - cluster_boundaries[:-1]
-    cluster_mids = cluster_boundaries[:-1] + cluster_sizes / 2
-
-    if not raw and cmap is None:
-        cmap = get_cn_cmap(plot_data.values)
-
-    im = ax.imshow(plot_data.astype(float).T, aspect='auto', cmap=cmap, interpolation='none')
-
-    ax.set(xticks=chrom_mids)
-    ax.set(xticklabels=chrom_names)
-
-    for val in chrom_boundaries[:-1]:
-        ax.axvline(x=val, linewidth=1, color='black', zorder=100)
-
-    return plot_data
-
-
-def plot_clustered_cell_cn_matrix_figure(fig, cn_data, cn_field_name, cluster_field_name='cluster_id', secondary_field_name=None, raw=False, max_cn=13, cmap=None):
-    ax = fig.add_axes([0.1,0.0,0.9,1.])
-    plot_data = plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name=cluster_field_name, secondary_field_name=secondary_field_name,raw=raw, max_cn=max_cn, cmap=cmap)
-
-    cluster_ids = plot_data.columns.get_level_values(1).values
-    color_mat = cncluster.get_cluster_colors(cluster_ids)
-
-    ax = fig.add_axes([0.0,0.0,0.05,1.])
-    ax.imshow(np.array(color_mat)[::-1, np.newaxis], aspect='auto', origin='lower', interpolation='none')
-    ax.grid(False)
-    ax.set_xticks([])
-    ax.set_yticks([])
-
-    return plot_data
-
-
-def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_cn=13, chromosome=None, s=5, squashy=False, rawy=False, cmap=None):
+def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_cn=13, chromosome=None, s=5,
+                         squashy=False, rawy=False, cmap=None):
     """ Plot copy number profile on a genome axis
 
     Args:
@@ -143,6 +79,7 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
     """
     chromosome_info = refgenome.info.chromosome_info[['chr', 'chromosome_start', 'chromosome_end']].copy()
     chromosome_info['chr'] = pd.Categorical(chromosome_info['chr'], categories=cn_data['chr'].cat.categories)
+
     plot_data = cn_data.merge(chromosome_info)
     plot_data = plot_data[plot_data['chr'].isin(refgenome.info.chromosomes)]
     plot_data['start'] = plot_data['start'] + plot_data['chromosome_start']
@@ -204,7 +141,7 @@ def plot_cell_cn_profile(ax, cn_data, value_field_name, cn_field_name=None, max_
         ax.set_ylim((-0.01, 1.01))
         ax.spines['left'].set_bounds(0, 1)
     elif not rawy:
-        ax.set_ylim((-0.05*max_cn, max_cn))
+        ax.set_ylim((-0.05 * max_cn, max_cn))
         ax.set_yticks(range(0, int(max_cn) + 1))
         ax.spines['left'].set_bounds(0, max_cn)
 
@@ -260,7 +197,7 @@ def plot_breakends(ax, breakends, lw=0.5):
         prediction_id = plot_data.loc[idx, 'prediction_id']
         x = plot_data.loc[idx, 'plot_position']
         strand = plot_data.loc[idx, 'strand']
-        y = np.random.uniform(ylim[0] + 0.75*yrng, ylim[0] + 0.95*yrng)
+        y = np.random.uniform(ylim[0] + 0.75 * yrng, ylim[0] + 0.95 * yrng)
         offset = (arrow_length, -arrow_length)[strand == '+']
         color = prediction_colors[prediction_id]
         ax.arrow(x, y, offset, 0, color=color, lw=lw, alpha=1.0, head_width=head_width, head_length=head_length)
@@ -283,55 +220,13 @@ def plot_breakends(ax, breakends, lw=0.5):
     ax.set_ylim((ylim[0], ylim[1] + 5))
 
 
-def plot_cluster_cn_matrix(fig, cn_data, cn_field_name, cluster_field_name='cluster_id'):
-    plot_data = cn_data.merge(refgenome.info.chromosome_info[['chr', 'chr_index']])
-    plot_data = plot_data.groupby(['chr_index', 'start', cluster_field_name], observed=True)[cn_field_name].median().astype(int)
-    plot_data = plot_data.unstack(level=[cluster_field_name]).fillna(0)
-    plot_data = plot_data.sort_index(axis=1, level=1)
-
-    logging.info(f'matrix with size {plot_data.T.shape}')
-
-    ax = fig.add_axes([0.0,1.,0.1,1.])
-    if plot_data.shape[1] > 2:
-        D = dst.squareform(dst.pdist(plot_data.T, 'cityblock'))
-        Y = sch.linkage(D, method='complete')
-        Z = sch.dendrogram(Y, color_threshold=-1, orientation='left')
-        idx = Z['leaves'][::-1]
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.spines['left'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        plot_data = plot_data.iloc[:, idx]
-
-    mat_chrom_idxs = plot_data.index.get_level_values(0).values
-    chrom_boundaries = np.array([0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [plot_data.shape[0] - 1])
-    chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
-    chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
-    chromosomes = refgenome.info.chromosome_info.set_index('chr_index').loc[np.unique(mat_chrom_idxs), 'chr_plot']
-
-    ax = fig.add_axes([0.125,1.,0.875,1.])
-    im = ax.imshow(plot_data.T, aspect='auto', cmap=get_cn_cmap(plot_data.values), interpolation='none')
-
-    ax.set(xticks=chrom_mids)
-    ax.set(xticklabels=chromosomes)
-    ax.set(yticks=list(range(len(plot_data.columns.values))))
-    ax.set(yticklabels=plot_data.columns.values)
-
-    for val in chrom_boundaries[:-1]:
-        ax.axvline(x=val, linewidth=1, color='black', zorder=100)
-
-    return plot_data.columns.values
-
-
 def compute_pca_loadings(cn_data):
     """ Compute the first n components of a PCA
     """
     cn_matrix = (
         cn_data
-        .set_index(['cell_id', 'chr', 'start', 'end'])['copy']
-        .unstack(level=[1, 2, 3]))
+            .set_index(['cell_id', 'chr', 'start', 'end'])['copy']
+            .unstack(level=[1, 2, 3]))
 
     num_null = cn_matrix.isnull().sum(axis=1)
     cn_matrix = cn_matrix[num_null <= 800]
@@ -362,4 +257,3 @@ def plot_pca_components(cn_data, n_components=4, plots_prefix=None):
 
     if plots_prefix is not None:
         fig.savefig(plots_prefix + 'pca_components.pdf', bbox_inches='tight')
-
