@@ -20,6 +20,7 @@ class Colors(object):
 
         self.rgb_color_reference = self.translate_hex_to_rgb(self.hex_color_reference)
 
+
     @property
     def cn_color_reference(self):
         color_reference = {

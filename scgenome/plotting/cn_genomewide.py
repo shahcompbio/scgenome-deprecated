@@ -38,9 +38,7 @@ TODO : 'least surprise': would be better to have a supported list of plotting fu
 and handle all of their peculiarities in this class instead of taking a callable func as input.
 """
 
-from collections import defaultdict
-
-import csverve.api as csverve
+import colors
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -56,18 +54,28 @@ class GenomeWidePlot(object):
             self,
             data,
             y,
-            plot_function,
             ax=None,
-            color_col=None
+            hue=None,
+            kind='scatter',
+            palette='cn'
     ):
+
         self.data = data
         self.y = y
-        self.plot_function = plot_function
-        self.color_col = color_col
 
         self.ax = plt.gca() if ax is None else ax
 
-        self.cmap = self.get_cmap()
+        assert kind in ('scatter', 'line', 'bar')
+        self.kind = kind
+
+        self.hue = hue
+
+        self.cmap, self.color_reference = self.get_cmap(palette, hue)
+
+        if isinstance(hue, str):
+            self.c = self.data[hue]
+        else:
+            self.c = hue
 
         self.refgenome_chromosomes = chromosomes()
         self.refgenome_plot_chromosomes = plot_chromosomes()
@@ -77,26 +85,34 @@ class GenomeWidePlot(object):
         self.plot()
         self.setup_genome_axis()
 
-    @property
-    def color_reference(self):
+    def get_cmap(self, palette, hue):
+        matplotlib_cmaps = plt.colormaps()
 
-        color_reference = {
-            0: '#3182BD', 1: '#9ECAE1', 2: '#CCCCCC', 3: '#FDCC8A',
-            4: '#FC8D59', 5: '#E34A33', 6: '#B30000', 7: '#980043',
-            8: '#DD1C77', 9: '#DF65B0', 10: '#C994C7', 11: '#D4B9DA'
-        }
+        color_ref = None
 
-        color_reference = defaultdict(lambda: '#D4B9DA', color_reference)
+        if palette == 'cn':
+            palette = colors.Colors('cn').hex_color_reference
 
-        return color_reference
+        if isinstance(palette, str):
+            if palette in matplotlib_cmaps:
+                palette = matplotlib.colors.Colormap(palette)
+            else:
+                palette = sns.color_palette(palette)
+        elif isinstance(palette, dict):
+            color_ref = palette
 
-    def get_cmap(self):
-        data = self.data[self.color_col].dropna().astype(int).values
-        min_cn = int(data.min())
-        max_cn = int(data.max())
-        color_list = [self.color_reference[cn] for cn in range(min_cn, max_cn + 1)]
-        cmap = ListedColormap(color_list)
-        return cmap
+            if isinstance(hue, str):
+                hue = self.data[hue].dropna().astype(int).values
+
+            min_cn = int(hue.min())
+            max_cn = int(hue.max())
+
+            color_list = [palette[cn] for cn in range(min_cn, max_cn + 1)]
+            palette = ListedColormap(color_list)
+        else:
+            raise NotImplementedError()
+
+        return palette, color_ref
 
     def setup_genome_axis(self):
         self.ax.set_xlim((-0.5, self.refgenome_chromosome_info['chromosome_end'].max()))
@@ -122,21 +138,37 @@ class GenomeWidePlot(object):
         self.ax.set_yticks(range(0, int(max_cn) + 1))
         self.ax.spines['left'].set_bounds(0, max_cn)
 
-    def plot(self):
+    def scatter_plot(self):
 
-        c = self.data[self.color_col].apply(lambda x: self.color_reference[x])
-
-        if self.color_col is not None:
-            self.plot_function(
+        if self.c is not None:
+            plt.scatter(
                 x=self.data['start'], y=self.data[self.y],
-                c=c, cmap=self.cmap
+                c=self.c, cmap=self.cmap
             )
         else:
-            self.plot_function(
+            plt.scatter(
                 x=self.data['start'], y=self.data[self.y]
             )
 
         self.set_y_ticks()
+
+    def line_plot(self):
+
+        sns.lineplot(data=self.data, x='start', y=self.y, hue=self.hue, palette=self.cmap)
+
+    def plot(self):
+        if self.kind == 'scatter':
+            self.scatter_plot()
+        elif self.kind == 'line':
+            sns.lineplot(data=self.data, x='start', y=self.y, hue=self.hue, palette=self.cmap)
+        elif self.kind == 'bar':
+            if self.hue:
+                colors = [self.color_reference[v] for v in self.data[self.hue]]
+                plt.bar(self.data['start'], self.data[self.y], color=colors)
+            else:
+                plt.bar(self.data['start'], self.data[self.y])
+        else:
+            raise NotImplementedError()
 
     def set_axis_to_chromosome(self, chromosome):
         chromosome_length = self.refgenome_chromosome_info.set_index('chr').loc[
@@ -160,4 +192,3 @@ class GenomeWidePlot(object):
         squash_f = lambda a: np.tanh(squash_coeff * a)
 
         self.ax.set_yscale('function', functions=(squash_f, squash_f))
-
