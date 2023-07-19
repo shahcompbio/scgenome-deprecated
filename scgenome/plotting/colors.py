@@ -1,25 +1,61 @@
 from collections import defaultdict
 
 import matplotlib
+import matplotlib.cm
+import matplotlib.cm
 import numpy as np
-from matplotlib.colors import to_rgb
+import seaborn as sns
+from matplotlib import pyplot as plt
+from matplotlib.colors import ListedColormap
+from matplotlib.colors import to_rgb, to_hex
 from matplotlib.patches import Patch
 from numpy import ndarray
 
 
 class Colors(object):
-    def __init__(self, category):
+    def __init__(self, palette, vmin=None, vmax=None):
 
-        category = category.lower()
-        assert category in ['cn', 'giemsa', 'cyto_band_giemsa_stain']
-
-        if category == 'cn':
-            self.hex_color_reference = self.cn_color_reference
-        elif category == 'giemsa' or category == 'cyto_band_giemsa_stain':
-            self.hex_color_reference = self.cyto_band_giemsa_stain_hex_color_reference
+        if isinstance(palette, str):
+            if palette.lower() == 'cn':
+                self.hex_color_reference = self.cn_color_reference
+                self.cmap = self.get_cmap_from_reference(vmin=vmin, vmax=vmax)
+            elif palette.lower() == 'giemsa' or palette.lower() == 'cyto_band_giemsa_stain':
+                self.hex_color_reference = self.cyto_band_giemsa_stain_hex_color_reference
+                self.cmap = None
+            else:
+                self.cmap = self.load_preset_colormap(palette)
+                self.hex_color_reference = self.get_reference_from_cmap(vmin=vmin, vmax=vmax)
+        elif isinstance(palette, dict):
+            self.hex_color_reference = palette
+            self.cmap = self.get_cmap_from_reference(vmin=vmin, vmax=vmax)
+        else:
+            raise Exception()
 
         self.rgb_color_reference = self.translate_hex_to_rgb(self.hex_color_reference)
 
+    def get_cmap_from_reference(self, vmin=None, vmax=None):
+        vmin = min(self.hex_color_reference.keys()) if vmin is None else vmin
+        vmax = min(self.hex_color_reference.keys()) if vmax is None else vmax
+
+        color_list = [self.hex_color_reference[cn] for cn in range(vmin, vmax + 1)]
+
+        cmap = ListedColormap(color_list)
+        return cmap
+
+    def get_reference_from_cmap(self, vmin=None, vmax=None):
+        colors = {v: to_hex(self.cmap(v)) for v in range(vmin, vmax + 1)}
+        return colors
+
+    def load_preset_colormap(self, palette):
+        matplotlib_cmaps = plt.colormaps()
+
+        if palette in matplotlib_cmaps:
+
+            palette = matplotlib.cm.get_cmap(palette)
+        else:
+            palette = sns.color_palette(palette, as_cmap=True)
+
+        return palette
 
     @property
     def cn_color_reference(self):

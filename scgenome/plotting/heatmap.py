@@ -1,5 +1,3 @@
-import warnings
-
 import Bio.Phylo
 import colors
 import numpy as np
@@ -30,6 +28,33 @@ bin                label1  label2
 1:1-500000         1       2
 1:500000-1000000   3       4
 
+
+usage:
+df = pd.read_csv("small_dataset.csv.gz")
+
+cellids = list(df['cell_id'].unique())
+annotations = pd.DataFrame(
+    [(v, True if i < 3000 else False, False if i < 3000 else True, i) for i, v in enumerate(cellids)],
+    columns=['cell_id', 'contaminated', 'control', 'num_reads']
+)
+annotations = annotations[['cell_id', 'contaminated', 'control']]
+
+df["bin"] = df.apply(lambda row: f"{row['chr']}:{row['start']}-{row['end']}", axis=1)
+df = df.pivot(
+    index='cell_id',
+    columns='bin',
+    values='state')
+
+
+bin_annotations = [
+    [bin, (1 if i < 3000 else 2), (True if i < 3000 else False), ('gneg' if i < 3000 else 'gpos')] for i, bin in
+    enumerate(df.columns.values)
+]
+bin_annotations = pd.DataFrame(bin_annotations, columns=['bin', 'val1', 'val2', 'cyto_band_giemsa_stain'])
+hmap = HeatMap(df, cell_annotation_data=annotations, bin_annotation_data=bin_annotations, cell_order=cellids[::-1])
+
+plt.savefig('out.png')
+
 """
 
 
@@ -41,111 +66,94 @@ class HeatMap(object):
             bin_annotation_data=None,
             ax=None,
             cmap=None,
-            max_cn=None,
             cell_order=None,
-            tree=None
+            phylogenetic_tree=None
     ):
 
-        self.cmap = 'viridis' if cmap is None else cmap
+        self.sanity_check_inputs(
+            cell_annotation_data, bin_annotation_data, ax, cell_order, phylogenetic_tree
+        )
 
-        self.data = data
-        self.data = self.data.fillna(0)
-        if max_cn:
-            self.data = self.data.clip(upper=max_cn)
+        self.data, self.cell_order, self.bins = self._reformat_data(data, phylogenetic_tree, cell_order)
 
-        self.tree = tree
+        self.cmap = cmap
+        self.tree = phylogenetic_tree
 
-        if tree is not None:
-            if cell_order is not None:
-                warnings.warn('both tree and cell_order provided. tree takes precedence')
-
-            self.cell_order = [a.name for a in tree.get_terminals()]
-
-        elif cell_order is not None:
-            self.cell_order = cell_order
+        if cell_annotation_data is not None:
+            self.cell_annotation_data = cell_annotation_data.set_index('cell_id')
+            self.num_cell_annotations = len(self.cell_annotation_data.columns)
         else:
-            self.cell_order = list(self.data.index)
+            self.cell_annotation_data = None
+            self.num_cell_annotations = 0
 
-        self.data.index = pd.Categorical(self.data.index, self.cell_order)
-        self.data = self.data.sort_index()
-
-        self.bins = self.get_bins()
-        self.sort_data()
-
-        self.cell_annotation_data = cell_annotation_data
-        if self.cell_annotation_data is not None:
-            self.cell_annotation_data = self.cell_annotation_data.set_index('cell_id')
-
-        self.bin_annotation_data = bin_annotation_data
-        if self.bin_annotation_data is not None:
-            self.bin_annotation_data = self.bin_annotation_data.set_index('bin')
-
-        if ax is None:
-            self.setup_axes()
+        if bin_annotation_data is not None:
+            self.bin_annotation_data = bin_annotation_data.set_index('bin')
+            self.num_bin_annotations = len(self.bin_annotation_data.columns)
         else:
+            self.bin_annotation_data = None
+            self.num_bin_annotations = 0
+
+        if ax is not None:
+            self.heatmap_ax = ax
+            self.heatmap_ax.set_axis_on()
+        else:
+            main_fig, legend_fig = self.setup_primary_fig()
+            self.tree_ax, self.heatmap_ax, self.cell_ann_axes, self.bin_ann_axes = self.setup_heatmap_axes(
+                main_fig, disable_axis=True)
+            self.heatmap_ax_legend, self.cell_ann_axes_legends, self.bin_ann_axes_legends = self.setup_legend_axes(
+                legend_fig, disable_axis=True)
+
+            self.heatmap_ax.set_axis_on()
+
+            for cell_annotation in self.cell_ann_axes:
+                cell_annotation.set_axis_on()
+
+            for bin_annotation in self.bin_ann_axes:
+                bin_annotation.set_axis_on()
+
+        self.plot_heatmap()
+
+        self.plot_cell_annotations()
+
+        self.plot_bin_annotations()
+
+        self.plot_phylogenetic_tree()
+
+    def sanity_check_inputs(
+            self, cell_annotation_data, bin_annotation_data,
+            axes, cell_order, tree
+    ):
+
+        if axes is not None:
             assert cell_annotation_data is None, 'annotation bars not allowed when an axis object is supplied'
             assert bin_annotation_data is None, 'annotation bars not allowed when an axis object is supplied'
             assert tree is None, 'annotation bars not allowed when an axis object is supplied'
-            self.heatmap_ax = ax
 
-    def setup_axes(self):
+        if tree is not None and cell_order is not None:
+            raise Exception('both tree and cell_order provided. please provide only one')
 
-        num_phylo = 1 if self.tree is not None else 0
-        heatmap_ax_col_idx = 1 if self.tree is not None else 0
-        tree_ax_idx = 1 if self.tree is not None else 0
-        num_annotations = len(self.cell_annotation_data.columns) if self.cell_annotation_data is not None else 0
-        num_var_annotations = len(self.bin_annotation_data.columns) if self.bin_annotation_data is not None else 0
-        heatmap_ax_row_idx = num_var_annotations + 1
+    def _reformat_data(self, data, tree, cell_order):
+        data = data.fillna(0)
 
-        fig = plt.figure()
-        fig_main, fig_legends = fig.subfigures(nrows=2, ncols=1, height_ratios=[5, 1], squeeze=True)
-        fig_legends.patch.set_alpha(0.0)
+        if tree is not None and cell_order is not None:
+            raise Exception('both tree and cell_order provided. please provide only one')
 
-        width_ratios = [0.5] * num_phylo + [1] + [0.005] + [0.02] * num_annotations
-        height_ratios = [0.02] * num_var_annotations + [0.01] + [1]
+        if cell_order is None and tree is not None:
+            cell_order = [a.name for a in self.tree.get_terminals()]
+        elif cell_order is None:
+            cell_order = list(self.data.index)
 
-        axes = fig_main.subplots(
-            nrows=len(height_ratios), ncols=len(width_ratios),
-            width_ratios=width_ratios, height_ratios=height_ratios,
-            squeeze=False, gridspec_kw=dict(hspace=0.02, wspace=0.02))
+        data.index = pd.Categorical(data.index, cell_order)
+        data = data.sort_index()
 
-        # Turn off axes for all annotation rows and columns
-        for ax in axes[:1, :].flatten():
-            ax.set_axis_off()
-        for ax in axes[:, heatmap_ax_col_idx + 1:].flatten():
-            ax.set_axis_off()
+        bins = self.get_sorted_bins(data)
+        data = data[bins]
 
-        # Re-enable axes and remove ticks for row annotations
-        for ax in axes[heatmap_ax_row_idx, heatmap_ax_col_idx + 2:].flatten():
-            ax.set_axis_on()
-            ax.set_yticks([])
+        return data, cell_order, bins
 
-        # Re-enable axes and remove ticks for column annotations
-        for ax in axes[:heatmap_ax_row_idx - 1, heatmap_ax_col_idx].flatten():
-            ax.set_axis_on()
-            ax.set_xticks([])
+    def get_sorted_bins(self, data):
 
-        axes_legends = fig_legends.subplots(
-            nrows=1, ncols=1 + num_annotations + num_var_annotations, squeeze=False)[0]
-        for ax in axes_legends:
-            ax.set_axis_off()
-            ax.set_alpha(0.0)
-            ax.patch.set_alpha(0.0)
-
-        self.tree_ax = axes[heatmap_ax_row_idx, tree_ax_idx]
-
-        self.heatmap_ax = axes[heatmap_ax_row_idx, heatmap_ax_col_idx]
-        self.heatmap_ax_legend = axes_legends[0]
-
-        self.cell_annotation_axes = axes[heatmap_ax_row_idx, heatmap_ax_col_idx + 2:]
-        self.cell_annotation_axes_legends = axes_legends[1:]
-
-        self.bin_annotation_axes = axes[:, heatmap_ax_col_idx]
-        self.bin_annotation_axes_legends = axes_legends[1 + num_annotations:]
-
-    def get_bins(self):
-
-        bins = self.data.columns
+        bins = data.columns
 
         bins = bins.drop_duplicates()
 
@@ -169,23 +177,91 @@ class HeatMap(object):
 
         return bins
 
-    def sort_data(self):
-        self.data = self.data[self.bins]
+    def setup_heatmap_axes(self, fig, disable_axis=False):
+        width_ratios = [1.0] + [0.02] * self.num_cell_annotations
+        if self.tree:
+            width_ratios = [0.5] + width_ratios
 
-    def plot_categorical_annotation(self, data, color_levels, title, bar_ax, legend_ax, horizontal=False):
+        height_ratios = [0.02] * self.num_bin_annotations + [1]
 
-        bar_ax.imshow(data, aspect='auto', interpolation='none')
+        axes_main = fig.subplots(
+            nrows=len(height_ratios), ncols=len(width_ratios),
+            width_ratios=width_ratios, height_ratios=height_ratios,
+            squeeze=False, gridspec_kw=dict(hspace=0.02, wspace=0.02)
+        )
+        if disable_axis:
+            for ax_row in axes_main:
+                for ax in ax_row:
+                    ax.set_axis_off()
+                    ax.set_yticks([])
+                    ax.set_xticks([])
+        # first few rows are annotations, last one is heatmap and tree
+        tree_ax = axes_main[-1][0] if self.tree is not None else None
+        heatmap_ax = axes_main[-1][0] if self.tree is None else axes_main[-1][1]
+        cell_ann_axes = axes_main[-1][1:] if self.tree is None else axes_main[-1][2:]
+        bin_ann_axes = [v[0] for v in axes_main] if self.tree is None else [v[1] for v in axes_main]
 
-        levels = []
-        patches = []
-        for s, h in color_levels.items():
-            levels.append(s)
-            patches.append(Patch(facecolor=h, edgecolor=h))
-        ncol = min(3, int(len(levels) ** (1 / 2)))
-        legend_ax.legend(patches, levels, ncol=ncol,
-                         frameon=True, loc=2, bbox_to_anchor=(0., 1.),
-                         facecolor='white', edgecolor='white', fontsize='4',
-                         title=title, title_fontsize='6')
+        return tree_ax, heatmap_ax, cell_ann_axes, bin_ann_axes
+
+    def setup_legend_axes(self, fig, disable_axis=False):
+
+        axes_legends = fig.subplots(
+            nrows=1,
+            ncols=1 + self.num_bin_annotations + self.num_cell_annotations,
+            squeeze=False
+        )[0]
+
+        if disable_axis:
+            for ax in axes_legends:
+                ax.set_axis_off()
+                ax.set_alpha(0.0)
+                ax.patch.set_alpha(0.0)
+
+        heatmap_ax_legend = axes_legends[0]
+        cell_ann_axes_legends = None
+        if self.cell_annotation_data is not None:
+            cell_ann_axes_legends = axes_legends[1:self.num_cell_annotations + 1]
+
+        bin_ann_axes_legends = None
+        if self.bin_annotation_data is not None:
+            bin_ann_axes_legends = axes_legends[1 + self.num_cell_annotations:]
+
+        return heatmap_ax_legend, cell_ann_axes_legends, bin_ann_axes_legends
+
+    def setup_primary_fig(self):
+
+        # split into main figure and legend
+        fig = plt.figure(figsize=(10, 10))
+        fig_main, fig_legends = fig.subfigures(nrows=2, ncols=1, height_ratios=[5, 1], squeeze=True)
+        fig_legends.patch.set_alpha(0.0)
+
+        return fig_main, fig_legends
+
+    def plot_annotation(self, data, title, bar_ax, legend_ax, horizontal=False, color_levels=None):
+
+        if color_levels is None:
+            im = bar_ax.imshow(data, aspect='auto', interpolation='none', cmap='Reds')
+            legend_ax.grid(False)
+            legend_ax.set_xticks([])
+            legend_ax.set_yticks([])
+
+            axins = legend_ax.inset_axes([0.5, 0.1, 0.05, 0.8])
+
+            cbar = plt.colorbar(im, cax=axins)
+            axins.set_title(title, fontsize='6')
+            cbar.ax.tick_params(labelsize='4')
+        else:
+            bar_ax.imshow(data, aspect='auto', interpolation='none')
+            levels = []
+            patches = []
+            for s, h in color_levels.items():
+                levels.append(s)
+                patches.append(Patch(facecolor=h, edgecolor=h))
+            ncol = min(3, int(len(levels) ** (1 / 2)))
+            legend_ax.legend(patches, levels, ncol=ncol,
+                             frameon=True, loc=2, bbox_to_anchor=(0., 1.),
+                             facecolor='white', edgecolor='white', fontsize='4',
+                             title=title, title_fontsize='6')
 
         bar_ax.grid(False)
 
@@ -195,34 +271,13 @@ class HeatMap(object):
         else:
             bar_ax.set_xticks([0.], [title], rotation=90, fontsize='6')
             bar_ax.tick_params(axis='y', left=False, right=False)
-
-    def plot_continuous_annotation(self, data, title, bar_ax, legend_ax, horizontal=False):
-        im = bar_ax.imshow(data, aspect='auto', interpolation='none', cmap='Reds')
-
-        bar_ax.grid(False)
-        if horizontal:
-            bar_ax.set_yticks([0.], [title], rotation=0, fontsize='6')
-            bar_ax.tick_params(axis='x', left=False, right=False)
-        else:
-            bar_ax.set_xticks([0.], [title], rotation=90, fontsize='6')
-            bar_ax.tick_params(axis='y', left=False, right=False)
-
-        legend_ax.grid(False)
-        legend_ax.set_xticks([])
-        legend_ax.set_yticks([])
-
-        axins = legend_ax.inset_axes([0.5, 0.1, 0.05, 0.8])
-
-        cbar = plt.colorbar(im, cax=axins)
-        axins.set_title(title, fontsize='6')
-        cbar.ax.tick_params(labelsize='4')
 
     def plot_cell_annotations(self):
 
         if self.cell_annotation_data is None:
             return
 
-        for ax, ax_legend, annotation_field in zip(self.cell_annotation_axes, self.cell_annotation_axes_legends,
+        for ax, ax_legend, annotation_field in zip(self.cell_ann_axes, self.cell_ann_axes_legends,
                                                    self.cell_annotation_data.columns):
 
             if self.cell_annotation_data[annotation_field].dtype.name in ('category', 'object', 'bool'):
@@ -234,19 +289,19 @@ class HeatMap(object):
                 color_values = [color_levels[annotation_map[cell]] for cell in self.cell_order]
                 color_values = np.array([color_values])
 
-                self.plot_categorical_annotation(
-                    color_values, color_levels, annotation_field, ax, ax_legend, horizontal=False
+                self.plot_annotation(
+                    color_values, annotation_field, ax, ax_legend, horizontal=False, color_levels=color_levels
                 )
             else:
                 values = np.array([self.cell_annotation_data[annotation_field].values]).T
-                self.plot_continuous_annotation(values, annotation_field, ax, ax_legend, horizontal=False)
+                self.plot_annotation(values, annotation_field, ax, ax_legend, horizontal=False)
 
     def plot_bin_annotations(self):
 
         if self.bin_annotation_data is None:
             return
 
-        for ax, ax_legend, annotation_field in zip(self.bin_annotation_axes, self.bin_annotation_axes_legends,
+        for ax, ax_legend, annotation_field in zip(self.bin_ann_axes, self.bin_ann_axes_legends,
                                                    self.bin_annotation_data.columns):
 
             if self.bin_annotation_data[annotation_field].dtype.name in ('category', 'object', 'bool'):
@@ -262,12 +317,12 @@ class HeatMap(object):
                 color_values = [color_levels[annotation_map[bin]] for bin in self.bins]
                 color_values = np.array([color_values])
 
-                self.plot_categorical_annotation(
-                    color_values, color_levels, annotation_field, ax, ax_legend, horizontal=True
+                self.plot_annotation(
+                    color_values, annotation_field, ax, ax_legend, horizontal=True, color_levels=color_levels
                 )
             else:
                 values = np.array([self.bin_annotation_data[annotation_field].values])
-                self.plot_continuous_annotation(values, annotation_field, ax, ax_legend, horizontal=True)
+                self.plot_annotation(values, annotation_field, ax, ax_legend, horizontal=True)
 
     def plot_phylogenetic_tree(self):
         if self.tree is None:
@@ -285,8 +340,6 @@ class HeatMap(object):
         self.tree_ax.set_yticks([])
 
     def plot_heatmap(self):
-
-        # raise Exception(self.heatmap_ax)
 
         mat = np.array(self.data)
         mat = np.nan_to_num(mat, nan=0)
@@ -318,13 +371,3 @@ class HeatMap(object):
 
         for val in chrom_boundaries[:-1]:
             self.heatmap_ax.axvline(x=val, linewidth=0.5, color='black', zorder=100)
-
-    def main(self):
-
-        self.plot_heatmap()
-
-        self.plot_cell_annotations()
-
-        self.plot_bin_annotations()
-
-        self.plot_phylogenetic_tree()

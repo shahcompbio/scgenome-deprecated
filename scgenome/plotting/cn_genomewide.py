@@ -22,20 +22,45 @@ To set x axis to one chromosome only:
 
 
 Example usage:
-data = csverve.read_csv("results/SHAH_H003347_T01_01_DLP01_hmmcopy_reads_small.csv.gz")
+
+
+import pandas as pd
+
+data = pd.read_csv("small_dataset.csv.gz")
+
+data = data[data['cell_id'] == '130081A-R37-C13']
+
+
+fig = plt.Figure(figsize=(20,10))
+ax = plt.gca()
 
 gwplot = GenomeWidePlot(
-    data, 'copy', plt.scatter, color_col='state'
+    data, 'copy', ax=ax, kind='scatter', hue='state', palette='cn'
 )
 
-gwplot.set_axis_to_chromosome('1')
-gwplot.squash_y_axis()
+data['copy'] = data['copy'] + 2
+blue_palette = {
+            0: '#01529B',
+            1: '#01529B',
+            2: '#01529B',
+            3: '#01529B',
+            4: '#01529B',
+            5: '#01529B',
+            6: '#01529B',
+            7: '#01529B',
+            8: '#01529B',
+            9: '#01529B',
+            10: '#01529B',
+            11: '#01529B'
+}
+
+gwplot = GenomeWidePlot(
+    data, 'copy', ax=ax, kind='scatter', hue='state', palette=blue_palette
+)
+
+
 plt.savefig('out.png')
 
-
-
-TODO : 'least surprise': would be better to have a supported list of plotting functions input as string: scatter, bar, line etc
-and handle all of their peculiarities in this class instead of taking a callable func as input.
 """
 
 import colors
@@ -43,7 +68,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from matplotlib.colors import ListedColormap
 from refgenome import chromosome_info
 from refgenome import chromosomes
 from refgenome import plot_chromosomes
@@ -70,7 +94,10 @@ class GenomeWidePlot(object):
 
         self.hue = hue
 
-        self.cmap, self.color_reference = self.get_cmap(palette, hue)
+        palette = colors.Colors(palette, vmin=min(data[hue]), vmax=max(data[hue]))
+
+        self.cmap = palette.cmap
+        self.color_reference = palette.hex_color_reference
 
         if isinstance(hue, str):
             self.c = self.data[hue]
@@ -84,35 +111,6 @@ class GenomeWidePlot(object):
         self.add_chromosome_info()
         self.plot()
         self.setup_genome_axis()
-
-    def get_cmap(self, palette, hue):
-        matplotlib_cmaps = plt.colormaps()
-
-        color_ref = None
-
-        if palette == 'cn':
-            palette = colors.Colors('cn').hex_color_reference
-
-        if isinstance(palette, str):
-            if palette in matplotlib_cmaps:
-                palette = matplotlib.colors.Colormap(palette)
-            else:
-                palette = sns.color_palette(palette)
-        elif isinstance(palette, dict):
-            color_ref = palette
-
-            if isinstance(hue, str):
-                hue = self.data[hue].dropna().astype(int).values
-
-            min_cn = int(hue.min())
-            max_cn = int(hue.max())
-
-            color_list = [palette[cn] for cn in range(min_cn, max_cn + 1)]
-            palette = ListedColormap(color_list)
-        else:
-            raise NotImplementedError()
-
-        return palette, color_ref
 
     def setup_genome_axis(self):
         self.ax.set_xlim((-0.5, self.refgenome_chromosome_info['chromosome_end'].max()))
@@ -143,11 +141,11 @@ class GenomeWidePlot(object):
         if self.c is not None:
             plt.scatter(
                 x=self.data['start'], y=self.data[self.y],
-                c=self.c, cmap=self.cmap
+                c=self.c, cmap=self.cmap, s=5
             )
         else:
             plt.scatter(
-                x=self.data['start'], y=self.data[self.y]
+                x=self.data['start'], y=self.data[self.y], s=5
             )
 
         self.set_y_ticks()
