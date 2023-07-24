@@ -1,4 +1,5 @@
 import sklearn.decomposition
+import sklearn.preprocessing
 import pandas as pd
 import anndata as ad
 import numpy as np
@@ -39,8 +40,9 @@ def pca_loadings(adata: AnnData, layer=None, n_components=None, random_state=100
     else:
         data = adata.layers[layer]
 
+    scaler = sklearn.preprocessing.StandardScaler()
     pca = sklearn.decomposition.PCA(n_components=n_components, random_state=random_state)
-    transformed = pca.fit_transform(scgenome.preprocessing.transform.fill_missing(data))
+    transformed = pca.fit_transform(scaler.fit_transform(scgenome.preprocessing.transform.fill_missing(data)))
 
     var = adata.var.copy()
     var['pca_mean'] = pca.mean_
