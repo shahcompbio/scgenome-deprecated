@@ -200,6 +200,7 @@ def convert_dlp_hmmcopy(metrics_data: DataFrame, cn_data: DataFrame) -> AnnData:
     AnnData
         An instantiated AnnData Object.
     """
+    scgenome.utils.union_categories([cn_data, metrics_data])
 
     return create_cn_anndata(
         cn_data[['cell_id', 'chr', 'start', 'end', 'reads', 'copy', 'state']],
