@@ -1,11 +1,9 @@
-import pyfaidx
-import pyBigWig
 import numba
 import numpy as np
-import pandas as pd
-
+import pyBigWig
+import pyfaidx
 import scgenome.refgenome
-import scgenome.tools.ranges
+from ranges import Ranges
 
 
 def _chromosome_count_gc(data, **kwargs):
@@ -42,7 +40,7 @@ def count_gc(bins, genome_fasta, column_name='gc', proportion=False):
     -------
     pyranges.PyRanges
         output ranges with additional column for gc count
-    """    
+    """
 
     data = bins.apply(_chromosome_count_gc, genome_fasta=genome_fasta, column_name=column_name)
 
@@ -64,17 +62,12 @@ def add_cyto_giemsa_stain(bins):
     -------
     pandas.DataFrame
         output dataframe with columns 'chr', 'start', 'end' and additional column for giesma stain values
-    """    
+    """
 
-    bins_pr = scgenome.tools.ranges.dataframe_to_pyranges(bins.rename_axis('_index').reset_index())
-    cyto_pr = scgenome.tools.ranges.dataframe_to_pyranges(scgenome.refgenome.info.cytobands)
+    bins = bins.rename_axis('_index').rese
+    cyto = scgenome.refgenome.cytobands()
 
-    intersect_1 = bins_pr.intersect(cyto_pr)
-    intersect_2 = cyto_pr.intersect(bins_pr)
-
-    intersect = pd.merge(
-        scgenome.tools.ranges.pyranges_to_dataframe(intersect_1),
-        scgenome.tools.ranges.pyranges_to_dataframe(intersect_2))
+    intersect = Ranges().intersect_two_regions(cyto, bins)
 
     intersect['_width'] = intersect['end'] - intersect['start'] + 1
 
@@ -99,7 +92,7 @@ def _chromosome_mean_bigwig(data, **kwargs):
     chr_prefix = kwargs['chr_prefix']
 
     chromosome = chr_prefix + chromosome
-    
+
     bw = pyBigWig.open(bigwig_file, 'r')
 
     if chromosome not in bw.chroms():
@@ -135,7 +128,7 @@ def mean_from_bigwig(bins, bigwig_file, column_name, chr_prefix=''):
     -------
     pyranges.PyRanges
         output ranges with additional column for mean bigwig value per bin
-    """    
+    """
 
     data = bins.apply(
         _chromosome_mean_bigwig,
@@ -145,4 +138,3 @@ def mean_from_bigwig(bins, bigwig_file, column_name, chr_prefix=''):
     )
 
     return data
-

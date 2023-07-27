@@ -1,11 +1,10 @@
-import pyranges as pr
-import pandas as pd
 import anndata as ad
 import numpy as np
-
-from pandas import DataFrame
+import pandas as pd
 from anndata import AnnData
+from pandas import DataFrame
 from pyranges import PyRanges
+from ranges import Ranges
 from typing import Iterable
 
 
@@ -21,11 +20,8 @@ def read_ensemble_genes_gtf(gtf_filename) -> PyRanges:
     -------
     PyRanges
         Genes bounds
-    """    
-    genes = pr.read_gtf(gtf_filename, as_df=True)
-    genes = genes.groupby(['Chromosome', 'gene_id', 'gene_name'], observed=True).agg({'Start': min, 'End': max}).reset_index()
-    genes = pr.PyRanges(genes)
-    return genes
+    """
+    return Ranges().read_gtf(gtf_filename)
 
 
 def _segment_width_weighted_mean_matrix(data: DataFrame, intersect: DataFrame) -> DataFrame:
@@ -59,8 +55,8 @@ def _segment_width_weighted_mean_var(data: DataFrame, intersect: DataFrame) -> D
 def aggregate_genes(
         adata: AnnData,
         genes: PyRanges,
-        agg_layers: Iterable=None,
-        agg_var: Iterable=None) -> AnnData:
+        agg_layers: Iterable = None,
+        agg_var: Iterable = None) -> AnnData:
     """ Aggregate copy number by gene to create gene CN matrix
 
     Currently only does segment width weighted mean aggregation.
@@ -92,11 +88,7 @@ def aggregate_genes(
         agg_var = set(adata.var.select_dtypes(include=np.number).columns.to_list()) - set(['chr', 'start', 'end'])
     agg_var = set(agg_var)
 
-    bins = pr.PyRanges(adata.var.reset_index().rename(columns={
-        'chr': 'Chromosome',
-        'start': 'Start',
-        'end': 'End',
-    })[['Chromosome', 'Start', 'End', 'bin']])
+    bins = Ranges().convert_to_pyranges(adata.var.reset_index()[['chr', 'start', 'end', 'bin']])
 
     intersect_1 = genes.intersect(bins)
     intersect_2 = bins.intersect(genes)
@@ -123,5 +115,3 @@ def aggregate_genes(
     )
 
     return adata
-
-

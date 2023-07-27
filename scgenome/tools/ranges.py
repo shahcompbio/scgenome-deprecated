@@ -1,82 +1,65 @@
-import pyranges as pr
-import pandas as pd
 import anndata as ad
-
-from pyranges import PyRanges
-from pandas import DataFrame
+import pandas as pd
+import pyranges as pr
+import scgenome.refgenome
 from anndata import AnnData
 from numpy import ndarray
-
-import scgenome.refgenome
-
+from pandas import DataFrame
 
 
-def dataframe_to_pyranges(data: DataFrame) -> PyRanges:
-    """ Convert dataframe with chr, start, end to pyranges object
+class Ranges(object):
 
-    Parameters
-    ----------
-    data : DataFrame
-        dataframe with columns 'chr', 'start', 'end'
+    def convert_to_pyranges(self, data):
+        assert 'chr' in data.columns
+        assert 'start' in data.columns
+        assert 'end' in data.columns
 
-    Returns
-    -------
-    PyRanges
-        pyranges object
-    """
-    data = pr.PyRanges(data.rename(columns={
-        'chr': 'Chromosome',
-        'start': 'Start',
-        'end': 'End',
-    }))
+        pr_data = pr.PyRanges(data.rename(columns={
+            'chr': 'Chromosome',
+            'start': 'Start',
+            'end': 'End',
+        }))
 
-    return data
+        return pr_data
 
+    def convert_to_dataframe(self, ranges):
+        data = ranges.as_df().rename(columns={
+            'Chromosome': 'chr',
+            'Start': 'start',
+            'End': 'end',
+        })
 
-def pyranges_to_dataframe(data: PyRanges) -> DataFrame:
-    """ Convert pyranges object to dataframe
+        return data
 
-    Parameters
-    ----------
-    data : PyRanges
-        pyranges object
+    def read_gtf(self, gtf_filename):
+        genes = pr.read_gtf(gtf_filename, as_df=True)
+        genes = genes.groupby(['Chromosome', 'gene_id', 'gene_name'], observed=True).agg(
+            {'Start': min, 'End': max}).reset_index()
+        genes = pr.PyRanges(genes)
+        return genes
 
-    Returns
-    -------
-    DataFrame
-        dataframe with columns 'chr', 'start', 'end'
-    """
-    data = data.as_df().rename(columns={
-        'Chromosome': 'chr',
-        'Start': 'start',
-        'End': 'end',
-    })
+    def tile_data(self, data, binsize):
+        ranges = self.convert_to_pyranges(data)
 
-    return data
+        bins = pr.gf.tile_genome(ranges, binsize)
 
+        bins_df = self.convert_to_dataframe(bins)
 
-def create_bins_pr(binsize: int) -> PyRanges:
-    """ Create a regular binning of the genome
+        return bins_df
 
-    Parameters
-    ----------
-    binsize : int
-        size of bins
+    def intersect_two_regions(self, data1, data2):
+        a = self.convert_to_pyranges(data1)
+        b = self.convert_to_pyranges(data2)
 
-    Returns
-    -------
-    PyRanges
-        regular bins tiled across the genome
-    """    
-    
-    chromsizes = scgenome.refgenome.info.chromosome_info[['chr', 'chromosome_length']].rename(
-        columns={'chr': 'Chromosome', 'chromosome_length': 'End'}).assign(Start=0)[['Chromosome', 'Start', 'End']]
+        intersect_1 = a.intersect(b)
+        intersect_2 = b.intersect(a)
 
-    chromsizes = pr.PyRanges(chromsizes)
+        intersect = pd.merge(
+            self.convert_to_dataframe(intersect_1),
+            self.convert_to_dataframe(intersect_2),
+            on=['chr', 'start', 'end'])
 
-    bins = pr.gf.tile_genome(chromsizes, binsize)
-
-    return bins
+        return intersect
 
 
 def create_bins(binsize: int) -> DataFrame:
@@ -92,7 +75,11 @@ def create_bins(binsize: int) -> DataFrame:
     DataFrame
         regular bins tiled across the genome
     """
-    return pyranges_to_dataframe(create_bins_pr(binsize=binsize))
+
+    chromsizes = scgenome.refgenome.info.chromosome_info[['chr', 'chromosome_length']].rename(
+        columns={'chr': 'Chromosome', 'chromosome_length': 'End'}).assign(Start=0)[['Chromosome', 'Start', 'End']]
+
+    return Ranges().tile_data(chromsizes, binsize)
 
 
 def rebin_agg_df(data: DataFrame, intersect: DataFrame, agg_f: dict) -> DataFrame:
@@ -116,7 +103,7 @@ def rebin_agg_df(data: DataFrame, intersect: DataFrame, agg_f: dict) -> DataFram
 
     data = data.set_index(intersect.set_index('bin')['target_bin'], append=True)
     data = data.set_index(intersect.set_index('bin')['width'], append=True)
-    
+
     data = data.groupby(level='target_bin').agg(**agg_f)
 
     return data
@@ -149,40 +136,12 @@ def rebin_agg_layer(adata: AnnData, intersect: DataFrame, layer_name: str, agg_f
     data = data.set_index(intersect.set_index('bin')['width'], append=True)
 
     data = data.groupby(level='target_bin').agg(agg_f)
-    
+
     return data.T
 
 
-def intersect_regions(a: DataFrame, b: DataFrame) -> DataFrame:
-    """ Compute intersection between two sets of regions
-
-    Parameters
-    ----------
-    a : DataFrame
-        region data with columns 'chr', 'start', 'end', ...
-    b : DataFrame
-        region data with columns 'chr', 'start', 'end', ...
-
-    Returns
-    -------
-    DataFrame
-        intersecting regions with columns 'chr', 'start', 'end' and columns from 'a' and 'b'
-    """
-    a = scgenome.tools.ranges.dataframe_to_pyranges(a)
-    b = scgenome.tools.ranges.dataframe_to_pyranges(b)
-
-    intersect_1 = a.intersect(b)
-    intersect_2 = b.intersect(a)
-
-    intersect = pd.merge(
-        scgenome.tools.ranges.pyranges_to_dataframe(intersect_1),
-        scgenome.tools.ranges.pyranges_to_dataframe(intersect_2),
-        on=['chr', 'start', 'end'])
-
-    return intersect
-
-
-def rebin(adata: AnnData, target_bins: DataFrame, outer_join: bool=False, agg_X=None, agg_var=None, agg_layers=()) -> AnnData:
+def rebin(adata: AnnData, target_bins: DataFrame, outer_join: bool = False, agg_X=None, agg_var=None,
+          agg_layers=()) -> AnnData:
     """ Rebin an AnnData and aggregate across multiple intersecting regions
 
     Parameters
@@ -209,17 +168,17 @@ def rebin(adata: AnnData, target_bins: DataFrame, outer_join: bool=False, agg_X=
 
     target_bins = target_bins.copy()
     target_bins['target_bin'] = (
-        target_bins['chr'].astype(str) + ':' +
-        target_bins['start'].astype(str) + '-' +
-        target_bins['end'].astype(str))
+            target_bins['chr'].astype(str) + ':' +
+            target_bins['start'].astype(str) + '-' +
+            target_bins['end'].astype(str))
     target_bins = target_bins[['chr', 'start', 'end', 'target_bin']]
 
-    intersect = intersect_regions(bins, target_bins)
+    intersect = Ranges().intersect_two_regions(bins, target_bins)
     intersect['width'] = intersect['end'] - intersect['start'] + 1
 
     if agg_var is not None:
         var = rebin_agg_df(adata.var, intersect, agg_var)
-    
+
     else:
         var = intersect[['target_bin']].set_index('target_bin')
 
@@ -250,7 +209,8 @@ def rebin(adata: AnnData, target_bins: DataFrame, outer_join: bool=False, agg_X=
     return adata
 
 
-def rebin_regular(adata: AnnData, bin_size: int, outer_join: bool=False, agg_X=None, agg_var=None, agg_layers=()) -> AnnData:
+def rebin_regular(adata: AnnData, bin_size: int, outer_join: bool = False, agg_X=None, agg_var=None,
+                  agg_layers=()) -> AnnData:
     """ Rebin an AnnData and aggregate across multiple intersecting regions
 
     Parameters
@@ -314,5 +274,3 @@ def bin_width_weighted_mean(df: DataFrame) -> float:
     values = df.values
     widths = df.index.get_level_values('width').values
     return weighted_mean(values, widths)
-
-
