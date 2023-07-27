@@ -31,10 +31,18 @@ bin                label1  label2
 
 usage:
 df = pd.read_csv("small_dataset.csv.gz")
+df["bin"] = df.apply(lambda row: f"{row['chr']}:{row['start']}-{row['end']}", axis=1)
+df = df.pivot(
+    index='cell_id',
+    columns='bin',
+    values='state')
+hmap = HeatMap(df)
+plt.savefig('out.png')
 
+df = pd.read_csv("small_dataset.csv.gz")
 cellids = list(df['cell_id'].unique())
 annotations = pd.DataFrame(
-    [(v, True if i < 3000 else False, False if i < 3000 else True, i) for i, v in enumerate(cellids)],
+    [(v, True if i < 3 else False, False if i < 2 else True, i) for i, v in enumerate(cellids)],
     columns=['cell_id', 'contaminated', 'control', 'num_reads']
 )
 annotations = annotations[['cell_id', 'contaminated', 'control']]
@@ -44,16 +52,21 @@ df = df.pivot(
     index='cell_id',
     columns='bin',
     values='state')
-
-
 bin_annotations = [
     [bin, (1 if i < 3000 else 2), (True if i < 3000 else False), ('gneg' if i < 3000 else 'gpos')] for i, bin in
     enumerate(df.columns.values)
 ]
 bin_annotations = pd.DataFrame(bin_annotations, columns=['bin', 'val1', 'val2', 'cyto_band_giemsa_stain'])
-hmap = HeatMap(df, cell_annotation_data=annotations, bin_annotation_data=bin_annotations, cell_order=cellids[::-1])
 
+hmap = AnnotatedHeatMap(df, cell_annotation_data=annotations, bin_annotation_data=bin_annotations,
+                        cell_order=cellids[::-1], subset=True)
+hmap.view_by_cell_annotation('subset', 1)
+hmap.show_cell_labels()
+hmap.hide_cell_labels()
+hmap.reset_cells()
 plt.savefig('out.png')
+
+
 
 """
 
@@ -62,86 +75,24 @@ class HeatMap(object):
     def __init__(
             self,
             data,
-            cell_annotation_data=None,
-            bin_annotation_data=None,
             ax=None,
             cmap=None,
             cell_order=None,
-            phylogenetic_tree=None
     ):
 
-        self.sanity_check_inputs(
-            cell_annotation_data, bin_annotation_data, ax, cell_order, phylogenetic_tree
-        )
-
-        self.data, self.cell_order, self.bins = self._reformat_data(data, phylogenetic_tree, cell_order)
+        self.data, self.cell_order, self.bins = self._reformat_data(data, cell_order)
 
         self.cmap = cmap
-        self.tree = phylogenetic_tree
 
-        if cell_annotation_data is not None:
-            self.cell_annotation_data = cell_annotation_data.set_index('cell_id')
-            self.num_cell_annotations = len(self.cell_annotation_data.columns)
-        else:
-            self.cell_annotation_data = None
-            self.num_cell_annotations = 0
-
-        if bin_annotation_data is not None:
-            self.bin_annotation_data = bin_annotation_data.set_index('bin')
-            self.num_bin_annotations = len(self.bin_annotation_data.columns)
-        else:
-            self.bin_annotation_data = None
-            self.num_bin_annotations = 0
-
-        if ax is not None:
-            self.heatmap_ax = ax
-            self.heatmap_ax.set_axis_on()
-        else:
-            main_fig, legend_fig = self.setup_primary_fig()
-            self.tree_ax, self.heatmap_ax, self.cell_ann_axes, self.bin_ann_axes = self.setup_heatmap_axes(
-                main_fig, disable_axis=True)
-            self.heatmap_ax_legend, self.cell_ann_axes_legends, self.bin_ann_axes_legends = self.setup_legend_axes(
-                legend_fig, disable_axis=True)
-
-            self.heatmap_ax.set_axis_on()
-
-            for cell_annotation in self.cell_ann_axes:
-                cell_annotation.set_axis_on()
-
-            for bin_annotation in self.bin_ann_axes:
-                bin_annotation.set_axis_on()
+        self.ax = plt.gca() if ax is None else ax
 
         self.plot_heatmap()
 
-        self.plot_cell_annotations()
-
-        self.plot_bin_annotations()
-
-        self.plot_phylogenetic_tree()
-
-    def sanity_check_inputs(
-            self, cell_annotation_data, bin_annotation_data,
-            axes, cell_order, tree
-    ):
-
-        if axes is not None:
-            assert cell_annotation_data is None, 'annotation bars not allowed when an axis object is supplied'
-            assert bin_annotation_data is None, 'annotation bars not allowed when an axis object is supplied'
-            assert tree is None, 'annotation bars not allowed when an axis object is supplied'
-
-        if tree is not None and cell_order is not None:
-            raise Exception('both tree and cell_order provided. please provide only one')
-
-    def _reformat_data(self, data, tree, cell_order):
+    def _reformat_data(self, data, cell_order):
         data = data.fillna(0)
 
-        if tree is not None and cell_order is not None:
-            raise Exception('both tree and cell_order provided. please provide only one')
-
-        if cell_order is None and tree is not None:
-            cell_order = [a.name for a in self.tree.get_terminals()]
-        elif cell_order is None:
-            cell_order = list(self.data.index)
+        if cell_order is None:
+            cell_order = list(data.index)
 
         data.index = pd.Categorical(data.index, cell_order)
         data = data.sort_index()
@@ -177,8 +128,111 @@ class HeatMap(object):
 
         return bins
 
+    def plot_heatmap(self):
+
+        mat = np.array(self.data)
+        mat = np.nan_to_num(mat, nan=0)
+
+        X_colors = colors.map_cn_colors_to_matrix(mat)
+
+        self.ax.imshow(X_colors, aspect='auto', interpolation='none')
+
+        chridxs = np.array(self.bins.str.split(':').str[0])
+        mat_chrom_idxs = np.array(sorted(np.unique(chridxs, return_inverse=True)[1]))
+
+        chrom_boundaries = np.array(
+            [0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [mat_chrom_idxs.shape[0] - 1]
+        )
+
+        chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
+        chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
+        ordered_mat_chrom_idxs = mat_chrom_idxs[np.where(np.array([1] + list(np.diff(mat_chrom_idxs))) != 0)]
+        chrom_names = np.array(refgenome.plot_chromosomes())[ordered_mat_chrom_idxs]
+
+        self.ax.set_xticks(chrom_mids)
+        self.ax.set_xticklabels(chrom_names, fontsize='6')
+        self.ax.set_xlabel('chromosome', fontsize=8)
+
+        # cell labels
+        self.ax.set(yticks=range(len(self.data.index)))
+        self.ax.set(yticklabels=self.data.index.values)
+        self.ax.tick_params(axis='y', labelrotation=0)
+
+        for val in chrom_boundaries[:-1]:
+            self.ax.axvline(x=val, linewidth=0.5, color='black', zorder=100)
+
+
+class AnnotatedHeatMap(object):
+    def __init__(
+            self,
+            data,
+            cell_annotation_data=None,
+            bin_annotation_data=None,
+            cmap=None,
+            cell_order=None,
+            phylogenetic_tree=None,
+            fig=None,
+            subset=False
+    ):
+
+        self.subset = subset
+        self.cmap = cmap
+        self.tree = phylogenetic_tree
+
+        if phylogenetic_tree is not None and cell_order is not None:
+            raise Exception('both tree and cell_order provided. please provide only one')
+
+        if cell_annotation_data is not None:
+            self.cell_annotation_data = cell_annotation_data.set_index('cell_id')
+            self.num_cell_annotations = len(self.cell_annotation_data.columns)
+        else:
+            self.cell_annotation_data = None
+            self.num_cell_annotations = 0
+
+        if bin_annotation_data is not None:
+            self.bin_annotation_data = bin_annotation_data.set_index('bin')
+            self.num_bin_annotations = len(self.bin_annotation_data.columns)
+        else:
+            self.bin_annotation_data = None
+            self.num_bin_annotations = 0
+
+        self.fig = plt.figure(figsize=(10, 10)) if fig is None else fig
+        main_fig, legend_fig = self.setup_primary_fig(self.fig)
+        self.tree_ax, self.heatmap_ax, self.cell_ann_axes, self.bin_ann_axes, self.subset_ax = self.setup_heatmap_axes(
+            main_fig, disable_axis=True)
+        self.heatmap_ax_legend, self.cell_ann_axes_legends, self.bin_ann_axes_legends, self.subset_ax_legend = self.setup_legend_axes(
+            legend_fig, disable_axis=True)
+
+        self.heatmap_ax.set_axis_on()
+
+        for cell_annotation in self.cell_ann_axes:
+            cell_annotation.set_axis_on()
+
+        for bin_annotation in self.bin_ann_axes:
+            bin_annotation.set_axis_on()
+
+        hm = HeatMap(data, ax=self.heatmap_ax, cell_order=cell_order, cmap=cmap)
+
+        self.cell_order = hm.cell_order
+        self.bins = hm.bins
+
+        self.plot_cell_annotations()
+
+        self.plot_bin_annotations()
+
+        self.plot_phylogenetic_tree()
+
+        if self.subset:
+            self.subset_ax.set_axis_on()
+            self.add_subset_annotation()
+
+        self.full_ylims = self.heatmap_ax.get_ylim()
+
     def setup_heatmap_axes(self, fig, disable_axis=False):
-        width_ratios = [1.0] + [0.02] * self.num_cell_annotations
+
+        num_cell_annotations = self.num_cell_annotations + 1 if self.subset else self.num_cell_annotations
+
+        width_ratios = [1.0] + [0.02] * num_cell_annotations
         if self.tree:
             width_ratios = [0.5] + width_ratios
 
@@ -198,16 +252,23 @@ class HeatMap(object):
         # first few rows are annotations, last one is heatmap and tree
         tree_ax = axes_main[-1][0] if self.tree is not None else None
         heatmap_ax = axes_main[-1][0] if self.tree is None else axes_main[-1][1]
-        cell_ann_axes = axes_main[-1][1:] if self.tree is None else axes_main[-1][2:]
         bin_ann_axes = [v[0] for v in axes_main] if self.tree is None else [v[1] for v in axes_main]
 
-        return tree_ax, heatmap_ax, cell_ann_axes, bin_ann_axes
+        if self.subset is False:
+            cell_ann_axes = axes_main[-1][1:] if self.tree is None else axes_main[-1][2:]
+            subset_ax = None
+        else:
+            cell_ann_axes = axes_main[-1][1:-1] if self.tree is None else axes_main[-1][2:-1]
+            subset_ax = axes_main[-1][-1] if self.tree is None else axes_main[-1][-1]
+
+        return tree_ax, heatmap_ax, cell_ann_axes, bin_ann_axes, subset_ax
 
     def setup_legend_axes(self, fig, disable_axis=False):
+        num_cell_annotations = self.num_cell_annotations + 1 if self.subset else self.num_cell_annotations
 
         axes_legends = fig.subplots(
             nrows=1,
-            ncols=1 + self.num_bin_annotations + self.num_cell_annotations,
+            ncols=1 + self.num_bin_annotations + num_cell_annotations,
             squeeze=False
         )[0]
 
@@ -219,19 +280,24 @@ class HeatMap(object):
 
         heatmap_ax_legend = axes_legends[0]
         cell_ann_axes_legends = None
+        subset_ax_legend = None
         if self.cell_annotation_data is not None:
-            cell_ann_axes_legends = axes_legends[1:self.num_cell_annotations + 1]
+            if self.subset:
+                cell_ann_axes_legends = axes_legends[1:num_cell_annotations]
+                subset_ax_legend = axes_legends[num_cell_annotations + 1]
+            else:
+                cell_ann_axes_legends = axes_legends[1:num_cell_annotations + 1]
+                subset_ax_legend = None
 
         bin_ann_axes_legends = None
         if self.bin_annotation_data is not None:
-            bin_ann_axes_legends = axes_legends[1 + self.num_cell_annotations:]
+            bin_ann_axes_legends = axes_legends[1 + num_cell_annotations:]
 
-        return heatmap_ax_legend, cell_ann_axes_legends, bin_ann_axes_legends
+        return heatmap_ax_legend, cell_ann_axes_legends, bin_ann_axes_legends, subset_ax_legend
 
-    def setup_primary_fig(self):
+    def setup_primary_fig(self, fig):
 
         # split into main figure and legend
-        fig = plt.figure(figsize=(10, 10))
         fig_main, fig_legends = fig.subfigures(nrows=2, ncols=1, height_ratios=[5, 1], squeeze=True)
         fig_legends.patch.set_alpha(0.0)
 
@@ -281,20 +347,16 @@ class HeatMap(object):
                                                    self.cell_annotation_data.columns):
 
             if self.cell_annotation_data[annotation_field].dtype.name in ('category', 'object', 'bool'):
-
-                color_levels = colors.map_colormap_to_levels(self.cell_annotation_data[annotation_field].unique())
-
                 annotation_map = self.cell_annotation_data[annotation_field].to_dict()
-
-                color_values = [color_levels[annotation_map[cell]] for cell in self.cell_order]
-                color_values = np.array([color_values])
-
-                self.plot_annotation(
-                    color_values, annotation_field, ax, ax_legend, horizontal=False, color_levels=color_levels
-                )
+                color_levels = colors.map_colormap_to_levels(set(annotation_map.values()))
+                values = [[color_levels[annotation_map[cell]]] for cell in self.cell_order]
             else:
-                values = np.array([self.cell_annotation_data[annotation_field].values]).T
-                self.plot_annotation(values, annotation_field, ax, ax_legend, horizontal=False)
+                values = np.array([self.cell_annotation_data[annotation_field].values])
+                color_levels = None
+
+            self.plot_annotation(
+                values, annotation_field, ax, ax_legend, horizontal=False, color_levels=color_levels
+            )
 
     def plot_bin_annotations(self):
 
@@ -305,24 +367,19 @@ class HeatMap(object):
                                                    self.bin_annotation_data.columns):
 
             if self.bin_annotation_data[annotation_field].dtype.name in ('category', 'object', 'bool'):
-
-                color_category = annotation_field if annotation_field == 'cyto_band_giemsa_stain' else None
-
-                color_levels = colors.map_colormap_to_levels(
-                    self.bin_annotation_data[annotation_field].unique(), colors=color_category
-                )
-
                 annotation_map = self.bin_annotation_data[annotation_field].to_dict()
-
-                color_values = [color_levels[annotation_map[bin]] for bin in self.bins]
-                color_values = np.array([color_values])
-
-                self.plot_annotation(
-                    color_values, annotation_field, ax, ax_legend, horizontal=True, color_levels=color_levels
+                color_levels = colors.map_colormap_to_levels(
+                    set(annotation_map.values()), colors=annotation_field
                 )
+                values = [color_levels[annotation_map[bin]] for bin in self.bins]
+                values = np.array([values])
             else:
                 values = np.array([self.bin_annotation_data[annotation_field].values])
-                self.plot_annotation(values, annotation_field, ax, ax_legend, horizontal=True)
+                color_levels = None
+
+            self.plot_annotation(
+                values, annotation_field, ax, ax_legend, horizontal=True, color_levels=color_levels
+            )
 
     def plot_phylogenetic_tree(self):
         if self.tree is None:
@@ -339,35 +396,83 @@ class HeatMap(object):
         self.tree_ax.set_ylabel('')
         self.tree_ax.set_yticks([])
 
-    def plot_heatmap(self):
+    def view_by_cell_annotation(self, annotation_label, annotation_value):
 
-        mat = np.array(self.data)
-        mat = np.nan_to_num(mat, nan=0)
+        cells_of_interest = self.cell_annotation_data[self.cell_annotation_data[annotation_label] == annotation_value]
+        cells_of_interest = cells_of_interest.index
+        indices = [self.cell_order.index(cell) for cell in cells_of_interest]
 
-        X_colors = colors.map_cn_colors_to_matrix(mat)
+        sorted_indices = sorted(indices)
+        self.add_subset_annotation(start=sorted_indices[0], end=sorted_indices[-1])
 
-        self.heatmap_ax.imshow(X_colors, aspect='auto', interpolation='none')
+        current_lims = self.full_ylims
+        inverted = False if current_lims[0] < current_lims[-1] else True
+        current_lims = sorted(current_lims)
+        current_lims = np.arange(current_lims[0], current_lims[-1], 1)
 
-        chridxs = np.array(self.bins.str.split(':').str[0])
-        mat_chrom_idxs = np.array(sorted(np.unique(chridxs, return_inverse=True)[1]))
+        start = current_lims[indices[0]]
+        end = current_lims[indices[-1]]
 
-        chrom_boundaries = np.array(
-            [0] + list(np.where(mat_chrom_idxs[1:] != mat_chrom_idxs[:-1])[0]) + [mat_chrom_idxs.shape[0] - 1]
-        )
+        if inverted:
+            start += 1
+        else:
+            end += 1
 
-        chrom_sizes = chrom_boundaries[1:] - chrom_boundaries[:-1]
-        chrom_mids = chrom_boundaries[:-1] + chrom_sizes / 2
-        ordered_mat_chrom_idxs = mat_chrom_idxs[np.where(np.array([1] + list(np.diff(mat_chrom_idxs))) != 0)]
-        chrom_names = np.array(refgenome.plot_chromosomes())[ordered_mat_chrom_idxs]
+        self.heatmap_ax.set_ylim(start, end)
+        for ax in self.cell_ann_axes:
+            ax.set_ylim(start, end)
+        self.subset_ax.set_ylim(start, end)
 
-        self.heatmap_ax.set_xticks(chrom_mids)
-        self.heatmap_ax.set_xticklabels(chrom_names, fontsize='6')
-        self.heatmap_ax.set_xlabel('chromosome', fontsize=8)
+        return self.fig
 
-        # cell labels
-        self.heatmap_ax.set(yticks=range(len(self.data.index)))
-        self.heatmap_ax.set(yticklabels=self.data.index.values)
+    def show_cell_labels(self):
+        self.heatmap_ax.set(yticks=range(len(self.cell_order)))
+        self.heatmap_ax.set(yticklabels=self.cell_order)
         self.heatmap_ax.tick_params(axis='y', labelrotation=0)
+        return self.fig
 
-        for val in chrom_boundaries[:-1]:
-            self.heatmap_ax.axvline(x=val, linewidth=0.5, color='black', zorder=100)
+    def hide_cell_labels(self):
+        self.heatmap_ax.set(yticks=[])
+        self.heatmap_ax.set(yticklabels=[])
+        return self.fig
+
+    def reset_cells(self):
+        self.add_subset_annotation()
+
+        start, end = self.full_ylims
+        self.heatmap_ax.set_ylim(start, end)
+        for ax in self.cell_ann_axes:
+            ax.set_ylim(start, end)
+        self.subset_ax.set_ylim(start, end)
+
+        return self.fig
+
+    def add_subset_annotation(self, start=None, end=None):
+
+        start = 0 if start is None else start
+        end = len(self.cell_order) - 1 if end is None else end
+
+        subsets = {}
+        curr_label = [0, 0]
+        for i, cell in enumerate(self.cell_order):
+            if i < start or i > end:
+                subsets[cell] = -1
+            else:
+                subsets[cell] = curr_label[1]
+                curr_label[0] += 1
+                if curr_label[0] >= 2:
+                    curr_label[0] = 0
+                    curr_label[1] += 1
+
+        subset_data = self.cell_annotation_data.index.to_series().map(subsets)
+        subset_data = subset_data.astype('category')
+
+        self.cell_annotation_data['subset'] = subset_data
+
+        annotation_map = subset_data.to_dict()
+        color_levels = colors.map_colormap_to_levels(set(annotation_map.values()))
+        values = [[color_levels[annotation_map[cell]]] for cell in self.cell_order]
+
+        self.plot_annotation(
+            values, 'subset', self.subset_ax, self.subset_ax_legend, horizontal=False, color_levels=color_levels
+        )
