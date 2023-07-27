@@ -3,6 +3,7 @@ import colors
 import numpy as np
 import pandas as pd
 import refgenome
+from anndata import AnnData
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
 
@@ -128,6 +129,17 @@ class HeatMap(object):
 
         return bins
 
+    def show_cell_labels(self):
+        self.ax.set(yticks=range(len(self.cell_order)))
+        self.ax.set(yticklabels=self.cell_order)
+        self.ax.tick_params(axis='y', labelrotation=0)
+        return self.ax
+
+    def hide_cell_labels(self):
+        self.ax.set(yticks=[])
+        self.ax.set(yticklabels=[])
+        return self.ax
+
     def plot_heatmap(self):
 
         mat = np.array(self.data)
@@ -152,14 +164,10 @@ class HeatMap(object):
         self.ax.set_xticks(chrom_mids)
         self.ax.set_xticklabels(chrom_names, fontsize='6')
         self.ax.set_xlabel('chromosome', fontsize=8)
-
-        # cell labels
-        self.ax.set(yticks=range(len(self.data.index)))
-        self.ax.set(yticklabels=self.data.index.values)
-        self.ax.tick_params(axis='y', labelrotation=0)
-
         for val in chrom_boundaries[:-1]:
             self.ax.axvline(x=val, linewidth=0.5, color='black', zorder=100)
+
+        self.hide_cell_labels()
 
 
 class AnnotatedHeatMap(object):
@@ -211,10 +219,10 @@ class AnnotatedHeatMap(object):
         for bin_annotation in self.bin_ann_axes:
             bin_annotation.set_axis_on()
 
-        hm = HeatMap(data, ax=self.heatmap_ax, cell_order=cell_order, cmap=cmap)
+        self.heatmap = HeatMap(data, ax=self.heatmap_ax, cell_order=cell_order, cmap=cmap)
 
-        self.cell_order = hm.cell_order
-        self.bins = hm.bins
+        self.cell_order = self.heatmap.cell_order
+        self.bins = self.heatmap.bins
 
         self.plot_cell_annotations()
 
@@ -284,7 +292,7 @@ class AnnotatedHeatMap(object):
         if self.cell_annotation_data is not None:
             if self.subset:
                 cell_ann_axes_legends = axes_legends[1:num_cell_annotations]
-                subset_ax_legend = axes_legends[num_cell_annotations + 1]
+                subset_ax_legend = axes_legends[num_cell_annotations]
             else:
                 cell_ann_axes_legends = axes_legends[1:num_cell_annotations + 1]
                 subset_ax_legend = None
@@ -426,14 +434,15 @@ class AnnotatedHeatMap(object):
         return self.fig
 
     def show_cell_labels(self):
-        self.heatmap_ax.set(yticks=range(len(self.cell_order)))
-        self.heatmap_ax.set(yticklabels=self.cell_order)
-        self.heatmap_ax.tick_params(axis='y', labelrotation=0)
+        current_lims = self.heatmap_ax.get_ylim()
+        self.heatmap.show_cell_labels()
+        self.heatmap_ax.set_ylim(*current_lims)
         return self.fig
 
     def hide_cell_labels(self):
-        self.heatmap_ax.set(yticks=[])
-        self.heatmap_ax.set(yticklabels=[])
+        current_lims = self.heatmap_ax.get_ylim()
+        self.heatmap.hide_cell_labels()
+        self.heatmap_ax.set_ylim(*current_lims)
         return self.fig
 
     def reset_cells(self):
@@ -452,6 +461,8 @@ class AnnotatedHeatMap(object):
         start = 0 if start is None else start
         end = len(self.cell_order) - 1 if end is None else end
 
+        num_per_subset = abs(start - end) // 10
+
         subsets = {}
         curr_label = [0, 0]
         for i, cell in enumerate(self.cell_order):
@@ -459,10 +470,11 @@ class AnnotatedHeatMap(object):
                 subsets[cell] = -1
             else:
                 subsets[cell] = curr_label[1]
-                curr_label[0] += 1
-                if curr_label[0] >= 2:
+                if curr_label[0] >= num_per_subset:
                     curr_label[0] = 0
                     curr_label[1] += 1
+                else:
+                    curr_label[0] += 1
 
         subset_data = self.cell_annotation_data.index.to_series().map(subsets)
         subset_data = subset_data.astype('category')
@@ -476,3 +488,83 @@ class AnnotatedHeatMap(object):
         self.plot_annotation(
             values, 'subset', self.subset_ax, self.subset_ax_legend, horizontal=False, color_levels=color_levels
         )
+
+
+def plot_cell_cn_matrix(
+        adata: AnnData,
+        layer_name='state',
+        cell_order_fields=(),
+        ax=None,
+        max_cn=13,
+        cmap=None,
+        show_cell_ids=False):
+    if len(cell_order_fields) > 0:
+        cell_order_fields = reversed(list(cell_order_fields))
+        cell_order_values = adata.obs[cell_order_fields].values.transpose()
+        cell_ordering = adata.obs.index[np.lexsort(cell_order_values)]
+    else:
+        cell_ordering = None
+
+    # could remove, current CN colormap can handle this
+    X = adata.layers[layer_name]
+    if max_cn is not None:
+        X[X > max_cn] = max_cn
+
+    df = pd.DataFrame(X, columns=adata.var.index, index=adata.obs.index)
+
+    hmap = HeatMap(df, cell_order=cell_ordering, ax=ax, cmap=cmap)
+
+    if show_cell_ids is True:
+        hmap.show_cell_labels()
+    else:
+        hmap.hide_cell_labels()
+
+
+def plot_cell_cn_matrix_fig(
+        adata: AnnData,
+        layer_name='state',
+        tree=None,
+        cell_order_fields=None,
+        annotation_fields=None,
+        var_annotation_fields=None,
+        fig=None,
+        cmap=None,
+        max_cn=13,
+        show_cell_ids=False,
+        show_subsets=False
+):
+    if len(cell_order_fields) > 0:
+        cell_order_fields = reversed(list(cell_order_fields))
+        cell_order_values = adata.obs[cell_order_fields].values.transpose()
+        cell_ordering = adata.obs.index[np.lexsort(cell_order_values)]
+    else:
+        cell_ordering = None
+
+    # could remove, current CN colormap can handle this
+    X = adata.layers[layer_name]
+    if max_cn is not None:
+        X[X > max_cn] = max_cn
+
+    cell_annotation_data = adata.obs[annotation_fields]
+    cell_annotation_data['cell_id'] = cell_annotation_data.index
+
+    bin_annotation_data = adata.var[var_annotation_fields]
+    bin_annotation_data['bin'] = bin_annotation_data.index
+
+    df = pd.DataFrame(X, columns=adata.var.index, index=adata.obs.index)
+
+    hmap = AnnotatedHeatMap(
+        df,
+        cell_order=cell_ordering,
+        fig=fig,
+        cmap=cmap,
+        cell_annotation_data=cell_annotation_data,
+        bin_annotation_data=bin_annotation_data,
+        phylogenetic_tree=tree,
+        subset=show_subsets
+    )
+
+    if show_cell_ids is True:
+        hmap.show_cell_labels()
+    else:
+        hmap.hide_cell_labels()
