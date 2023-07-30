@@ -221,7 +221,7 @@ def rebin(adata: AnnData, target_bins: DataFrame, outer_join: bool=False, agg_X=
         var = rebin_agg_df(adata.var, intersect, agg_var)
     
     else:
-        var = intersect[['target_bin']].set_index('target_bin')
+        var = intersect[['target_bin']].drop_duplicates().set_index('target_bin')
 
     var = target_bins.set_index('target_bin').merge(
         var, left_index=True, right_index=True, how=('inner', 'left')[outer_join])
