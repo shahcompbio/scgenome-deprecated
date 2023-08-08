@@ -62,12 +62,12 @@ gwplot = GenomeWidePlot(
 plt.savefig('out.png')
 
 """
-
 import colors
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from anndata import AnnData
 from refgenome import chromosome_info
 from refgenome import chromosomes
 from refgenome import plot_chromosomes
@@ -81,13 +81,20 @@ class GenomeWidePlot(object):
             ax=None,
             hue=None,
             kind='scatter',
-            palette='cn'
+            palette='cn',
+            point_size=5
     ):
 
         self.data = data
         self.y = y
+        self.point_size = point_size
 
-        self.ax = plt.gca() if ax is None else ax
+        if ax is None:
+            self.fig = plt.gcf()
+            self.ax = plt.gca()
+        else:
+            self.fig = plt.gcf()
+            self.ax = ax
 
         assert kind in ('scatter', 'line', 'bar')
         self.kind = kind
@@ -123,7 +130,7 @@ class GenomeWidePlot(object):
             matplotlib.ticker.FixedLocator(self.refgenome_chromosome_info['chromosome_mid'])
         )
         self.ax.xaxis.set_minor_formatter(matplotlib.ticker.FixedFormatter(self.refgenome_plot_chromosomes))
-        sns.despine(ax=self.ax, offset=10, trim=True)
+        self.ax.spines[['right', 'top']].set_visible(False)
 
     def add_chromosome_info(self):
         self.data = self.data.merge(self.refgenome_chromosome_info)
@@ -141,11 +148,11 @@ class GenomeWidePlot(object):
         if self.c is not None:
             plt.scatter(
                 x=self.data['start'], y=self.data[self.y],
-                c=self.c, cmap=self.cmap, s=5
+                c=self.c, cmap=self.cmap, s=self.point_size
             )
         else:
             plt.scatter(
-                x=self.data['start'], y=self.data[self.y], s=5
+                x=self.data['start'], y=self.data[self.y], s=self.point_size
             )
 
         self.set_y_ticks()
@@ -168,7 +175,7 @@ class GenomeWidePlot(object):
         else:
             raise NotImplementedError()
 
-    def set_axis_to_chromosome(self, chromosome):
+    def view_chromosome(self, chromosome):
         chromosome_length = self.refgenome_chromosome_info.set_index('chr').loc[
             chromosome, 'chromosome_length']
         chromosome_start = self.refgenome_chromosome_info.set_index('chr').loc[chromosome, 'chromosome_start']
@@ -181,8 +188,12 @@ class GenomeWidePlot(object):
         self.ax.set_xticklabels(xticklabels)
         self.ax.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(xminorticks + chromosome_start))
         self.ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-        self.ax.set_xlim((chromosome_start, chromosome_end))
-        sns.despine(ax=self.ax, offset=10, trim=False)
+        self.ax.set_xlim(chromosome_start, chromosome_end)
+        return self.fig
+
+    def view_entire_genome(self):
+        self.setup_genome_axis()
+        return self.fig
 
     def squash_y_axis(self):
 
@@ -190,3 +201,143 @@ class GenomeWidePlot(object):
         squash_f = lambda a: np.tanh(squash_coeff * a)
 
         self.ax.set_yscale('function', functions=(squash_f, squash_f))
+        return self.fig
+
+
+def plot_cn_profile(
+        adata: AnnData,
+        obs_id: str,
+        value_layer_name=None,
+        state_layer_name=None,
+        ax=None,
+        chromosome=None,
+        s=5,
+        squashy=False,
+):
+    """Plot scatter points of copy number across the genome or a chromosome.
+
+    Parameters
+    ----------
+    adata : AnnData
+        copy number data
+    obs_id : str
+        observation to plot
+    value_layer_name : str, optional
+        layer with values for y axis, None for X, by default None
+    state_layer_name : str, optional
+        layer with states for colors, None for no color by state, by default None
+    ax : [type], optional
+        existing axis to plot into, by default None
+    max_cn : int, optional
+        max copy number for y axis, by default 13
+    chromosome : [type], optional
+        single chromosome plot, by default None
+    s : int, optional
+        size of scatter points, by default 5
+    squashy : bool, optional
+        compress y axis, by default False
+    rawy : bool, optional
+        raw data on y axis, by default False
+
+    Examples
+    -------
+
+    .. plot::
+        :context: close-figs
+
+        import scgenome
+        adata = scgenome.datasets.OV2295_HMMCopy_reduced()
+        scgenome.pl.plot_cn_profile(adata, 'SA922-A90554B-R27-C43', value_layer_name='copy', state_layer_name='state')
+
+    TODO: missing return
+    """
+    cn_data = adata.var.copy()
+
+    if value_layer_name is not None:
+        cn_data['value'] = np.array(adata[[obs_id], :].layers[value_layer_name][0])
+    else:
+        cn_data['value'] = np.array(adata[[obs_id], :].X[0])
+
+    cn_field_name = None
+    if state_layer_name is not None:
+        cn_data['state'] = np.array(adata[[obs_id], :].layers[state_layer_name][0])
+        cn_field_name = 'state'
+
+    cn_data = cn_data.dropna(subset=['value'])
+
+    gwp = GenomeWidePlot(
+        cn_data,
+        'value',
+        hue=cn_field_name,
+        kind='scatter',
+        ax=ax,
+        point_size=s
+    )
+
+    if chromosome is not None:
+        gwp.view_chromosome(chromosome)
+
+    if squashy:
+        gwp.squash_y_axis()
+
+    return gwp
+
+
+def plot_var_profile(
+        adata, value_field_name, cn_field_name=None, ax=None, chromosome=None, s=5,
+        squashy=False
+):
+    """Plot scatter points of copy number across the genome or a chromosome.
+
+    Parameters
+    ----------
+    adata : AnnData
+        copy number data
+    value_field_name : str, optional
+        var field with values for y axis, None for X, by default None
+    cn_field_name : str, optional
+        var field with states for colors, None for no color by state, by default None
+    ax : [type], optional
+        existing axis to plot into, by default None
+    max_cn : int, optional
+        max copy number for y axis, by default 13
+    chromosome : [type], optional
+        single chromosome plot, by default None
+    s : int, optional
+        size of scatter points, by default 5
+    squashy : bool, optional
+        compress y axis, by default False
+    rawy : bool, optional
+        raw data on y axis, by default False
+
+    Examples
+    -------
+
+    .. plot::
+        :context: close-figs
+
+        import scgenome
+        adata = scgenome.datasets.OV2295_HMMCopy_reduced()
+        scgenome.pl.plot_var_profile(adata[:, adata.var['gc'] > 0], 'gc', rawy=True)
+
+    TODO: missing return
+    """
+
+    data = adata.var.copy()
+
+    gwp = GenomeWidePlot(
+        data,
+        value_field_name,
+        hue=cn_field_name,
+        kind='scatter',
+        ax=ax,
+        point_size=s
+    )
+
+    if chromosome is not None:
+        gwp.view_chromosome(chromosome)
+
+    if squashy:
+        gwp.squash_y_axis()
+
+    return gwp
