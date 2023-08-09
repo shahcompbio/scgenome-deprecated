@@ -157,21 +157,22 @@ class GenomeWidePlot(object):
 
         self.set_y_ticks()
 
-    def line_plot(self):
-
-        sns.lineplot(data=self.data, x='start', y=self.y, hue=self.hue, palette=self.cmap)
+    def get_bin_size(self):
+        positions = sorted(self.data['start'])
+        return positions[1] - positions[0]
 
     def plot(self):
         if self.kind == 'scatter':
             self.scatter_plot()
         elif self.kind == 'line':
-            sns.lineplot(data=self.data, x='start', y=self.y, hue=self.hue, palette=self.cmap)
+            sns.lineplot(data=self.data, x='start', y=self.y, hue=self.hue, palette=self.color_reference)
         elif self.kind == 'bar':
+            width = self.get_bin_size()
             if self.hue:
                 colors = [self.color_reference[v] for v in self.data[self.hue]]
-                plt.bar(self.data['start'], self.data[self.y], color=colors)
+                plt.bar(self.data['start'], self.data[self.y], color=colors, width=width)
             else:
-                plt.bar(self.data['start'], self.data[self.y])
+                plt.bar(self.data['start'], self.data[self.y], width=width)
         else:
             raise NotImplementedError()
 
