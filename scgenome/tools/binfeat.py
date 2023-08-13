@@ -3,7 +3,7 @@ import numpy as np
 import pyBigWig
 import pyfaidx
 import scgenome.refgenome
-from ranges import Ranges
+from .ranges import Ranges
 
 
 def _chromosome_count_gc(data, **kwargs):

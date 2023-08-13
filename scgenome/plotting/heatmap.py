@@ -1,11 +1,12 @@
 import Bio.Phylo
-import colors
 import numpy as np
 import pandas as pd
-import refgenome
 from anndata import AnnData
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
+
+from . import colors
+import scgenome.refgenome as refgenome
 
 """
 data is dataframe

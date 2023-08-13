@@ -186,40 +186,40 @@ def map_colormap_to_levels(levels, colors=None):
 
     return Colors(levels=levels).rgb_color_reference
 
-# def cn_legend(ax, frameon=True, loc=2, bbox_to_anchor=(0., 1.), title='Copy Number'):
-#     """ Display a legend for copy number state colors
-#
-#     Parameters
-#     ----------
-#     ax : Axes
-#         matplotlib Axes on which to show legend
-#     frameon : bool, optional
-#         show frame, by default True
-#     loc : int, optional
-#         location of the legend, by default 2
-#     bbox_to_anchor : tuple, optional
-#         bounding box to which to anchor legend location, by default (0., 1.)
-#
-#     Returns
-#     -------
-#     Legend
-#         legend object
-#     """
-#
-#     color_reference = Colors('cn').hex_color_reference
-#
-#     states = []
-#     patches = []
-#     for s, h in color_reference.items():
-#         states.append(s)
-#         patches.append(Patch(facecolor=h, edgecolor=h))
-#
-#     ncol = min(3, int(len(states) ** (1 / 2)))
-#
-#     legend = ax.legend(patches, states, ncol=ncol,
-#                        frameon=frameon, loc=loc, bbox_to_anchor=bbox_to_anchor,
-#                        facecolor='white', edgecolor='white', fontsize='4',
-#                        title=title, title_fontsize='6')
-#     legend.set_zorder(level=200)
-#
-#     return legend
+def cn_legend(ax, frameon=True, loc=2, bbox_to_anchor=(0., 1.), title='Copy Number'):
+    """ Display a legend for copy number state colors
+
+    Parameters
+    ----------
+    ax : Axes
+        matplotlib Axes on which to show legend
+    frameon : bool, optional
+        show frame, by default True
+    loc : int, optional
+        location of the legend, by default 2
+    bbox_to_anchor : tuple, optional
+        bounding box to which to anchor legend location, by default (0., 1.)
+
+    Returns
+    -------
+    Legend
+        legend object
+    """
+
+    color_reference = Colors('cn').hex_color_reference
+
+    states = []
+    patches = []
+    for s, h in color_reference.items():
+        states.append(s)
+        patches.append(Patch(facecolor=h, edgecolor=h))
+
+    ncol = min(3, int(len(states) ** (1 / 2)))
+
+    legend = ax.legend(patches, states, ncol=ncol,
+                       frameon=frameon, loc=loc, bbox_to_anchor=bbox_to_anchor,
+                       facecolor='white', edgecolor='white', fontsize='4',
+                       title=title, title_fontsize='6')
+    legend.set_zorder(level=200)
+
+    return legend

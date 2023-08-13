@@ -62,15 +62,15 @@ gwplot = GenomeWidePlot(
 plt.savefig('out.png')
 
 """
-import colors
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from anndata import AnnData
-from refgenome import chromosome_info
-from refgenome import chromosomes
-from refgenome import plot_chromosomes
+from scgenome.refgenome import chromosome_info
+from scgenome.refgenome import chromosomes
+from scgenome.refgenome import plot_chromosomes
+import scgenome.plotting.colors as colors
 
 
 class GenomeWidePlot(object):

@@ -4,7 +4,7 @@ import pandas as pd
 from anndata import AnnData
 from pandas import DataFrame
 from pyranges import PyRanges
-from ranges import Ranges
+from .ranges import Ranges
 from typing import Iterable
 
 
