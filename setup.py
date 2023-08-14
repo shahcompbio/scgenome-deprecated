@@ -27,13 +27,13 @@ setup(
         'nose',
         'numba',
         'numexpr',
-        'numpy',
+        'numpy==1.23',
         'oauthlib',
         'pandas',
         'pyBigWig',
         'pyfaidx',
         'pyranges',
-        'pysam',
+        'pysam==0.19',
         'PyYAML',
         'scikit-learn',
         'scipy',
@@ -44,8 +44,9 @@ setup(
         'nose',
         'biopython',
         'pypeliner',
-        'joblib==1.1.0',
-        'sphinx==5.1.1'
+        'joblib==1.1.1',
+        'sphinx==5.1.1',
+        'requests==2.28'
     ],
     package_data={
         'scgenome': [

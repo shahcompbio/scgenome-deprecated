@@ -4,7 +4,6 @@ import numpy as np
 import anndata as ad
 import pyranges as pr
 
-import scgenome.loaders.qc
 import csverve
 
 from anndata import AnnData
