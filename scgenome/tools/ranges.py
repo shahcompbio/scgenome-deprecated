@@ -242,6 +242,7 @@ def rebin(adata: AnnData, target_bins: DataFrame, outer_join: bool=False, agg_X=
 
     adata = ad.AnnData(
         X,
+        dtype=X.values.dtype,
         obs=adata.obs,
         var=var,
         layers=layer_data,
