@@ -352,6 +352,8 @@ def plot_cell_cn_matrix_fig(
         for a in tree.get_terminals():
             cell_ids.append(a.name)
 
+        assert set(cell_ids) == set(adata.obs.index), 'tree and adata have different cells'
+
         adata.obs['phylo_order'] = -1
         for idx, _ in adata.obs.iterrows():
             adata.obs.loc[idx, 'phylo_order'] = cell_ids.index(idx)
