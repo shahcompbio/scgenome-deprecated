@@ -57,7 +57,7 @@ def _secondary_clustering(data):
     return ordering
 
 
-def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', secondary_field_name=None, raw=False, max_cn=13, cmap=None):
+def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name='cluster_id', secondary_field_name=None, raw=False, max_cn=13, cmap=None, chrom_boundary_width=1):
     plot_data = cn_data.merge(refgenome.info.chrom_idxs)
 
     if secondary_field_name is not None:
@@ -103,7 +103,7 @@ def plot_clustered_cell_cn_matrix(ax, cn_data, cn_field_name, cluster_field_name
     ax.set(xticklabels=chrom_names)
 
     for val in chrom_boundaries[:-1]:
-        ax.axvline(x=val, linewidth=1, color='black', zorder=100)
+        ax.axvline(x=val, linewidth=chrom_boundary_width, color='black', zorder=100)
 
     return plot_data
 
