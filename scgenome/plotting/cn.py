@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+from scipy.sparse import issparse
 
 from anndata import AnnData
 
@@ -60,10 +61,17 @@ def plot_cn_profile(
     cn_data = adata.var.copy()
 
     if value_layer_name is not None:
-        cn_data['value'] = np.array(adata[[obs_id], :].layers[value_layer_name][0])
+        cn_value = adata[[obs_id], :].layers[value_layer_name]
     else:
-        cn_data['value'] = np.array(adata[[obs_id], :].X[0])
+        cn_value = adata[[obs_id], :].X
 
+    if issparse(cn_value):
+        cn_data['value'] = cn_value.toarray()[0]
+
+    else:
+        cn_data['value'] = np.array(cn_value)[0]
+
+    # TODO: what if state is sparse
     cn_field_name = None
     if state_layer_name is not None:
         cn_data['state'] = np.array(adata[[obs_id], :].layers[state_layer_name][0])
