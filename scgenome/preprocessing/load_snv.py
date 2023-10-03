@@ -16,33 +16,33 @@ def read_snv_genotyping(filename: str) -> AnnData:
     Returns
     -------
     AnnData
-        SNV matrix with alt_counts in X and ref_counts in layers['ref_counts']
+        SNV matrix with alt_count in X and ref_count in layers['ref_count']
     """    
 
     data = pd.read_csv(filename, dtype={
-        'chrom': 'category',
+        'chromosome': 'category',
         'ref': 'category',
         'alt': 'category',
         'cell_id': 'category'})
 
-    data['snv_idx'] = data.groupby(['chrom', 'pos', 'ref', 'alt'], observed=True).ngroup()
+    data['snv_idx'] = data.groupby(['chromosome', 'position', 'ref', 'alt'], observed=True).ngroup()
 
     alt_counts_matrix = csr_matrix(
-        (data['alt_counts'], (data['cell_id'].cat.codes, data['snv_idx'].values)),
+        (data['alt_count'], (data['cell_id'].cat.codes, data['snv_idx'].values)),
         shape=(data['cell_id'].cat.categories.size, data['snv_idx'].max() + 1))
 
     ref_counts_matrix = csr_matrix(
-        (data['ref_counts'], (data['cell_id'].cat.codes, data['snv_idx'].values)),
+        (data['ref_count'], (data['cell_id'].cat.codes, data['snv_idx'].values)),
         shape=(data['cell_id'].cat.categories.size, data['snv_idx'].max() + 1))
 
     obs = data[['cell_id']].drop_duplicates()
     obs['cell_idx'] = obs['cell_id'].cat.codes
     obs = obs.sort_values('cell_idx').set_index('cell_id').drop('cell_idx', axis=1)
 
-    var = data[['snv_idx', 'chrom', 'pos', 'ref', 'alt']].drop_duplicates()
+    var = data[['snv_idx', 'chromosome', 'position', 'ref', 'alt']].drop_duplicates()
     var['snv_id'] = (
-        var['chrom'].astype(str) + '_' +
-        var['pos'].astype(str) + '_' +
+        var['chromosome'].astype(str) + '_' +
+        var['position'].astype(str) + '_' +
         var['ref'].astype(str) + '_' +
         var['alt'].astype(str))
     var = var.sort_values('snv_idx').set_index('snv_id')
@@ -53,7 +53,7 @@ def read_snv_genotyping(filename: str) -> AnnData:
         obs,
         var,
         layers={
-            'ref_counts': ref_counts_matrix,
+            'ref_count': ref_counts_matrix,
         }
     )
     
